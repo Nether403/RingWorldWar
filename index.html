@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ring World War</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        --amber: #f0821e;
+        --cyan: #3fd0e8;
+        --ink: #07090c;
+        --paper: #d8dee6;
+        --font: 'Rajdhani', 'Eurostile', 'Bahnschrift', 'DIN Alternate',
+          'Segoe UI Semibold', system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        overflow: hidden; background: var(--ink); color: var(--paper);
+        font-family: var(--font); -webkit-font-smoothing: antialiased;
+      }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; width: 100%; height: 100%; outline: none; }
+
+      /* ---- Boot / loading screen ---- */
+      #boot {
+        position: fixed; inset: 0; z-index: 1000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background:
+          radial-gradient(ellipse at 50% 120%, #17222e 0%, #07090c 60%),
+          var(--ink);
+        transition: opacity 0.8s ease; gap: 28px;
+      }
+      #boot.hidden { opacity: 0; pointer-events: none; }
+      #boot h1 {
+        margin: 0; font-size: clamp(28px, 6vw, 64px); font-weight: 600;
+        letter-spacing: 0.42em; text-indent: 0.42em; text-transform: uppercase;
+      }
+      #boot .sub {
+        margin: -18px 0 0; font-size: 12px; letter-spacing: 0.5em; text-indent: 0.5em;
+        text-transform: uppercase; opacity: 0.45;
+      }
+      #bootbar {
+        width: min(420px, 60vw); height: 2px; background: rgba(216, 222, 230, 0.12);
+        position: relative; overflow: hidden;
+      }
+      #bootbar > i {
+        position: absolute; inset: 0 100% 0 0; background: var(--amber);
+        box-shadow: 0 0 12px var(--amber); transition: right 0.3s ease;
+      }
+      #bootmsg {
+        font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
+        opacity: 0.5; min-height: 1em;
+      }
+      #boot .err { color: #ff6b5e; letter-spacing: 0.06em; text-transform: none;
+        max-width: 60ch; text-align: center; line-height: 1.6; opacity: 0.9; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="boot">
+      <h1>Ring World War</h1>
+      <p class="sub">Megastructure Theatre</p>
+      <div id="bootbar"><i></i></div>
+      <div id="bootmsg">initialising</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

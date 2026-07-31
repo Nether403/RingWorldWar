@@ -1,0 +1,27 @@
+{
+  "name": "ring-world-war",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A fully procedural 3D real-time strategy game on the inner surface of a rotating ring megastructure.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "postprocessing": "^6.39.4",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.3",
+    "playwright": "^1.62.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  }
+}
