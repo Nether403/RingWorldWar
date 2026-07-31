@@ -6,6 +6,7 @@ const alias = {
   '@sim': fileURLToPath(new URL('./src/sim', import.meta.url)),
   '@render': fileURLToPath(new URL('./src/render', import.meta.url)),
   '@gen': fileURLToPath(new URL('./src/gen', import.meta.url)),
+  '@ai': fileURLToPath(new URL('./src/ai', import.meta.url)),
   '@ui': fileURLToPath(new URL('./src/ui', import.meta.url)),
 };
 

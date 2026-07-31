@@ -21,6 +21,7 @@
       "@sim/*": ["./src/sim/*"],
       "@render/*": ["./src/render/*"],
       "@gen/*": ["./src/gen/*"],
+      "@ai/*": ["./src/ai/*"],
       "@ui/*": ["./src/ui/*"]
     }
   },

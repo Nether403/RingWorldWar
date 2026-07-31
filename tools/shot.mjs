@@ -77,7 +77,7 @@ if (panS !== 0) {
 
 // Capture at viewport size, then downscale via the page itself so the file
 // stays small enough to inspect quickly.
-const raw = await page.screenshot({ timeout: 120000, animations: 'disabled' });
+const raw = await page.screenshot({ timeout: 120000 });
 const scaled = await page.evaluate(async (bytes) => {
   const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
   const bmp = await createImageBitmap(blob);

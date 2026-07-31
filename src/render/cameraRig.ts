@@ -30,12 +30,13 @@ export class CameraRig {
   /** Focus point on the ring surface. */
   s = 0;
   z = 0;
-  /** Distance from the focus to the camera. */
-  distance = 420;
+  /** Distance from the focus to the camera. Opens close enough that a mech is
+   *  clearly a mech, since that first impression is doing a lot of work. */
+  distance = 240;
   /** Rotation of the camera around the focus, radians. 0 looks spinward. */
   yaw = 0;
 
-  private targetDistance = 420;
+  private targetDistance = 240;
   private smoothS = 0;
   private smoothZ = 0;
   private smoothYaw = 0;
@@ -121,9 +122,12 @@ export class CameraRig {
     this.focusHeight = lerp(this.focusHeight, ground, 1 - Math.exp(-dt * 6));
 
     this.camera.fov = lerp(this.camera.fov, this.targetFov, 1 - Math.exp(-dt * 6));
-    // Near/far scale with zoom to keep depth precision usable at every scale.
-    this.camera.near = clamp(this.distance * 0.04, 0.4, 40);
-    this.camera.far = 90000;
+    // Keep the depth range as tight as the world allows. The far side of the
+    // ring is only ~7.2 km away and the starfield sits just beyond that, so
+    // there is no reason for a far plane in the tens of kilometres -- and a
+    // huge near/far ratio wrecks depth precision for any screen-space effect.
+    this.camera.near = clamp(this.distance * 0.05, 2, 40);
+    this.camera.far = 26000;
     this.camera.updateProjectionMatrix();
 
     // --- Build the camera transform in the local tangent frame --------------
@@ -135,7 +139,20 @@ export class CameraRig {
     const offS = -Math.cos(this.smoothYaw) * horiz;
     const offZ = -Math.sin(this.smoothYaw) * horiz;
 
-    anchor.toVector(this.smoothS + offS, this.focusHeight + vert, this.smoothZ + offZ, this._pos);
+    // Keep the camera above the ground it is standing behind. The pitch here is
+    // shallow by design, so on terrain with 150 m of relief the camera would
+    // otherwise end up inside a ridge and render nothing but the inside of a
+    // hill. Sampling a few points along the view ray and taking the highest is
+    // enough to clear a crest without the camera visibly popping.
+    let clearance = this.focusHeight + vert;
+    for (let i = 0; i <= 4; i++) {
+      const t = i / 4;
+      const gs = this.smoothS + offS * t;
+      const gz = this.smoothZ + offZ * t;
+      clearance = Math.max(clearance, terrain.heightAt(gs, gz) + 55);
+    }
+
+    anchor.toVector(this.smoothS + offS, clearance, this.smoothZ + offZ, this._pos);
     // Aim above the focus, more so when zoomed out. This lifts the horizon down
     // the frame and lets the ring arc occupy the top without having to raise
     // the camera itself.

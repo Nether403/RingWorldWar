@@ -1,0 +1,297 @@
+/**
+ * World-space UI: selection rings, health bars, the build ghost, and incoming
+ * impact warnings.
+ *
+ * All drawn as flat geometry that hugs the ground rather than as screen-space
+ * overlays, because on a curved wrapped world a screen-space ring would detach
+ * from its unit the moment the surface tilts away.
+ *
+ * Everything here lives in two pooled meshes and is rebuilt each frame, so the
+ * count of markers has no effect on draw calls.
+ */
+
+import * as THREE from 'three';
+import { RING_CIRCUMFERENCE } from '@core/constants';
+import { deltaS } from '@core/ringMath';
+import { FACTION_COLOR, Faction, STRUCTURES, UNITS, type StructureKind } from '@sim/data';
+import type { World } from '@sim/world';
+import type { RenderAnchor } from './anchor';
+
+const MAX_RING_SEGMENTS = 3600;
+const MAX_BAR_QUADS = 400;
+const RING_STEPS = 24;
+/** Markers beyond this arc distance are skipped -- see the note below. */
+const MARKER_RANGE = 2600;
+
+export class Markers {
+  readonly object = new THREE.Group();
+
+  private rings: THREE.LineSegments;
+  private ringPos: Float32Array;
+  private ringCol: Float32Array;
+
+  private bars: THREE.Mesh;
+  private barPos: Float32Array;
+  private barCol: Float32Array;
+
+  private readonly _v = new THREE.Vector3();
+  private readonly _up = new THREE.Vector3();
+  private readonly _right = new THREE.Vector3();
+
+  constructor() {
+    this.object.name = 'markers';
+    this.object.renderOrder = 10;
+
+    const rp = MAX_RING_SEGMENTS * 2 * 3;
+    this.ringPos = new Float32Array(rp);
+    this.ringCol = new Float32Array(rp);
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.BufferAttribute(this.ringPos, 3));
+    rg.setAttribute('color', new THREE.BufferAttribute(this.ringCol, 3));
+    this.rings = new THREE.LineSegments(
+      rg,
+      new THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: true,
+        depthWrite: false,
+        fog: false,
+      }),
+    );
+    this.rings.frustumCulled = false;
+    this.rings.renderOrder = 10;
+    this.object.add(this.rings);
+
+    const bp = MAX_BAR_QUADS * 6 * 3;
+    this.barPos = new Float32Array(bp);
+    this.barCol = new Float32Array(bp);
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position', new THREE.BufferAttribute(this.barPos, 3));
+    bg.setAttribute('color', new THREE.BufferAttribute(this.barCol, 3));
+    this.bars = new THREE.Mesh(
+      bg,
+      new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+      }),
+    );
+    this.bars.frustumCulled = false;
+    this.bars.renderOrder = 11;
+    this.object.add(this.bars);
+  }
+
+  update(
+    world: World,
+    anchor: RenderAnchor,
+    selection: Set<number>,
+    cursor: { s: number; z: number; valid: boolean },
+    placing: StructureKind | null,
+    player: Faction,
+  ): void {
+    let rv = 0;
+    let bv = 0;
+
+    const pushRingSeg = (
+      s0: number,
+      z0: number,
+      s1: number,
+      z1: number,
+      h: number,
+      r: number,
+      g: number,
+      b: number,
+    ): void => {
+      if (rv + 6 > this.ringPos.length) return;
+      anchor.toVector(s0, world.terrain.heightAt(s0, z0) + h, z0, this._v);
+      this.ringPos[rv] = this._v.x;
+      this.ringPos[rv + 1] = this._v.y;
+      this.ringPos[rv + 2] = this._v.z;
+      anchor.toVector(s1, world.terrain.heightAt(s1, z1) + h, z1, this._v);
+      this.ringPos[rv + 3] = this._v.x;
+      this.ringPos[rv + 4] = this._v.y;
+      this.ringPos[rv + 5] = this._v.z;
+      for (let i = 0; i < 2; i++) {
+        this.ringCol[rv + i * 3] = r;
+        this.ringCol[rv + i * 3 + 1] = g;
+        this.ringCol[rv + i * 3 + 2] = b;
+      }
+      rv += 6;
+    };
+
+    /** A circle on the surface, following the terrain so it never floats. */
+    const circle = (
+      cs: number,
+      cz: number,
+      radius: number,
+      col: [number, number, number],
+      dashed = false,
+    ): void => {
+      for (let i = 0; i < RING_STEPS; i++) {
+        if (dashed && i % 2 === 1) continue;
+        const a0 = (i / RING_STEPS) * Math.PI * 2;
+        const a1 = ((i + 1) / RING_STEPS) * Math.PI * 2;
+        pushRingSeg(
+          cs + Math.cos(a0) * radius,
+          cz + Math.sin(a0) * radius,
+          cs + Math.cos(a1) * radius,
+          cz + Math.sin(a1) * radius,
+          1.2,
+          col[0],
+          col[1],
+          col[2],
+        );
+      }
+    };
+
+    // --- Selection rings -----------------------------------------------------
+    for (const id of selection) {
+      const u = world.unitById(id);
+      if (u) {
+        if (Math.abs(deltaS(anchor.s, u.s)) > MARKER_RANGE) continue;
+        circle(u.s, u.z, UNITS[u.kind].radius * 1.9, [0.35, 1.0, 0.55]);
+        // A short line showing where it has been told to go.
+        if (u.order.kind === 'move' || u.order.kind === 'attackMove') {
+          pushRingSeg(u.s, u.z, u.order.s, u.order.z, 2.5, 0.2, 0.7, 0.35);
+          circle(u.order.s, u.order.z, 5, [0.2, 0.7, 0.35], true);
+        }
+        continue;
+      }
+      const st = world.structureById(id);
+      if (st) circle(st.s, st.z, STRUCTURES[st.kind].radius * 1.25, [0.35, 1.0, 0.55]);
+    }
+
+    // --- Neutral capture points -----------------------------------------------
+    // Culled by arc distance: without this, a node on the far side of the ring
+    // draws its capture circle across the sky, because the far side really is
+    // up there and the projection is honest about it.
+    for (const st of world.structures) {
+      if (!st.alive || st.kind !== 'spinalNode') continue;
+      if (Math.abs(deltaS(anchor.s, st.s)) > MARKER_RANGE) continue;
+      const col: [number, number, number] =
+        st.faction < 0
+          ? [0.6, 0.66, 0.72]
+          : st.faction === Faction.Compact
+            ? [0.94, 0.51, 0.12]
+            : [0.25, 0.82, 0.91];
+      circle(st.s, st.z, 110, col, true);
+    }
+
+    // --- Incoming artillery warnings -----------------------------------------
+    // Only for shells the player can actually see coming. This is the single
+    // most important readability aid in the game: a shell lands 20+ seconds
+    // after launch, and without a telegraph the player cannot react at all.
+    for (const pr of world.projectiles) {
+      if (!pr.alive || !pr.ballistic) continue;
+      if (Math.abs(deltaS(anchor.s, pr.impactS)) > MARKER_RANGE) continue;
+      if (pr.faction === player) {
+        circle(pr.impactS, pr.impactZ, 26, [0.35, 0.85, 0.5], true);
+      } else if (world.isVisible(player, pr.impactS, pr.impactZ)) {
+        const pulse = 0.55 + 0.45 * Math.sin(world.time * 9);
+        circle(pr.impactS, pr.impactZ, 30, [1.0 * pulse, 0.18 * pulse, 0.12 * pulse]);
+      }
+    }
+
+    // --- Build ghost ----------------------------------------------------------
+    if (placing && cursor.valid) {
+      const ok = world.canPlace(player, placing, cursor.s, cursor.z);
+      const col: [number, number, number] = ok ? [0.35, 1.0, 0.55] : [1.0, 0.28, 0.2];
+      const def = STRUCTURES[placing];
+      circle(cursor.s, cursor.z, def.radius, col);
+      circle(cursor.s, cursor.z, def.radius * 0.5, col, true);
+      // Show the anchor radius so the player learns the build-range rule.
+      circle(cursor.s, cursor.z, 6, col);
+    }
+
+    // --- Health bars ----------------------------------------------------------
+    // Drawn only for damaged or selected things, so a healthy base is not a
+    // wall of green bars.
+    anchor.upAt(anchor.s, this._up);
+    this._right.set(1, 0, 0);
+
+    const pushBar = (
+      s: number,
+      z: number,
+      h: number,
+      frac: number,
+      width: number,
+      col: [number, number, number],
+    ): void => {
+      if (bv + 36 > this.barPos.length) return;
+      anchor.toVector(s, h, z, this._v);
+      const w = width;
+      const t = 0.9;
+      // Background then fill, both billboarded crudely along local x.
+      const emit = (x0: number, x1: number, c: [number, number, number]): void => {
+        const pts = [
+          [x0, -t],
+          [x1, -t],
+          [x1, t],
+          [x0, -t],
+          [x1, t],
+          [x0, t],
+        ];
+        for (const [dx, dy] of pts) {
+          this.barPos[bv] = this._v.x + dx!;
+          this.barPos[bv + 1] = this._v.y + dy!;
+          this.barPos[bv + 2] = this._v.z;
+          this.barCol[bv] = c[0];
+          this.barCol[bv + 1] = c[1];
+          this.barCol[bv + 2] = c[2];
+          bv += 3;
+        }
+      };
+      emit(-w, w, [0.05, 0.06, 0.08]);
+      if (frac > 0) emit(-w, -w + 2 * w * frac, col);
+      void col;
+    };
+
+    for (const u of world.units) {
+      if (!u.alive) continue;
+      if (Math.abs(deltaS(anchor.s, u.s)) > 900) continue;
+      const def = UNITS[u.kind];
+      const frac = u.hp / def.hp;
+      if (frac > 0.985 && !selection.has(u.id)) continue;
+      const col: [number, number, number] =
+        u.faction === player
+          ? frac > 0.5
+            ? [0.35, 0.92, 0.5]
+            : frac > 0.25
+              ? [0.95, 0.75, 0.3]
+              : [1.0, 0.32, 0.22]
+          : [1.0, 0.35, 0.28];
+      pushBar(u.s, u.z, world.terrain.heightAt(u.s, u.z) + def.height * 1.15, frac, def.radius * 1.4, col);
+    }
+
+    for (const st of world.structures) {
+      if (!st.alive || st.faction < 0) continue;
+      if (Math.abs(deltaS(anchor.s, st.s)) > 900) continue;
+      const def = STRUCTURES[st.kind];
+      const frac = st.hp / def.hp;
+      if (frac > 0.985 && st.progress >= 1 && !selection.has(st.id)) continue;
+      const col: [number, number, number] =
+        st.progress < 1 ? [0.95, 0.7, 0.25] : frac > 0.5 ? [0.35, 0.92, 0.5] : [1.0, 0.32, 0.22];
+      pushBar(
+        st.s,
+        st.z,
+        world.terrain.heightAt(st.s, st.z) + def.height * 1.1,
+        st.progress < 1 ? st.progress : frac,
+        def.radius * 0.9,
+        col,
+      );
+    }
+
+    if (rv < this.ringPos.length) this.ringPos.fill(0, rv);
+    if (bv < this.barPos.length) this.barPos.fill(0, bv);
+    this.rings.geometry.attributes.position!.needsUpdate = true;
+    this.rings.geometry.attributes.color!.needsUpdate = true;
+    this.bars.geometry.attributes.position!.needsUpdate = true;
+    this.bars.geometry.attributes.color!.needsUpdate = true;
+    void RING_CIRCUMFERENCE;
+    void FACTION_COLOR;
+  }
+}

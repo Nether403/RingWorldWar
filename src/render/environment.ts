@@ -153,6 +153,7 @@ export class Environment {
   private filamentGlow!: THREE.Mesh;
   private panels: THREE.Mesh[] = [];
   private stars!: THREE.Points;
+  private envTarget: THREE.WebGLRenderTarget | null = null;
 
   private readonly _v = new THREE.Vector3();
 
@@ -286,7 +287,10 @@ export class Environment {
     const col = new Float32Array(count * 3);
     const size = new Float32Array(count);
     const c = new THREE.Color();
-    const R = RING_CIRCUMFERENCE * 2;
+    // Just inside the camera's far plane. Stars only need to sit behind
+    // everything else, and pushing them further out would force a far plane
+    // that costs depth precision across the whole scene.
+    const R = 11000;
 
     for (let i = 0; i < count; i++) {
       // Uniform on a sphere.
@@ -400,6 +404,75 @@ export class Environment {
   /** Fog colour for the current lighting. */
   get fogColor(): THREE.Color {
     return this.cycle.hazeColor;
+  }
+
+  /**
+   * Build the image reflected by every metal surface in the game.
+   *
+   * Without this, `metalness` is close to a mute button: a metal surface has no
+   * diffuse response, so with nothing to reflect it renders black. Every mech
+   * and building was coming out as a silhouette for exactly that reason.
+   *
+   * The map is a tiny equirectangular gradient drawn from the same palette as
+   * the world -- dusty ground below, hazy air at the horizon, and a hot band
+   * across the top standing in for the solar filament -- then prefiltered by
+   * PMREM so roughness behaves correctly. 64x32 is plenty: it is only ever seen
+   * blurred across curved metal.
+   */
+  buildEnvironment(renderer: THREE.WebGLRenderer, scene: THREE.Scene): void {
+    const w = 64;
+    const h = 32;
+    const data = new Float32Array(w * h * 4);
+
+    const ground = new THREE.Color('#3a3228');
+    const horizon = new THREE.Color('#8ea2b6');
+    const sky = new THREE.Color('#6d8299');
+    const lamp = new THREE.Color('#fff0d8');
+    const c = new THREE.Color();
+
+    for (let y = 0; y < h; y++) {
+      // v runs 0 at the top of the sphere to 1 at the bottom.
+      const v = y / (h - 1);
+      for (let x = 0; x < w; x++) {
+        if (v < 0.42) {
+          c.copy(sky).lerp(horizon, smoothstep(0.0, 0.42, v));
+        } else if (v < 0.55) {
+          c.copy(horizon).lerp(ground, smoothstep(0.42, 0.55, v));
+        } else {
+          c.copy(ground);
+        }
+        // The filament: a bright band along the top, brightest at the zenith.
+        const lampT = 1 - smoothstep(0.0, 0.20, v);
+        c.lerp(lamp, lampT * 0.9);
+        const gain = 1 + lampT * 5;
+
+        const i = (y * w + x) * 4;
+        data[i] = c.r * gain;
+        data[i + 1] = c.g * gain;
+        data[i + 2] = c.b * gain;
+        data[i + 3] = 1;
+      }
+    }
+
+    const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat, THREE.FloatType);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.LinearSRGBColorSpace;
+    tex.needsUpdate = true;
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    this.envTarget = pmrem.fromEquirectangular(tex);
+    scene.environment = this.envTarget.texture;
+    // Ambient light and the environment both contribute indirect light, so the
+    // ambient terms are pulled back elsewhere to compensate.
+    scene.environmentIntensity = 0.55;
+
+    tex.dispose();
+    pmrem.dispose();
+  }
+
+  dispose(): void {
+    this.envTarget?.dispose();
   }
 }
 

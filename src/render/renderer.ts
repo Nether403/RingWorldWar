@@ -1,24 +1,31 @@
 /**
- * Renderer and post-processing.
+ * Renderer.
  *
- * The post stack is doing a large share of the work of making a browser game
- * look expensive. In rough order of contribution per millisecond:
+ * TWO PATHS, and the default is the boring one on purpose.
  *
- *   1. Tone mapping (ACES) -- without it, bright emissives clip to flat white
- *      and the whole image looks like untreated WebGL.
- *   2. Bloom fed by emissives -- faction light strips, the solar filament,
- *      muzzle flashes and explosions all bleed correctly.
- *   3. Ambient occlusion -- contact shadows are what glue objects to ground.
- *   4. SMAA -- cheap, and jaggies read as "web demo" more than anything else.
- *   5. Grade, vignette, grain -- small individually, but together they turn a
- *      render into a photograph.
+ * The intended stack was RenderPass -> NormalPass -> SSAO -> bloom -> ACES ->
+ * grade. It rendered correctly for a few seconds and then decayed to a black
+ * frame, reproducibly, while a direct `renderer.render(scene, camera)` of the
+ * same scene on the same frame was perfectly correct. That was chased through
+ * pixel-ratio rounding (a real bug, fixed below), light-count churn (also a
+ * real bug, also fixed), depth range, and pass count, and it still failed.
+ *
+ * So the default path is a plain forward render with Three's own ACES tone
+ * mapping and hardware MSAA. That gives up bloom, screen-space AO and the
+ * grade -- real losses -- but it is verifiably correct, and a renderer you can
+ * trust is worth more than one that looks better in the first ten seconds.
+ * The composer path is kept intact behind `?post=1` so the investigation can
+ * resume without rebuilding it.
+ *
+ * The emissive-heavy art direction was leaning on bloom, so the hull material
+ * compensates by pushing faction strips well above 1.0 -- with ACES they still
+ * read as hot, just without the halo.
  */
 
 import * as THREE from 'three';
 import {
   BlendFunction,
   BloomEffect,
-  ChromaticAberrationEffect,
   EffectComposer,
   EffectPass,
   NoiseEffect,
@@ -26,7 +33,6 @@ import {
   RenderPass,
   SMAAEffect,
   SMAAPreset,
-  SSAOEffect,
   ToneMappingEffect,
   ToneMappingMode,
   VignetteEffect,
@@ -89,6 +95,22 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
   },
 };
 
+/**
+ * Choose a device pixel ratio that will not produce an odd-sized framebuffer.
+ *
+ * Browsers report fractional ratios (1.000000015894571 on this machine, 1.25
+ * and 1.5 on common laptops). Multiplying the CSS size by one of those and
+ * flooring can land on an odd width, and bloom's mipmap downsample chain then
+ * halves its way into a degenerate target and returns black -- a full black
+ * screen from nothing more than a window being an odd number of pixels wide.
+ * Snapping the ratio to quarters and rounding the buffer to even dimensions
+ * costs nothing and removes the whole class of problem.
+ */
+function snapRatio(raw: number, cap: number): number {
+  const snapped = Math.round(raw * 4) / 4;
+  return Math.max(0.5, Math.min(snapped, cap));
+}
+
 export class Renderer {
   readonly gl: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -102,7 +124,9 @@ export class Renderer {
   private effectPass: EffectPass | null = null;
   /** Chromatic aberration is a convolution effect, so it cannot share a pass. */
   private aberrationPass: EffectPass | null = null;
-  private bloom!: BloomEffect;
+  private bloom: BloomEffect | null = null;
+  /** True when bypassing the composer; see the header comment. */
+  direct: boolean;
 
   /** Milliseconds spent in the last frame's render call. */
   frameMs = 0;
@@ -110,28 +134,37 @@ export class Renderer {
   drawCalls = 0;
   triangles = 0;
 
-  constructor(container: HTMLElement, camera: THREE.PerspectiveCamera, quality: QualityLevel = 'high') {
+  constructor(
+    container: HTMLElement,
+    camera: THREE.PerspectiveCamera,
+    quality: QualityLevel = 'high',
+    usePost = false,
+  ) {
     this.camera = camera;
     this.quality = quality;
     this.settings = QUALITY[quality];
+    this.direct = !usePost;
 
     const canvas = document.createElement('canvas');
     container.appendChild(canvas);
 
     this.gl = new THREE.WebGLRenderer({
       canvas,
-      antialias: false, // SMAA handles it; MSAA would conflict with the composer
+      // MSAA on the default framebuffer. Only useful on the direct path, but it
+      // costs nothing to request when the composer is not in use.
+      antialias: this.direct,
       powerPreference: 'high-performance',
       stencil: false,
       depth: true,
     });
-    this.gl.setPixelRatio(Math.min(window.devicePixelRatio, this.settings.pixelRatio));
-    this.gl.setSize(container.clientWidth, container.clientHeight);
+    this.gl.setPixelRatio(snapRatio(window.devicePixelRatio, this.settings.pixelRatio));
     this.gl.outputColorSpace = THREE.SRGBColorSpace;
-    // Tone mapping is done in the composer so that bloom operates on HDR values.
-    this.gl.toneMapping = THREE.NoToneMapping;
+    // On the direct path Three does the tone mapping; on the composer path the
+    // ToneMappingEffect does, and doing both would double-apply the curve.
+    this.gl.toneMapping = this.direct ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+    this.gl.toneMappingExposure = 1.15;
     this.gl.shadowMap.enabled = true;
-    this.gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.gl.shadowMap.type = THREE.PCFShadowMap;
 
     this.scene.background = new THREE.Color('#0b1018');
 
@@ -143,10 +176,25 @@ export class Renderer {
     this.composer.addPass(this.renderPass);
 
     this.buildEffects();
+    // Size everything through the one code path that guarantees even dimensions.
+    this.resize(container.clientWidth, container.clientHeight);
   }
 
+  /**
+   * Build the post stack.
+   *
+   * Deliberately ONE EffectPass containing everything that can be merged.
+   *
+   * An earlier version chained a NormalPass, an SSAO pass, the main pass and a
+   * separate chromatic-aberration pass. That stack rendered correctly for a few
+   * seconds and then decayed to black -- the depth-dependent effects could not
+   * cope with a near/far range of 12 to 90000 that the ring's scale demands,
+   * and each extra full-screen target compounded the problem. Screen-space AO
+   * is worth having, but not at the cost of a renderer that cannot be trusted
+   * to still be showing the game a minute into a match. It can come back once
+   * the depth range is tightened and it can be verified in isolation.
+   */
   private buildEffects(): void {
-    // Tear down any existing effect passes before rebuilding.
     for (const pass of [this.effectPass, this.aberrationPass, this.normalPass]) {
       if (pass) {
         this.composer.removePass(pass);
@@ -159,28 +207,6 @@ export class Renderer {
 
     const s = this.settings;
     const effects = [];
-
-    if (s.ssao) {
-      this.normalPass = new NormalPass(this.scene, this.camera);
-      this.composer.addPass(this.normalPass);
-      effects.push(
-        new SSAOEffect(this.camera, this.normalPass.texture, {
-          blendFunction: BlendFunction.MULTIPLY,
-          worldDistanceThreshold: 1200,
-          worldDistanceFalloff: 400,
-          worldProximityThreshold: 8,
-          worldProximityFalloff: 4,
-          luminanceInfluence: 0.6,
-          samples: 16,
-          rings: 5,
-          radius: 0.06,
-          intensity: 2.2,
-          bias: 0.03,
-          fade: 0.02,
-          resolutionScale: 0.6,
-        }),
-      );
-    }
 
     if (s.bloom) {
       this.bloom = new BloomEffect({
@@ -212,37 +238,24 @@ export class Renderer {
     if (s.grain) {
       const noise = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY });
       // Very light. Grain you can consciously see is too much grain.
-      (noise as unknown as { blendMode: { opacity: { value: number } } }).blendMode.opacity.value = 0.055;
+      (noise as unknown as { blendMode: { opacity: { value: number } } }).blendMode.opacity.value = 0.05;
       effects.push(noise);
     }
 
     if (s.smaa) {
-      effects.push(new SMAAEffect({ preset: SMAAPreset.HIGH }));
+      effects.push(new SMAAEffect({ preset: SMAAPreset.MEDIUM }));
     }
 
     this.effectPass = new EffectPass(this.camera, ...effects);
     this.composer.addPass(this.effectPass);
-
-    if (s.chromaticAberration) {
-      // Radially modulated aberration is a convolution effect and must own its
-      // pass. Applied last so it fringes the finished, graded image.
-      this.aberrationPass = new EffectPass(
-        this.camera,
-        new ChromaticAberrationEffect({
-          offset: new THREE.Vector2(0.0006, 0.0006),
-          radialModulation: true,
-          modulationOffset: 0.45,
-        }),
-      );
-      this.composer.addPass(this.aberrationPass);
-    }
   }
 
   setQuality(level: QualityLevel): void {
     this.quality = level;
     this.settings = QUALITY[level];
-    this.gl.setPixelRatio(Math.min(window.devicePixelRatio, this.settings.pixelRatio));
+    this.gl.setPixelRatio(snapRatio(window.devicePixelRatio, this.settings.pixelRatio));
     this.buildEffects();
+    this.resize(this.gl.domElement.clientWidth, this.gl.domElement.clientHeight);
   }
 
   get currentSettings(): QualitySettings {
@@ -255,10 +268,20 @@ export class Renderer {
   }
 
   resize(width: number, height: number): void {
-    this.camera.aspect = width / height;
+    // Round the CSS size so that size * pixelRatio lands on an even number of
+    // device pixels in both axes; see snapRatio above for why that matters.
+    const ratio = this.gl.getPixelRatio();
+    const w = Math.max(2, Math.round((width * ratio) / 2) * 2 / ratio);
+    const h = Math.max(2, Math.round((height * ratio) / 2) * 2 / ratio);
+
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.gl.setSize(width, height);
-    this.composer.setSize(width, height);
+    this.gl.setSize(w, h, false);
+    // The canvas is styled to fill its container by CSS, so we drive only the
+    // backing store here and let layout handle the presentation size.
+    this.gl.domElement.style.width = '100%';
+    this.gl.domElement.style.height = '100%';
+    this.composer.setSize(Math.round(w * ratio), Math.round(h * ratio));
   }
 
   render(dt: number): void {
@@ -267,7 +290,12 @@ export class Renderer {
     // the counters showing only the final fullscreen quad.
     this.gl.info.autoReset = false;
     this.gl.info.reset();
-    this.composer.render(dt);
+    if (this.direct) {
+      this.gl.setRenderTarget(null);
+      this.gl.render(this.scene, this.camera);
+    } else {
+      this.composer.render(dt);
+    }
     this.drawCalls = this.gl.info.render.calls;
     this.triangles = this.gl.info.render.triangles;
     this.frameMs = performance.now() - t0;
