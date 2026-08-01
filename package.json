@@ -6,15 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "lint": "node tools/lint.mjs && tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "npm run lint && npm test && npm run build",
     "typecheck": "tsc --noEmit"
   },
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "postprocessing": "^6.39.4",
     "three": "^0.185.1"
   },
   "devDependencies": {

@@ -353,6 +353,8 @@ export interface StructureDef {
   solar?: boolean;
   /** Unlocks these structures for building once one exists. */
   unlocks?: StructureKind[];
+  /** Completed structure required before this can be placed. */
+  requires?: StructureKind;
   hotkey?: string;
 }
 
@@ -451,6 +453,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     weapons: [],
     energy: -8,
     produces: ['wisp', 'vanguard', 'aegis', 'longbow'],
+    requires: 'fabricator',
     hotkey: 'M',
   },
   rocketBattery: {
@@ -466,6 +469,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     vision: 150,
     weapons: ['batteryGun'],
     energy: -6,
+    requires: 'fabricator',
     hotkey: 'R',
   },
   pointDefense: {

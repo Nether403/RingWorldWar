@@ -15,6 +15,7 @@ import { RING_CIRCUMFERENCE } from '@core/constants';
 import { deltaS } from '@core/ringMath';
 import { FACTION_COLOR, Faction, STRUCTURES, UNITS, type StructureKind } from '@sim/data';
 import type { World } from '@sim/world';
+import type { TrajectorySample } from '@sim/ballistics';
 import type { RenderAnchor } from './anchor';
 
 const MAX_RING_SEGMENTS = 3600;
@@ -92,6 +93,9 @@ export class Markers {
     cursor: { s: number; z: number; valid: boolean },
     placing: StructureKind | null,
     player: Faction,
+    trajectory: readonly TrajectorySample[] | null,
+    artilleryTargeting: boolean,
+    camera: THREE.Camera,
   ): void {
     let rv = 0;
     let bv = 0;
@@ -119,6 +123,28 @@ export class Markers {
         this.ringCol[rv + i * 3] = r;
         this.ringCol[rv + i * 3 + 1] = g;
         this.ringCol[rv + i * 3 + 2] = b;
+      }
+      rv += 6;
+    };
+
+    const pushAirSeg = (a: TrajectorySample, b: TrajectorySample): void => {
+      if (rv + 6 > this.ringPos.length) return;
+      if (
+        Math.abs(deltaS(anchor.s, a.s)) > MARKER_RANGE &&
+        Math.abs(deltaS(anchor.s, b.s)) > MARKER_RANGE
+      ) return;
+      anchor.toVector(a.s, a.h, a.z, this._v);
+      this.ringPos[rv] = this._v.x;
+      this.ringPos[rv + 1] = this._v.y;
+      this.ringPos[rv + 2] = this._v.z;
+      anchor.toVector(b.s, b.h, b.z, this._v);
+      this.ringPos[rv + 3] = this._v.x;
+      this.ringPos[rv + 4] = this._v.y;
+      this.ringPos[rv + 5] = this._v.z;
+      for (let i = 0; i < 2; i++) {
+        this.ringCol[rv + i * 3] = 0.35;
+        this.ringCol[rv + i * 3 + 1] = 1;
+        this.ringCol[rv + i * 3 + 2] = 0.65;
       }
       rv += 6;
     };
@@ -187,12 +213,25 @@ export class Markers {
     // after launch, and without a telegraph the player cannot react at all.
     for (const pr of world.projectiles) {
       if (!pr.alive || !pr.ballistic) continue;
+      if (!world.isProjectileVisible(player, pr)) continue;
       if (Math.abs(deltaS(anchor.s, pr.impactS)) > MARKER_RANGE) continue;
       if (pr.faction === player) {
         circle(pr.impactS, pr.impactZ, 26, [0.35, 0.85, 0.5], true);
       } else if (world.isVisible(player, pr.impactS, pr.impactZ)) {
         const pulse = 0.55 + 0.45 * Math.sin(world.time * 9);
         circle(pr.impactS, pr.impactZ, 30, [1.0 * pulse, 0.18 * pulse, 0.12 * pulse]);
+      }
+    }
+
+    // --- Player artillery trajectory -----------------------------------------
+    if (artilleryTargeting && cursor.valid) {
+      const valid = trajectory && trajectory.length > 1;
+      circle(cursor.s, cursor.z, 24, valid ? [0.35, 1, 0.65] : [1, 0.25, 0.18], true);
+      if (valid) {
+        for (let i = 3; i < trajectory.length; i += 3) pushAirSeg(trajectory[i - 3]!, trajectory[i]!);
+        const last = trajectory.length - 1;
+        const previous = last - (last % 3 || 3);
+        if (previous >= 0 && previous !== last) pushAirSeg(trajectory[previous]!, trajectory[last]!);
       }
     }
 
@@ -210,8 +249,8 @@ export class Markers {
     // --- Health bars ----------------------------------------------------------
     // Drawn only for damaged or selected things, so a healthy base is not a
     // wall of green bars.
-    anchor.upAt(anchor.s, this._up);
-    this._right.set(1, 0, 0);
+    this._right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    this._up.set(0, 1, 0).applyQuaternion(camera.quaternion);
 
     const pushBar = (
       s: number,
@@ -236,9 +275,9 @@ export class Markers {
           [x0, t],
         ];
         for (const [dx, dy] of pts) {
-          this.barPos[bv] = this._v.x + dx!;
-          this.barPos[bv + 1] = this._v.y + dy!;
-          this.barPos[bv + 2] = this._v.z;
+          this.barPos[bv] = this._v.x + this._right.x * dx! + this._up.x * dy!;
+          this.barPos[bv + 1] = this._v.y + this._right.y * dx! + this._up.y * dy!;
+          this.barPos[bv + 2] = this._v.z + this._right.z * dx! + this._up.z * dy!;
           this.barCol[bv] = c[0];
           this.barCol[bv + 1] = c[1];
           this.barCol[bv + 2] = c[2];
@@ -252,6 +291,7 @@ export class Markers {
 
     for (const u of world.units) {
       if (!u.alive) continue;
+      if (!world.isEntityVisible(player, u.id)) continue;
       if (Math.abs(deltaS(anchor.s, u.s)) > 900) continue;
       const def = UNITS[u.kind];
       const frac = u.hp / def.hp;
@@ -269,6 +309,7 @@ export class Markers {
 
     for (const st of world.structures) {
       if (!st.alive || st.faction < 0) continue;
+      if (!world.isEntityVisible(player, st.id)) continue;
       if (Math.abs(deltaS(anchor.s, st.s)) > 900) continue;
       const def = STRUCTURES[st.kind];
       const frac = st.hp / def.hp;

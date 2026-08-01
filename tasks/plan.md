@@ -15,7 +15,7 @@ Each phase ends at a **gate**: a demonstrable artifact plus a go/no-go decision.
 - Repo scaffold: Vite + TS strict, ESLint (incl. the `no-Math.random-in-sim` rule), Vitest, Playwright, CI running typecheck/lint/test.
 - `core/ringMath.ts`: ring↔surface↔render conversions, `deltaS` wrapping, curvature drop, orientation basis. Fully unit-tested — this module is the spine of the project.
 - `core/rng.ts` + `core/detMath.ts` with determinism tests.
-- **Spike A — Precision:** floating-origin camera flying the full 3,770 km circumference. Success = zero jitter, zero z-fighting, geometry visibly curving up into the sky.
+- **Spike A — Precision:** floating-origin camera flying the full 22.6 km circumference. Success = zero jitter, zero z-fighting, geometry visibly curving up into the sky.
 - **Spike B — Ballistics:** a debug scene firing projectiles spinward/antispinward with trajectory ribbons. Success = the Coriolis asymmetry is *visible and legible* without explanation.
 - **Spike C — Far ring shell:** whole ring drawn at interactive framerate. Success = < 3 ms for the far tier.
 
@@ -26,7 +26,7 @@ Each phase ends at a **gate**: a demonstrable artifact plus a go/no-go decision.
 ## Phase 1 — Playable Core Loop (≈6 weeks)
 **Goal:** ugly but genuinely playable. Programmer art only — cubes, capsules, flat colors.
 
-- ECS world + fixed-timestep sim loop + render interpolation; sim moved into its worker.
+- Stable-ordered world + fixed-timestep sim loop + render interpolation. A worker is deferred until profiling shows the main-thread boundary is insufficient.
 - Terrain: heightfield → clipmap LOD on the ring; navgrid + flow-field pathfinding with wrap.
 - Economy: Salvage extraction, Energy generation/upkeep, Command Points from Spinal Nodes.
 - Structures: Bastion, Extractor, Solar Array, Fabricator, Mech Foundry, Rocket Battery.

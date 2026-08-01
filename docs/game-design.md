@@ -5,7 +5,7 @@
 A real-time strategy game on the inner surface of a rotating ring megastructure. Because the world curves up and wraps around, war is fought in three registers: ground maneuver (mechs), over-the-horizon bombardment (rockets), and the psychological register of *seeing the enemy's territory hanging in your sky*.
 
 ## 2. The World
-- **The Ring:** canonical gameplay ring: radius **600 km**, surface width **40 km**, rotating to produce ~1 g of centrifugal "gravity" pointing outward (down, for inhabitants). Small enough that curvature is dramatic and visible; large enough for meaningful travel time. (Not Niven-scale — this is tuned for gameplay and rendering.)
+- **The Ring:** canonical gameplay ring: radius **3.6 km**, surface width **4 km**, rotating to produce **6 m/s²** of centrifugal gravity. The far side is 7.2 km overhead and the circumference is 22.6 km, making the overhead enemy and wrap-around flank readable during a match.
 - **Topology:** the map wraps in the ring (spinward) direction — a cylinder. The rim walls bound the map in the axial direction. No corners to turtle in; every base can be flanked from both spinward and antispinward.
 - **Shadow squares:** an inner ring of panels casts moving day/night bands across the surface. Night matters: solar power drops, sensor ranges shrink, rocket launches are easier to spot (visible plumes).
 - **Terrain:** ruined megastructure districts, scrith plains, breach scars (holes to space, impassable), overgrown arcologies. Terrain provides cover, chokepoints, and salvage.
@@ -40,7 +40,7 @@ Design intent: S drives *quantity*, E drives *quality/activation*, C drives *map
 Rockets are the strategic layer. All rocket flight is truly simulated in the rotating ring frame — no faked hit-scan.
 
 ### 6.1 Trajectory classes
-- **Ballistic arc (surface-to-surface):** the workhorse. Rockets arc "up" and come down range-limited by launch velocity. Because the frame rotates, **Coriolis drift** bends the flight path: spinward shots fly flatter and longer; antispinward shots loft higher and drop shorter. Skilled players lead targets differently depending on firing direction — a mechanic literally impossible on a flat map.
+- **Ballistic arc (surface-to-surface):** the workhorse. In the implemented convention, **antispinward shots travel much farther** because they subtract from inertial floor speed; spinward shots are shorter. The live trajectory ribbon makes this asymmetry legible before firing.
 - **Chord shot (endgame):** heavy missiles that leave the atmosphere and cut across the ring's interior, hitting the far side in a fraction of surface travel time. Devastating, expensive, and visible to everyone — a glowing lance crossing the sky. Counterable only by dedicated interceptors.
 - **Cruise (low & slow):** terrain-hugging, immune to long-range interception, blockable by point defense and terrain. Good vs radar-heavy turtles.
 

@@ -12,6 +12,7 @@ import { createTerrain, type Terrain } from '@gen/terrain';
 import { AiOpponent, type Difficulty } from '@ai/opponent';
 import { Faction, STRUCTURES, UNITS, type StructureKind } from '@sim/data';
 import { World } from '@sim/world';
+import type { TrajectorySample } from '@sim/ballistics';
 import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
 import { EntityRenderer } from '@render/entityRenderer';
@@ -33,6 +34,12 @@ export class Game {
   selection = new Set<number>();
   /** Ground point under the cursor, in surface coordinates. */
   cursor = { s: 0, z: 0, valid: false };
+  trajectoryPreview: TrajectorySample[] | null = null;
+  private artillerySourceId = 0;
+  private directUnitId = 0;
+  private readonly controlGroups = new Map<number, number[]>();
+  private previewDirty = false;
+  private previewCooldown = 0;
 
   private acc = 0;
   private readonly _ray = new THREE.Raycaster();
@@ -58,8 +65,9 @@ export class Game {
 
     this.hud.onMinimapClick = (s, z) => {
       this.rig.setFocus(s, z);
-      this.anchor.set(s, z);
     };
+    this.hud.onArtilleryTarget = (sourceId) => this.beginArtilleryTarget(sourceId);
+    this.hud.onBuildRequest = (kind) => this.setBuild(kind);
   }
 
   get objects(): THREE.Object3D[] {
@@ -69,6 +77,17 @@ export class Game {
   // -------------------------------------------------------------------------
 
   update(dt: number, time: number): void {
+    this.previewCooldown = Math.max(0, this.previewCooldown - dt);
+    if (this.artillerySourceId && this.cursor.valid && this.previewDirty && this.previewCooldown === 0) {
+      this.trajectoryPreview = this.world.previewBallistic(
+        this.artillerySourceId,
+        this.cursor.s,
+        this.cursor.z,
+        PLAYER,
+      );
+      this.previewDirty = false;
+      this.previewCooldown = 0.1;
+    }
     // Fixed-timestep simulation. Capped so that a long stall (an alt-tab, a
     // shader compile) cannot trigger a death spiral of catch-up ticks.
     this.acc += dt;
@@ -82,17 +101,30 @@ export class Game {
     if (steps === 6) this.acc = 0;
 
     const events = this.world.drainEvents();
-    this.effects.consume(events, this.world, this.anchor);
-    this.effects.update(dt, this.world, this.anchor, this.rig.camera);
+    this.effects.consume(events, this.world, this.anchor, PLAYER);
+    this.effects.update(dt, this.world, this.anchor, PLAYER, this.rig.camera);
     if (this.effects.shake > 0) this.rig.addShake(this.effects.shake);
 
-    this.entities.update(this.world, this.anchor, time);
-    this.markers.update(this.world, this.anchor, this.selection, this.cursor, this.hud.placing, PLAYER);
+    this.entities.update(this.world, this.anchor, time, PLAYER, this.acc / SIM_DT);
+    this.markers.update(
+      this.world,
+      this.anchor,
+      this.selection,
+      this.cursor,
+      this.hud.placing,
+      PLAYER,
+      this.trajectoryPreview,
+      this.artilleryTargeting,
+      this.rig.camera,
+    );
     this.hud.update(dt, this.world, PLAYER, this.selection, this.rig.s, this.rig.z);
 
     // Drop dead entities from the selection so the panel does not show ghosts.
     for (const id of [...this.selection]) {
       if (!this.world.unitById(id) && !this.world.structureById(id)) this.selection.delete(id);
+    }
+    if (this.artillerySourceId && !this.world.structureById(this.artillerySourceId)) {
+      this.cancelArtilleryTarget();
     }
   }
 
@@ -162,6 +194,7 @@ export class Game {
     let bestD = Infinity;
     for (const u of this.world.units) {
       if (!u.alive) continue;
+      if (!this.world.isEntityVisible(PLAYER, u.id)) continue;
       const r = UNITS[u.kind].radius + 6;
       const d = surfaceDist(u.s, u.z, s, z);
       if (d < r && d < bestD) {
@@ -172,6 +205,7 @@ export class Game {
     if (best) return best;
     for (const st of this.world.structures) {
       if (!st.alive) continue;
+      if (!this.world.isEntityVisible(PLAYER, st.id)) continue;
       const r = STRUCTURES[st.kind].radius + 4;
       const d = surfaceDist(st.s, st.z, s, z);
       if (d < r && d < bestD) {
@@ -185,6 +219,119 @@ export class Game {
   // -------------------------------------------------------------------------
   // Commands
   // -------------------------------------------------------------------------
+
+  get artilleryTargeting(): boolean {
+    return this.artillerySourceId !== 0;
+  }
+
+  get directControlActive(): boolean {
+    return this.directUnitId !== 0;
+  }
+
+  enterDirectControl(): boolean {
+    if (this.world.winner !== null) return false;
+    if (this.selection.size !== 1) return false;
+    const id = this.selection.values().next().value as number | undefined;
+    const unit = id ? this.world.unitById(id) : undefined;
+    if (!unit || unit.faction !== PLAYER || !UNITS[unit.kind].isMech) return false;
+    this.cancelArtilleryTarget();
+    this.hud.placing = null;
+    this.directUnitId = unit.id;
+    this.rig.enterDirect();
+    this.rig.followDirect(unit.s, unit.z, unit.yaw);
+    this.hud.alert(`Piloting ${UNITS[unit.kind].name} — WASD move, click attack, Esc tactical`);
+    return true;
+  }
+
+  updateDirectControl(forward: number, right: number): void {
+    if (this.world.winner !== null) return;
+    if (!this.directUnitId) return;
+    const unit = this.world.unitById(this.directUnitId);
+    if (!unit) {
+      this.exitDirectControl();
+      return;
+    }
+
+    const length = Math.hypot(forward, right);
+    if (length > 0) {
+      const f = forward / length;
+      const r = right / length;
+      const c = Math.cos(this.rig.yaw);
+      const sn = Math.sin(this.rig.yaw);
+      const ds = f * c - r * sn;
+      const dz = f * sn + r * c;
+      unit.order = {
+        kind: 'move',
+        s: wrapS(unit.s + ds * 90),
+        z: clamp(unit.z + dz * 90, -RING_HALF_WIDTH + 60, RING_HALF_WIDTH - 60),
+        targetId: 0,
+      };
+    } else if (unit.order.kind === 'move') {
+      unit.order = { kind: 'idle', s: unit.s, z: unit.z, targetId: 0 };
+    }
+    if (this.cursor.valid) {
+      unit.manualAimYaw = Math.atan2(this.cursor.z - unit.z, deltaS(unit.s, this.cursor.s));
+    }
+    this.rig.followDirect(unit.s, unit.z, unit.yaw);
+  }
+
+  directAttack(s: number, z: number): void {
+    if (this.world.winner !== null) return;
+    if (!this.directUnitId) return;
+    const targetId = this.pickEntity(s, z);
+    const targetUnit = targetId ? this.world.unitById(targetId) : undefined;
+    const targetStructure = targetId ? this.world.structureById(targetId) : undefined;
+    const targetFaction = targetUnit?.faction ?? targetStructure?.faction ?? -1;
+    const unit = this.world.unitById(this.directUnitId);
+    if (!unit || targetFaction < 0 || targetFaction === PLAYER) return;
+    unit.order = { kind: 'attack', s, z, targetId };
+    unit.targetId = targetId;
+  }
+
+  exitDirectControl(): void {
+    if (!this.directUnitId) return;
+    const unit = this.world.unitById(this.directUnitId);
+    if (unit) {
+      unit.manualAimYaw = null;
+      this.rig.setFocus(unit.s, unit.z);
+    }
+    this.directUnitId = 0;
+    this.rig.exitDirect();
+    this.hud.alert('Tactical control restored');
+  }
+
+  beginArtilleryTarget(sourceId: number): void {
+    if (this.world.winner !== null) return;
+    const source = this.world.structureById(sourceId);
+    if (!source || source.faction !== PLAYER || source.kind !== 'rocketBattery') return;
+    this.hud.placing = null;
+    this.artillerySourceId = sourceId;
+    this.trajectoryPreview = null;
+    this.previewDirty = true;
+    this.hud.alert('Choose a spotted target — antispinward carries farther; click to fire');
+    if (this.cursor.valid) this.updateCursor(this.cursor.s, this.cursor.z);
+  }
+
+  updateCursor(s: number, z: number): void {
+    this.cursor.s = s;
+    this.cursor.z = z;
+    this.cursor.valid = true;
+    if (this.artillerySourceId) this.previewDirty = true;
+  }
+
+  fireArtilleryTarget(s: number, z: number): boolean {
+    if (!this.artillerySourceId) return false;
+    const fired = this.world.fireBallisticAt(this.artillerySourceId, s, z, PLAYER);
+    this.hud.alert(fired ? 'Rocket away' : 'Target unreachable, unspotted, or launcher reloading');
+    if (fired) this.cancelArtilleryTarget();
+    return fired;
+  }
+
+  cancelArtilleryTarget(): void {
+    this.artillerySourceId = 0;
+    this.trajectoryPreview = null;
+    this.previewDirty = false;
+  }
 
   selectAt(s: number, z: number, additive: boolean): void {
     const id = this.pickEntity(s, z);
@@ -227,8 +374,36 @@ export class Game {
     }
   }
 
+  setControlGroup(index: number): void {
+    const ids = [...this.selection].filter((id) => {
+      const unit = this.world.unitById(id);
+      const structure = unit ? undefined : this.world.structureById(id);
+      return unit?.faction === PLAYER || structure?.faction === PLAYER;
+    });
+    this.controlGroups.set(index, ids);
+    this.hud.alert(`Control group ${index} set — ${ids.length} selected`);
+  }
+
+  recallControlGroup(index: number): void {
+    const ids = this.controlGroups.get(index);
+    if (!ids) return;
+    this.cancelArtilleryTarget();
+    this.hud.placing = null;
+    this.selection.clear();
+    for (const id of ids) {
+      if (this.world.unitById(id) || this.world.structureById(id)) this.selection.add(id);
+    }
+    const first = this.selection.values().next().value as number | undefined;
+    if (first) {
+      const position = this.world.positionOf(first);
+      if (position) this.rig.setFocus(position.s, position.z);
+    }
+  }
+
   /** Right-click: move, attack, or assist, depending on what is under it. */
   issueOrder(s: number, z: number, attackMove: boolean): void {
+    if (this.world.winner !== null) return;
+    this.cancelArtilleryTarget();
     const targetId = this.pickEntity(s, z);
     const targetUnit = targetId ? this.world.unitById(targetId) : undefined;
     const targetStruct = targetId ? this.world.structureById(targetId) : undefined;
@@ -274,6 +449,7 @@ export class Game {
 
   /** Try to place the structure the player is holding. */
   tryBuild(s: number, z: number): boolean {
+    if (this.world.winner !== null) return false;
     const kind = this.hud.placing;
     if (!kind) return false;
     const site = this.world.tryPlaceStructure(PLAYER, kind, s, z);
@@ -322,6 +498,8 @@ export class Game {
   }
 
   setBuild(kind: StructureKind | null): void {
+    if (this.world.winner !== null || this.directControlActive) return;
+    if (kind) this.cancelArtilleryTarget();
     this.hud.placing = kind;
   }
 

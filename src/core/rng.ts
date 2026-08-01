@@ -75,6 +75,11 @@ export class Rng {
   fork(): Rng {
     return new Rng((this.state ^ Math.floor(this.next() * 0xffffffff)) >>> 0);
   }
+
+  /** Current deterministic state, used only by simulation checksums. */
+  snapshot(): number {
+    return this.state;
+  }
 }
 
 /** Convenience: turn a string into a numeric seed. */

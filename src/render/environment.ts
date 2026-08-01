@@ -77,8 +77,8 @@ export class DayCycle {
   readonly hazeColor = new THREE.Color();
   ambientIntensity = 1;
 
-  update(dt: number, anchorS: number): void {
-    this.time += dt;
+  update(time: number, anchorS: number): void {
+    this.time = time;
 
     // Panels orbit slowly; one full day for a fixed point takes DAY_LENGTH.
     this.filamentAngle = panelPhaseAt(this.time);
@@ -357,8 +357,8 @@ export class Environment {
 
   // -------------------------------------------------------------------------
 
-  update(dt: number, anchor: RenderAnchor, cameraPos: THREE.Vector3): void {
-    this.cycle.update(dt, anchor.s);
+  update(time: number, anchor: RenderAnchor, cameraPos: THREE.Vector3): void {
+    this.cycle.update(time, anchor.s);
 
     const anchorAngle = (anchor.s / RING_CIRCUMFERENCE) * Math.PI * 2;
 

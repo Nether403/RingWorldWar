@@ -215,10 +215,17 @@ export class Effects {
   // -------------------------------------------------------------------------
 
   /** Handle a batch of simulation events. */
-  consume(events: SimEvent[], world: World, anchor: RenderAnchor): void {
+  consume(events: SimEvent[], world: World, anchor: RenderAnchor, viewer: Faction): void {
+    this.shake = 0;
     for (const e of events) {
       const near = Math.abs(deltaS(anchor.s, e.s)) < RING_CIRCUMFERENCE * 0.3;
       if (!near) continue;
+      if (
+        e.faction >= 0 &&
+        e.faction !== viewer &&
+        !world.isEntityVisible(viewer, e.id) &&
+        !world.isVisible(viewer, e.s, e.z)
+      ) continue;
       anchor.toVector(e.s, e.h, e.z, this._v);
 
       switch (e.kind) {
@@ -337,9 +344,14 @@ export class Effects {
 
   // -------------------------------------------------------------------------
 
-  update(dt: number, world: World, anchor: RenderAnchor, camera?: THREE.PerspectiveCamera): void {
+  update(
+    dt: number,
+    world: World,
+    anchor: RenderAnchor,
+    viewer: Faction,
+    camera?: THREE.PerspectiveCamera,
+  ): void {
     this.flash = Math.max(0, this.flash - dt * 3);
-    this.shake = 0;
 
     if (camera) {
       const mat = this.puffs.material as THREE.ShaderMaterial;
@@ -347,8 +359,8 @@ export class Effects {
       mat.uniforms.uProjScale!.value = h;
     }
 
-    this.updateTrails(dt, world, anchor);
-    this.updateTracers(world, anchor);
+    this.updateTrails(dt, world, anchor, viewer);
+    this.updateTracers(world, anchor, viewer);
     this.updateParticles(dt);
 
     for (let i = 0; i < this.lights.length; i++) {
@@ -363,10 +375,11 @@ export class Effects {
     }
   }
 
-  private updateTrails(dt: number, world: World, anchor: RenderAnchor): void {
+  private updateTrails(dt: number, world: World, anchor: RenderAnchor, viewer: Faction): void {
     // Attach a trail to every live ballistic round that does not have one.
     for (const pr of world.projectiles) {
       if (!pr.alive || !pr.ballistic) continue;
+      if (!world.isProjectileVisible(viewer, pr)) continue;
       let t = this.trails.find((x) => x.active && x.projectileId === pr.id);
       if (!t) {
         t = this.trails.find((x) => !x.active);
@@ -438,10 +451,11 @@ export class Effects {
     this.trailMesh.geometry.attributes.color!.needsUpdate = true;
   }
 
-  private updateTracers(world: World, anchor: RenderAnchor): void {
+  private updateTracers(world: World, anchor: RenderAnchor, viewer: Faction): void {
     let v = 0;
     for (const pr of world.projectiles) {
       if (!pr.alive || pr.ballistic) continue;
+      if (!world.isProjectileVisible(viewer, pr)) continue;
       if (Math.abs(deltaS(anchor.s, pr.p.s)) > RING_CIRCUMFERENCE * 0.3) continue;
       if (v + 6 > this.tracerPos.length) break;
 

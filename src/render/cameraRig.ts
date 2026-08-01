@@ -41,6 +41,8 @@ export class CameraRig {
   private smoothZ = 0;
   private smoothYaw = 0;
   private focusHeight = 0;
+  private direct = false;
+  private savedDistance = 240;
 
   /** Shake state, driven by impacts and footfalls. */
   private shake = 0;
@@ -65,12 +67,14 @@ export class CameraRig {
    * always leaving the top third of the frame for the world rising away.
    */
   get pitch(): number {
+    if (this.direct) return 0.22;
     const t = smoothstep(ZOOM_MIN, ZOOM_MAX, this.distance);
     return lerp(0.30, 0.545, t);
   }
 
   /** Field of view widens slightly when zoomed out, exaggerating the curve. */
   private get targetFov(): number {
+    if (this.direct) return 55;
     const t = smoothstep(ZOOM_MIN, ZOOM_MAX, this.distance);
     return lerp(46, 62, t);
   }
@@ -99,6 +103,30 @@ export class CameraRig {
 
   rotate(delta: number): void {
     this.yaw += delta;
+  }
+
+  enterDirect(): void {
+    if (this.direct) return;
+    this.direct = true;
+    this.savedDistance = this.targetDistance;
+    this.targetDistance = 68;
+  }
+
+  followDirect(s: number, z: number, yaw: number): void {
+    if (!this.direct) return;
+    this.s = wrapS(s);
+    this.z = clamp(z, -RING_HALF_WIDTH, RING_HALF_WIDTH);
+    this.yaw = yaw;
+  }
+
+  exitDirect(): void {
+    if (!this.direct) return;
+    this.direct = false;
+    this.targetDistance = this.savedDistance;
+  }
+
+  get directMode(): boolean {
+    return this.direct;
   }
 
   /** Add camera shake. `amount` is roughly metres of displacement. */

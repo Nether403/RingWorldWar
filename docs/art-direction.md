@@ -31,12 +31,13 @@ The one screenshot that sells the game: a mech lance silhouetted on a ruined pla
 - **Shadows:** CSM for sun; no shadows from local lights (use baked contact shadows / blob-plus-SSAO instead).
 
 ## 4. Atmosphere — the make-or-break system
-Distance haze is what will sell 600 km of ring. Non-negotiable:
+Distance haze is what sells the 22.6 km ring as a world rather than a curved arena. Non-negotiable:
 - **Aerial perspective / height fog** with a physically-motivated falloff, tinted by sun angle. Distant ring surface fades into the sky color and becomes indistinguishable from the horizon — this is what makes the curve feel enormous instead of like a curved plane.
 - **Volumetric light shafts** (cheap raymarched, half-res, temporally jittered) at shadow-square boundaries — the terminator line sweeping across the map with god rays is a signature moment.
 - **Dust & particulate:** always-present drifting motes near camera, dust plumes from mech footsteps, smoke that persists in battle zones. Motion in the air = alive.
 
-## 5. Post-Processing Stack (order matters)
+## 5. Post-Processing Roadmap
+Gate 1 deliberately uses stable forward rendering with ACES after the composer prototype intermittently produced black frames. The following stack is a post-Gate-1 roadmap and must return behind a direct-render fallback with browser regression coverage:
 1. TAA (temporal AA — also amortizes our volumetrics and SSAO)
 2. SSAO (GTAO-style, half-res, bilateral upsample)
 3. SSR — **only** on wet/metal ground surfaces, quality-gated off on low presets

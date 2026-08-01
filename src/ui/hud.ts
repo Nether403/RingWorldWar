@@ -93,6 +93,23 @@ const CSS = `
 /* Hints */
 .rww-hint { position: absolute; left: 12px; bottom: 132px; font-size: 10.5px;
   line-height: 1.85; opacity: 0.4; letter-spacing: 0.08em; }
+@media (max-width: 900px) {
+  .rww-map { width: min(440px, calc(100vw - 20px)); }
+  .rww-bottom { padding-right: min(470px, calc(100vw - 10px)); }
+  .rww-sel { min-width: 210px; }
+}
+@media (max-width: 900px), (max-height: 560px) {
+  .rww-top { left: 8px; right: 8px; transform: none; }
+  .rww-res { flex: 1; padding: 7px 8px; }
+  .rww-res b { font-size: 15px; }
+  .rww-res span { display: none; }
+  .rww-bottom { padding: 6px; padding-bottom: 108px; flex-wrap: wrap; }
+  .rww-sel { min-width: 180px; max-width: 45vw; }
+  .rww-cmds { max-height: 104px; overflow-y: auto; }
+  .rww-btn { min-width: 78px; padding: 6px 8px; }
+  .rww-map { left: 6px; right: 6px; bottom: 6px; width: auto; height: 86px; }
+  .rww-hint { display: none; }
+}
 `;
 
 export type BuildRequest = { kind: StructureKind } | null;
@@ -112,9 +129,16 @@ export class Hud {
   private map: HTMLCanvasElement;
   private mapCtx: CanvasRenderingContext2D;
   private alertTimer = 0;
+  private selectionSignature = '';
+  private cameraS = 0;
+  private cameraZ = 0;
 
   /** Callback wired by main: jump the camera to a surface position. */
   onMinimapClick: ((s: number, z: number) => void) | null = null;
+  /** Begin a ground-targeted artillery command for a selected launcher. */
+  onArtilleryTarget: ((sourceId: number) => void) | null = null;
+  /** Route build mode changes through the game mode coordinator. */
+  onBuildRequest: ((kind: StructureKind | null) => void) | null = null;
 
   constructor() {
     const style = document.createElement('style');
@@ -129,6 +153,7 @@ export class Hud {
 
     const bottom = el('div', 'rww-bottom');
     this.selEl = el('div', 'rww-sel rww-panel');
+    this.selEl.setAttribute('aria-live', 'polite');
     this.cmdEl = el('div', 'rww-cmds');
     bottom.appendChild(this.selEl);
     bottom.appendChild(this.cmdEl);
@@ -141,6 +166,9 @@ export class Hud {
     this.map = document.createElement('canvas');
     this.map.width = 900;
     this.map.height = 160;
+    this.map.tabIndex = 0;
+    this.map.setAttribute('role', 'application');
+    this.map.setAttribute('aria-label', 'Ring minimap. Use arrow keys to move the camera.');
     mapWrap.appendChild(this.map);
     this.mapCtx = this.map.getContext('2d')!;
     this.root.appendChild(mapWrap);
@@ -151,15 +179,31 @@ export class Hud {
       const fy = (e.clientY - r.top) / r.height;
       this.onMinimapClick?.(fx * RING_CIRCUMFERENCE, (fy - 0.5) * 2 * RING_HALF_WIDTH);
     });
+    this.map.addEventListener('keydown', (e) => {
+      const stepS = e.shiftKey ? 1_500 : 500;
+      const stepZ = e.shiftKey ? 500 : 200;
+      if (e.key === 'ArrowLeft') this.cameraS -= stepS;
+      else if (e.key === 'ArrowRight') this.cameraS += stepS;
+      else if (e.key === 'ArrowUp') this.cameraZ -= stepZ;
+      else if (e.key === 'ArrowDown') this.cameraZ += stepZ;
+      else return;
+      e.preventDefault();
+      this.onMinimapClick?.(
+        ((this.cameraS % RING_CIRCUMFERENCE) + RING_CIRCUMFERENCE) % RING_CIRCUMFERENCE,
+        Math.max(-RING_HALF_WIDTH, Math.min(RING_HALF_WIDTH, this.cameraZ)),
+      );
+    });
 
     this.alertEl = el('div', 'rww-alert rww-panel');
+    this.alertEl.setAttribute('role', 'status');
+    this.alertEl.setAttribute('aria-live', 'polite');
     this.root.appendChild(this.alertEl);
 
     const hint = el('div', 'rww-hint');
     hint.innerHTML =
       'WASD / edge — pan &nbsp;·&nbsp; wheel — zoom &nbsp;·&nbsp; Q E — rotate<br>' +
       'left click — select &nbsp;·&nbsp; drag — box select &nbsp;·&nbsp; right click — move / attack<br>' +
-      'esc — cancel &nbsp;·&nbsp; F3 — stats';
+      'V — pilot mech &nbsp;·&nbsp; Alt/Ctrl+1..9 — group &nbsp;·&nbsp; esc — cancel / tactical &nbsp;·&nbsp; F3 — stats';
     this.root.appendChild(hint);
 
     document.body.appendChild(this.root);
@@ -181,6 +225,8 @@ export class Hud {
     cameraS: number,
     cameraZ: number,
   ): void {
+    this.cameraS = cameraS;
+    this.cameraZ = cameraZ;
     if (this.alertTimer > 0) {
       this.alertTimer -= dt;
       if (this.alertTimer <= 0) this.alertEl.style.opacity = '0';
@@ -210,7 +256,8 @@ export class Hud {
     };
     add('salvage', Math.floor(p.salvage).toString());
     add('power', `${net >= 0 ? '+' : ''}${net.toFixed(0)}`, brownout);
-    add('command', `${p.commandUsed}/${p.commandCap}`, p.commandUsed >= p.commandCap);
+    const committedCommand = p.commandUsed + world.queuedCommand(player);
+    add('command', `${committedCommand}/${p.commandCap}`, committedCommand >= p.commandCap);
 
     const mins = Math.floor(world.time / 60);
     const secs = Math.floor(world.time % 60);
@@ -229,6 +276,25 @@ export class Hud {
       const st = world.structureById(id);
       if (st) structs.push(st);
     }
+
+    const playerState = world.players[player];
+    const signature = [
+      [...selection].join(','),
+      Math.floor(playerState.salvage / 10),
+      playerState.commandUsed,
+      playerState.commandCap,
+      [...playerState.unlocked].sort().join(','),
+      this.placing ?? '',
+      units.map((unit) => `${unit.id}:${Math.ceil(unit.hp / 25)}:${unit.order.kind}`).join('|'),
+      structs
+        .map((structure) =>
+          `${structure.id}:${Math.ceil(structure.hp / 50)}:${Math.ceil(structure.progress * 20)}:` +
+          `${structure.progress >= 1 ? 1 : 0}:${structure.queue.length}:${Math.ceil(structure.cd[0] ?? 0)}`,
+        )
+        .join('|'),
+    ].join(';');
+    if (signature === this.selectionSignature) return;
+    this.selectionSignature = signature;
 
     this.cmdEl.innerHTML = '';
 
@@ -259,6 +325,17 @@ export class Hud {
           q.innerHTML = `<u>Queue</u><s>${st.queue.length} pending</s>`;
           this.cmdEl.appendChild(q);
         }
+      }
+      if (st.faction === player && st.progress >= 1 && st.kind === 'rocketBattery') {
+        const ready = (st.cd[0] ?? 0) <= 0;
+        const target = button('rww-btn' + (ready ? '' : ' off'));
+        target.innerHTML = `<u>Target rocket</u><s>${ready ? 'ground target' : `${st.cd[0]!.toFixed(1)}s reload`}</s>`;
+        target.title = 'Preview the ring-physics trajectory, then click to fire';
+        target.onclick = (): void => {
+          if (ready) this.onArtilleryTarget?.(st.id);
+          else this.alert('Rocket Battery is reloading');
+        };
+        this.cmdEl.appendChild(target);
       }
       return;
     }
@@ -291,7 +368,7 @@ export class Hud {
     const p = world.players[player];
     const affordable =
       p.salvage >= (def.cost.salvage ?? 0) &&
-      (!def.cost.command || p.commandUsed + def.cost.command <= p.commandCap);
+      (!def.cost.command || p.commandUsed + world.queuedCommand(player) + def.cost.command <= p.commandCap);
 
     const b = button('rww-btn' + (affordable ? '' : ' off'));
     b.innerHTML =
@@ -313,11 +390,7 @@ export class Hud {
     const def = STRUCTURES[kind];
     const p = world.players[player];
 
-    // Gate on prerequisites: the foundry needs a fabricator first.
-    let locked = false;
-    if (kind === 'mechFoundry' || kind === 'rocketBattery') {
-      locked = !p.unlocked.has('fabricator');
-    }
+    const locked = Boolean(def.requires && !p.unlocked.has(def.requires));
     const affordable = p.salvage >= (def.cost.salvage ?? 0);
     const usable = affordable && !locked;
 
@@ -325,17 +398,17 @@ export class Hud {
     b.innerHTML =
       (def.hotkey ? `<em>${def.hotkey}</em>` : '') +
       `<u>${def.name}</u><s>${def.cost.salvage ?? 0} slv · ${def.energy >= 0 ? '+' : ''}${def.energy} pwr</s>`;
-    b.title = locked ? `${def.role}  (requires Fabricator)` : def.role;
+    b.title = locked ? `${def.role}  (requires ${STRUCTURES[def.requires!].name})` : def.role;
     b.onclick = (): void => {
       if (locked) {
-        this.alert('Requires a Fabricator');
+        this.alert(`Requires ${STRUCTURES[def.requires!].name}`);
         return;
       }
       if (!affordable) {
         this.alert('Not enough salvage');
         return;
       }
-      this.placing = this.placing === kind ? null : kind;
+      this.onBuildRequest?.(this.placing === kind ? null : kind);
     };
     this.cmdEl.appendChild(b);
   }
@@ -383,7 +456,7 @@ export class Hud {
     // Structures.
     for (const st of world.structures) {
       if (!st.alive) continue;
-      const visible = st.faction === player || world.isVisible(player, st.s, st.z);
+      const visible = world.isEntityVisible(player, st.id);
       if (!visible) continue;
       const col =
         st.faction < 0 ? '#9fb0c0' : `#${FACTION_COLOR[st.faction as Faction].toString(16).padStart(6, '0')}`;
@@ -395,7 +468,7 @@ export class Hud {
     // Units.
     for (const u of world.units) {
       if (!u.alive) continue;
-      const visible = u.faction === player || world.isVisible(player, u.s, u.z) || u.revealed > 0;
+      const visible = world.isEntityVisible(player, u.id);
       if (!visible) continue;
       g.fillStyle = `#${FACTION_COLOR[u.faction].toString(16).padStart(6, '0')}`;
       const r = UNITS[u.kind].isMech ? 2.2 : 1.4;
@@ -407,6 +480,7 @@ export class Hud {
     // Live shells, so incoming fire is visible before it lands.
     for (const pr of world.projectiles) {
       if (!pr.alive || !pr.ballistic) continue;
+      if (!world.isProjectileVisible(player, pr)) continue;
       g.fillStyle = '#ffffff';
       g.fillRect(X(pr.p.s) - 1, Y(pr.p.z) - 1, 2, 2);
       g.strokeStyle = 'rgba(255,120,90,0.65)';
@@ -435,6 +509,8 @@ export class Hud {
 
     const won = world.winner === player;
     this.endEl = el('div', 'rww-end');
+    this.endEl.setAttribute('role', 'dialog');
+    this.endEl.setAttribute('aria-modal', 'true');
     const h = document.createElement('h1');
     h.textContent = won ? 'Victory' : 'Defeat';
     h.style.color = won ? '#8ce8b0' : '#ff7a5e';
@@ -447,6 +523,7 @@ export class Hud {
     };
     this.endEl.append(h, p, b);
     this.root.appendChild(this.endEl);
+    b.focus();
   }
 }
 

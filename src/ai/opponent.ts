@@ -201,6 +201,30 @@ export class AiOpponent {
     const artillery = army.filter((u) => u.kind === 'longbow');
     const line = army.filter((u) => u.kind === 'vanguard' || u.kind === 'aegis');
 
+    for (const battery of this.myStructures(world).filter((structure) => structure.kind === 'rocketBattery')) {
+      if ((battery.cd[0] ?? 0) > 0) continue;
+      const targets = [
+        ...world.units.filter(
+          (unit) => unit.alive && unit.faction !== this.faction && world.isEntityVisible(this.faction, unit.id),
+        ),
+        ...world.structures.filter(
+          (structure) =>
+            structure.alive &&
+            structure.faction >= 0 &&
+            structure.faction !== this.faction &&
+            world.isEntityVisible(this.faction, structure.id),
+        ),
+      ];
+      targets.sort(
+        (a, b) =>
+          surfaceDist(battery.s, battery.z, a.s, a.z) -
+          surfaceDist(battery.s, battery.z, b.s, b.z),
+      );
+      for (const target of targets) {
+        if (world.fireBallisticAt(battery.id, target.s, target.z, this.faction)) break;
+      }
+    }
+
     // --- Scouts take and hold nodes ------------------------------------------
     const nodes = world.structures.filter((s) => s.alive && s.kind === 'spinalNode');
     const wanted = nodes.filter((n) => n.faction !== this.faction);
@@ -314,7 +338,10 @@ export class AiOpponent {
     let bestScore = -Infinity;
 
     const candidates: Structure[] = world.structures.filter(
-      (s) => s.alive && (s.faction === enemy || (s.kind === 'spinalNode' && s.faction !== this.faction)),
+      (s) =>
+        s.alive &&
+        (s.faction === enemy || (s.kind === 'spinalNode' && s.faction !== this.faction)) &&
+        world.isEntityVisible(this.faction, s.id),
     );
 
     for (const c of candidates) {
@@ -336,6 +363,7 @@ export class AiOpponent {
       let defended = 0;
       for (const o of world.structures) {
         if (!o.alive || o.faction !== enemy) continue;
+        if (!world.isEntityVisible(this.faction, o.id)) continue;
         if (STRUCTURES[o.kind].weapons.length === 0) continue;
         if (surfaceDist(o.s, o.z, c.s, c.z) < 220) defended++;
       }
@@ -361,6 +389,7 @@ export class AiOpponent {
     let bestD = range;
     for (const u of world.units) {
       if (!u.alive || u.faction === this.faction) continue;
+      if (!world.isEntityVisible(this.faction, u.id)) continue;
       const d = surfaceDist(u.s, u.z, s, z);
       if (d < bestD) {
         bestD = d;

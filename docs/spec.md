@@ -16,8 +16,8 @@ A browser-based 3D real-time strategy game set on the inner surface of a ring-sh
 - **Language:** TypeScript (strict mode)
 - **Rendering:** Three.js (latest stable), WebGL2 baseline, WebGPU renderer as progressive enhancement later
 - **Build:** Vite
-- **Post-processing:** `postprocessing` (pmndrs)
-- **ECS:** `bitecs` (data-oriented, deterministic-friendly)
+- **Presentation:** Three.js forward rendering with ACES; decorative post effects return after Gate 1 stability
+- **Simulation:** stable-ordered object arrays with fixed-step state hashing
 - **UI:** HTML/CSS overlay (no framework initially; revisit if HUD complexity demands it)
 - **Testing:** Vitest (simulation unit tests), Playwright (smoke/e2e)
 - **Assets: NONE.** Hard constraint — zero external art, audio, or model files. Every mesh, texture, material, animation, and sound is generated in code at build or load time. See `docs/procedural-assets.md`.
@@ -43,7 +43,7 @@ tasks/             → plan.md and todo.md (development plan + task list)
 public/            → Static assets served as-is (compressed textures, models, audio)
 src/
   core/            → Engine-agnostic utilities: math (ring-space), events, RNG
-  sim/             → Deterministic game simulation (ECS world, systems, no Three.js imports)
+  sim/             → Deterministic game simulation (world, navigation, ballistics; no Three.js imports)
   render/          → Three.js scene, materials, VFX, post-processing, LOD
   input/           → Camera controls, selection, command input, direct mech control
   ai/              → Opponent AI (strategic + tactical layers)
@@ -58,37 +58,27 @@ e2e/               → Playwright smoke tests
 
 ## Code Style
 ```ts
-// src/sim/systems/projectileSystem.ts
-import { defineQuery } from 'bitecs';
-import { Projectile, RingPosition, Velocity } from '../components';
-import { RING, coriolisAccel, surfaceGravity } from '../../core/ringMath';
-import type { SimWorld } from '../world';
+const world = new World(terrain, seed);
+world.setup();
 
-const projectiles = defineQuery([Projectile, RingPosition, Velocity]);
-
-/** Integrates rocket flight in the rotating ring frame (fixed timestep). */
-export function projectileSystem(world: SimWorld): void {
-  const dt = world.fixedDt;
-  for (const eid of projectiles(world)) {
-    const ax = coriolisAccel(Velocity.y[eid], RING.omega);
-    Velocity.x[eid] += ax * dt;
-    Velocity.y[eid] -= surfaceGravity(RingPosition.r[eid]) * dt;
-    RingPosition.theta[eid] = wrapTheta(RingPosition.theta[eid] + (Velocity.x[eid] / RingPosition.r[eid]) * dt);
-    RingPosition.r[eid] += Velocity.y[eid] * dt;
-  }
+while (accumulator >= SIM_DT) {
+  world.step();
+  accumulator -= SIM_DT;
 }
+
+entityRenderer.update(world, anchor, renderTime, player, accumulator / SIM_DT);
 ```
 Conventions:
 - `camelCase` functions/variables, `PascalCase` types/components, `SCREAMING_SNAKE` constants.
-- Systems are plain functions `(world) => void`; no classes in `src/sim/`.
-- All sim math uses the fixed timestep `world.fixedDt` — never wall-clock time.
+- World state is processed in stable entity-array order.
+- All sim math uses `SIM_DT` — never wall-clock or frame time.
 - No `any`. No floating-point nondeterminism shortcuts in sim (no `Math.random` — use seeded RNG from `core/rng.ts`).
-- Files under ~300 lines; split systems rather than grow them.
+- New subsystems should be focused modules; `World` remains the authoritative orchestration boundary.
 
 ## Testing Strategy
 - **Vitest unit tests** for everything in `src/sim/` and `src/core/`: ring math, projectile ballistics (golden-value trajectories), economy ticks, combat resolution, pathfinding on the wrapped grid.
 - **Determinism test:** run the same seeded skirmish twice for N ticks, assert identical state hashes. This test is sacred — it guards multiplayer readiness.
-- **Playwright smoke test:** game boots, renders first frame without WebGL errors, a unit can be selected and ordered to move.
+- **Playwright smoke tests:** stable rendering/resource use plus boot, move, control groups, mech takeover, and commanded artillery.
 - Render layer is verified visually + via smoke tests, not unit-tested.
 - Coverage expectation: sim layer ≥ 80%; no coverage requirement on render layer.
 
@@ -98,13 +88,13 @@ Conventions:
 - **Never:** commit secrets or API keys; **add any binary art/audio/model asset to the repo**; import Three.js inside `src/sim/`; delete or skip the determinism test to make CI green.
 
 ## Success Criteria (vertical slice)
-- [ ] One map (a ring segment ~40 km of arc, wrapping logically into the full ring), 2 factions, playable skirmish vs AI, 20–40 min match length.
-- [ ] Full core loop works: harvest 2 resources → build structures → produce units → fire rockets → deploy mechs → destroy enemy Bastion → win/lose screen.
-- [ ] Rockets visibly arc with ring curvature; spinward vs antispinward shots land differently; a tutorial tooltip explains it.
-- [ ] Player can take direct control of any mech (WASD + mouse aim) and return to tactical camera seamlessly.
+- [x] One complete 22.6 km ring map, 2 factions, and a playable skirmish vs AI with a 45-minute hard cap.
+- [x] Full core loop works: extract salvage and generate power → build structures → produce units → fire rockets → deploy mechs → destroy enemy Bastion → win/lose screen.
+- [x] Rockets visibly arc with ring curvature; spinward vs antispinward shots land differently; targeting guidance explains the long-range direction.
+- [x] Player can take direct control of any mech (WASD + mouse aim) and return to tactical camera seamlessly.
 - [ ] 60 fps at 1080p on a GTX 1660-class GPU with default settings; no GC hitches > 16 ms during combat.
-- [ ] The ring arc, atmosphere, and shadow-square day/night cycle are visible and composed into the default camera framing.
-- [ ] Determinism test passes: identical seeds → identical outcomes.
+- [x] The ring arc, atmosphere, and shadow-square day/night cycle are visible and composed into the default camera framing.
+- [x] Determinism test passes: identical seeds → identical outcomes.
 
 ## Open Questions
 - Faction identity: symmetric factions with cosmetic differences (cheaper to balance) vs asymmetric mechanics (more interesting)? Vertical slice assumes **symmetric with distinct visual identity**.

@@ -132,15 +132,15 @@ export class EntityRenderer {
     return this.structureModels.get(kind)?.radius ?? STRUCTURES[kind].radius;
   }
 
-  update(world: World, anchor: RenderAnchor, time: number): void {
+  update(world: World, anchor: RenderAnchor, time: number, viewer: Faction, alpha: number): void {
     this.counts.clear();
 
     for (const m of this.mechMeshes.values()) m.count = 0;
     for (const m of this.structMeshes.values()) m.count = 0;
     for (const m of this.engineerMeshes) if (m) m.count = 0;
 
-    this.drawStructures(world, anchor);
-    this.drawUnits(world, anchor, time);
+    this.drawStructures(world, anchor, viewer);
+    this.drawUnits(world, anchor, time, viewer, alpha);
 
     for (const m of this.mechMeshes.values()) if (m.count > 0) m.instanceMatrix.needsUpdate = true;
     for (const m of this.structMeshes.values()) if (m.count > 0) m.instanceMatrix.needsUpdate = true;
@@ -156,9 +156,10 @@ export class EntityRenderer {
 
   // -------------------------------------------------------------------------
 
-  private drawStructures(world: World, anchor: RenderAnchor): void {
+  private drawStructures(world: World, anchor: RenderAnchor, viewer: Faction): void {
     for (const st of world.structures) {
       if (!st.alive) continue;
+      if (!world.isEntityVisible(viewer, st.id)) continue;
       // Cull by arc distance: anything more than a quarter of the way round is
       // both tiny and behind the far-side haze.
       if (Math.abs(deltaS(anchor.s, st.s)) > RING_CIRCUMFERENCE * 0.3) continue;
@@ -180,28 +181,33 @@ export class EntityRenderer {
     }
   }
 
-  private drawUnits(world: World, anchor: RenderAnchor, time: number): void {
+  private drawUnits(world: World, anchor: RenderAnchor, time: number, viewer: Faction, alpha: number): void {
     for (const u of world.units) {
       if (!u.alive) continue;
-      if (Math.abs(deltaS(anchor.s, u.s)) > RING_CIRCUMFERENCE * 0.3) continue;
+      if (!world.isEntityVisible(viewer, u.id)) continue;
+      const s = wrapLerp(u.prevS, u.s, alpha);
+      const z = THREE.MathUtils.lerp(u.prevZ, u.z, alpha);
+      const yaw = angleLerp(u.prevYaw, u.yaw, alpha);
+      const aimYaw = angleLerp(u.prevAimYaw, u.aimYaw, alpha);
+      if (Math.abs(deltaS(anchor.s, s)) > RING_CIRCUMFERENCE * 0.3) continue;
 
       const def = UNITS[u.kind];
-      const ground = world.terrain.heightAt(u.s, u.z);
+      const ground = world.terrain.heightAt(s, z);
 
       if (!def.isMech) {
         const mesh = this.engineerMeshes[u.faction];
         if (!mesh || mesh.count >= mesh.instanceMatrix.count) continue;
         // Engineers hover, with a slight bob so they never look parked.
         const bob = Math.sin(time * 2.4 + u.id) * 0.35;
-        anchor.toVector(u.s, ground + 3 + bob, u.z, this._v);
-        anchor.orientation(u.s, u.yaw, this._q);
+        anchor.toVector(s, ground + 3 + bob, z, this._v);
+        anchor.orientation(s, yaw, this._q);
         this._scale.set(1, 1, 1);
         this._m.compose(this._v, this._q, this._scale);
         mesh.setMatrixAt(mesh.count++, this._m);
         continue;
       }
 
-      this.drawMech(u.kind as MechClass, u, world, anchor, ground, time);
+      this.drawMech(u.kind as MechClass, u, world, anchor, ground, time, s, z, yaw, aimYaw);
     }
   }
 
@@ -220,6 +226,10 @@ export class EntityRenderer {
     anchor: RenderAnchor,
     ground: number,
     time: number,
+    s: number,
+    z: number,
+    yaw: number,
+    aimYaw: number,
   ): void {
     const rig = this.rigs.get(cls);
     if (!rig) return;
@@ -253,14 +263,14 @@ export class EntityRenderer {
 
     // Terrain under each foot, so the mech stands correctly on a slope.
     const slopeFwd =
-      (world.terrain.heightAt(u.s + Math.cos(u.yaw) * 6, u.z + Math.sin(u.yaw) * 6) -
-        world.terrain.heightAt(u.s - Math.cos(u.yaw) * 6, u.z - Math.sin(u.yaw) * 6)) /
+      (world.terrain.heightAt(s + Math.cos(yaw) * 6, z + Math.sin(yaw) * 6) -
+        world.terrain.heightAt(s - Math.cos(yaw) * 6, z - Math.sin(yaw) * 6)) /
       12;
     const pitch = Math.atan(slopeFwd) * 0.8 + lean;
 
     // --- Build the local-to-render transform --------------------------------
-    anchor.toVector(u.s, ground, u.z, this._v);
-    anchor.orientation(u.s, u.yaw, this._q);
+    anchor.toVector(s, ground, z, this._v);
+    anchor.orientation(s, yaw, this._q);
     this._basis.compose(this._v, this._q, ONE);
 
     const push = (part: PartName, local: THREE.Matrix4): void => {
@@ -280,7 +290,7 @@ export class EntityRenderer {
     // The torso yaws independently of the legs, so a mech can walk one way and
     // shoot another. That single detail does more for the sense of a piloted
     // machine than any amount of extra geometry.
-    const torsoYaw = angleWrap(u.aimYaw - u.yaw);
+    const torsoYaw = angleWrap(aimYaw - yaw);
     _local.makeRotationY(torsoYaw);
     _rot.makeRotationX(pitch * 0.6);
     _local.premultiply(_rot);
@@ -316,8 +326,8 @@ export class EntityRenderer {
       }
 
       // Ground height under this foot, in local forward/side coordinates.
-      const fs2 = u.s + Math.cos(u.yaw) * footFwd - Math.sin(u.yaw) * hipX;
-      const fz2 = u.z + Math.sin(u.yaw) * footFwd + Math.cos(u.yaw) * hipX;
+      const fs2 = s + Math.cos(yaw) * footFwd - Math.sin(yaw) * hipX;
+      const fz2 = z + Math.sin(yaw) * footFwd + Math.cos(yaw) * hipX;
       const footGround = world.terrain.heightAt(fs2, fz2) - ground;
       const footY = footGround + footUp;
 
@@ -389,4 +399,14 @@ function angleWrap(a: number): number {
   if (x > Math.PI) x -= Math.PI * 2;
   else if (x < -Math.PI) x += Math.PI * 2;
   return x;
+}
+
+function angleLerp(from: number, to: number, alpha: number): number {
+  return from + angleWrap(to - from) * alpha;
+}
+
+function wrapLerp(from: number, to: number, alpha: number): number {
+  let s = from + deltaS(from, to) * alpha;
+  s %= RING_CIRCUMFERENCE;
+  return s < 0 ? s + RING_CIRCUMFERENCE : s;
 }

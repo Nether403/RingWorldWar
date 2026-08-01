@@ -50,12 +50,10 @@ async function start(): Promise<void> {
   rig.setFocus(0, 0);
   anchor.set(0, 0);
 
-  const renderer = new Renderer(
-    container,
-    rig.camera,
-    pickQuality(params),
-    params.get('post') === '1',
-  );
+  const renderer = new Renderer(container, rig.camera, pickQuality(params));
+  // An explicit ?quality= means the player asked for that level; do not let the
+  // adaptive governor override a deliberate choice.
+  if (params.get('quality')) renderer.autoQuality = false;
 
   await boot.step(0.3, 'generating terrain');
   const game = new Game(seed, anchor, rig);
@@ -68,7 +66,13 @@ async function start(): Promise<void> {
   const environment = new Environment(seed);
   renderer.scene.add(environment.group);
   environment.buildEnvironment(renderer.gl, renderer.scene);
-  environment.keyLight.shadow.mapSize.setScalar(renderer.currentSettings.shadowMapSize);
+  const applyShadowQuality = (): void => {
+    environment.keyLight.shadow.mapSize.setScalar(renderer.currentSettings.shadowMapSize);
+    environment.keyLight.shadow.map?.dispose();
+    environment.keyLight.shadow.map = null;
+  };
+  renderer.onQualityChange = applyShadowQuality;
+  applyShadowQuality();
   for (const o of game.objects) renderer.scene.add(o);
 
   // Aerial perspective. Inside a ring you are always looking through kilometres
@@ -81,7 +85,7 @@ async function start(): Promise<void> {
   const overlay = new DebugOverlay();
 
   wireCommands(renderer.gl.domElement, game, rig);
-  wireKeys(game, renderer, environment, ringMesh, overlay);
+  wireKeys(game, renderer, overlay, input);
 
   await boot.step(1.0, 'ready');
   boot.hide();
@@ -98,7 +102,9 @@ async function start(): Promise<void> {
     last = now;
     time += dt;
 
+    input.setDirectMode(game.directControlActive);
     input.update(dt);
+    game.updateDirectControl(input.moveForward, input.moveRight);
     rig.update(dt, anchor, game.terrain);
 
     // Re-base the floating origin onto the camera when it drifts far enough.
@@ -107,17 +113,17 @@ async function start(): Promise<void> {
     if (anchor.update(rig.s, rig.z)) {
       ringMesh.syncToAnchor(anchor);
       game.onRebase(prevS, prevZ);
+      rig.update(0, anchor, game.terrain);
     }
 
     game.effects.viewportHeight = renderer.gl.getContext().drawingBufferHeight;
     game.update(dt, time);
-    environment.update(dt, anchor, rig.camera.position);
+    environment.update(game.world.time, anchor, rig.camera.position);
 
     ringMesh.uniforms.uTime.value = time;
     ringMesh.uniforms.uPanelPhase.value = environment.cycle.filamentAngle;
     ringMesh.uniforms.uAmbientTint.value.copy(environment.cycle.hazeColor);
-    renderer.setBloomBoost(game.effects.flash);
-
+    ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
     fog.color.copy(environment.fogColor);
     (renderer.scene.background as THREE.Color).copy(environment.fogColor).multiplyScalar(0.5);
 
@@ -169,6 +175,8 @@ function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
   let dragStart: { s: number; z: number } | null = null;
   let downX = 0;
   let downY = 0;
+  let activePointer = -1;
+  let suppressCommand = false;
 
   const ndc = (e: PointerEvent): { x: number; y: number } => {
     const r = canvas.getBoundingClientRect();
@@ -182,15 +190,16 @@ function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
     const p = ndc(e);
     const hit = game.pickGround(p.x, p.y, rig.camera);
     if (hit) {
-      game.cursor.s = hit.s;
-      game.cursor.z = hit.z;
-      game.cursor.valid = true;
+      game.updateCursor(hit.s, hit.z);
     } else {
       game.cursor.valid = false;
     }
   });
 
   canvas.addEventListener('pointerdown', (e) => {
+    activePointer = e.pointerId;
+    suppressCommand = e.button === 2 && e.shiftKey;
+    canvas.setPointerCapture(e.pointerId);
     if (e.button === 0) {
       downX = e.clientX;
       downY = e.clientY;
@@ -204,11 +213,19 @@ function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
   });
 
   window.addEventListener('pointerup', (e) => {
+    if (e.pointerId !== activePointer) return;
+    activePointer = -1;
+    if (suppressCommand) {
+      suppressCommand = false;
+      return;
+    }
     if (e.button === 2) {
       const p = ndc(e);
       const hit = game.pickGround(p.x, p.y, rig.camera);
       if (hit) {
+        if (game.directControlActive) return;
         if (game.hud.placing) game.hud.placing = null;
+        else if (game.artilleryTargeting) game.cancelArtilleryTarget();
         else game.issueOrder(hit.s, hit.z, e.ctrlKey);
       }
       return;
@@ -220,7 +237,11 @@ function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
     const hit = game.pickGround(p.x, p.y, rig.camera);
     const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
 
-    if (game.hud.placing && hit) {
+    if (game.directControlActive && hit) {
+      game.directAttack(hit.s, hit.z);
+    } else if (game.artilleryTargeting && hit) {
+      game.fireArtilleryTarget(hit.s, hit.z);
+    } else if (game.hud.placing && hit) {
       game.tryBuild(hit.s, hit.z);
     } else if (hit && moved > 6) {
       game.selectBox(dragStart.s, dragStart.z, hit.s, hit.z, e.shiftKey);
@@ -234,24 +255,48 @@ function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
 function wireKeys(
   game: Game,
   renderer: Renderer,
-  environment: Environment,
-  ringMesh: RingMesh,
   overlay: DebugOverlay,
+  input: InputController,
 ): void {
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
-      if (game.hud.placing) game.hud.placing = null;
+      input.consume(e.code);
+      if (game.directControlActive) {
+        game.exitDirectControl();
+        input.setDirectMode(false);
+      } else if (game.artilleryTargeting) game.cancelArtilleryTarget();
+      else if (game.hud.placing) game.hud.placing = null;
       else game.selection.clear();
       return;
     }
+    if (e.code === 'KeyV' && !e.ctrlKey && !e.shiftKey && !game.directControlActive) {
+      if (game.enterDirectControl()) {
+        input.consume(e.code);
+        input.setDirectMode(true);
+        e.preventDefault();
+        return;
+      }
+    }
     if (e.code === 'F3') {
+      input.consume(e.code);
       e.preventDefault();
       overlay.toggle();
       return;
     }
+    if (game.directControlActive) return;
     if (e.code === 'KeyG' && e.ctrlKey) {
+      input.consume(e.code);
       e.preventDefault();
       game.selectAllCombat();
+      return;
+    }
+
+    const group = /^Digit([1-9])$/.exec(e.code)?.[1];
+    if (group && !e.shiftKey) {
+      input.consume(e.code);
+      e.preventDefault();
+      if (e.ctrlKey || e.altKey) game.setControlGroup(Number(group));
+      else game.recallControlGroup(Number(group));
       return;
     }
 
@@ -265,6 +310,7 @@ function wireKeys(
       for (const kind of BUILDABLE) {
         const hk = STRUCTURES[kind].hotkey;
         if (hk && e.code === `Key${hk}`) {
+          input.consume(e.code);
           e.preventDefault();
           game.setBuild(game.hud.placing === kind ? null : kind);
           return;
@@ -280,12 +326,17 @@ function wireKeys(
     };
     const level = levels[e.code];
     if (level && e.shiftKey) {
+      // Choosing a preset by hand turns the governor off; the player has said
+      // what they want and having it silently overridden would be maddening.
+      renderer.autoQuality = false;
+      input.consume(e.code);
       renderer.setQuality(level);
-      environment.keyLight.shadow.mapSize.setScalar(renderer.currentSettings.shadowMapSize);
-      environment.keyLight.shadow.map?.dispose();
-      environment.keyLight.shadow.map = null;
-      ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
-      overlay.flash(`quality: ${level}`);
+      overlay.flash(`quality: ${level} (auto off)`);
+    }
+    if (e.code === 'KeyP' && e.shiftKey) {
+      input.consume(e.code);
+      renderer.autoQuality = !renderer.autoQuality;
+      overlay.flash(`adaptive quality: ${renderer.autoQuality ? 'on' : 'off'}`);
     }
   });
 }
