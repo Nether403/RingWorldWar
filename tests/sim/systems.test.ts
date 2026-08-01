@@ -32,6 +32,29 @@ describe('economy', () => {
 });
 
 describe('combat and interception', () => {
+  it('admits weapon pulses without overspending and recovers capacity after one second', () => {
+    const world = emptyWorld();
+    const first = world.spawnStructure(Faction.Compact, 'rocketBattery', 0, 0, 1);
+    const second = world.spawnStructure(Faction.Compact, 'rocketBattery', 30, 0, 1);
+    world.spawnStructure(Faction.Compact, 'radarMast', 500, 0, 1);
+    world.spawnStructure(Faction.Compact, 'fusionCore', 200, 300, 1);
+    world.spawnUnit(Faction.Choir, 'vanguard', 1_000, 0);
+
+    expect(world.fireBallisticAt(first.id, 1_000, 0, Faction.Compact, 'cruiseMissile')).toBe(true);
+    expect(world.players[Faction.Compact].weaponEnergyLoad).toBe(10);
+    expect(world.players[Faction.Compact].energyDrawn).toBeLessThanOrEqual(
+      world.players[Faction.Compact].energyProduced,
+    );
+    const projectileCount = world.projectiles.length;
+    expect(world.fireBallisticAt(second.id, 1_000, 0, Faction.Compact, 'cruiseMissile')).toBe(false);
+    expect(world.projectiles).toHaveLength(projectileCount);
+
+    for (let tick = 0; tick < 30; tick++) world.step();
+
+    expect(world.players[Faction.Compact].weaponEnergyLoad).toBe(0);
+    expect(world.fireBallisticAt(second.id, 1_000, 0, Faction.Compact, 'cruiseMissile')).toBe(true);
+  });
+
   it('applies armor damage and refunds command on death', () => {
     const world = emptyWorld();
     const unit = world.spawnUnit(Faction.Compact, 'wisp', 0, 0);
@@ -46,10 +69,12 @@ describe('combat and interception', () => {
   it('allows point defence to intercept a commanded rocket', () => {
     const world = emptyWorld();
     const battery = world.spawnStructure(Faction.Compact, 'rocketBattery', 0, 0, 1);
+    world.spawnStructure(Faction.Compact, 'fusionCore', 200, 300, 1);
     world.spawnUnit(Faction.Compact, 'wisp', 780, 0);
     world.spawnUnit(Faction.Choir, 'vanguard', 1_000, 0);
     const preview = world.previewBallistic(battery.id, 1_000, 0, Faction.Compact)!;
     const impact = preview[preview.length - 1]!;
+    world.spawnStructure(Faction.Choir, 'fusionCore', impact.s + 200, impact.z + 300, 1);
     world.spawnStructure(Faction.Choir, 'pointDefense', impact.s, impact.z, 1);
     expect(world.fireBallisticAt(battery.id, 1_000, 0, Faction.Compact)).toBe(true);
 
@@ -65,6 +90,7 @@ describe('combat and interception', () => {
   it('lets a mobile Aegis intercept without a ground target', () => {
     const world = emptyWorld();
     const battery = world.spawnStructure(Faction.Compact, 'rocketBattery', 0, 0, 1);
+    world.spawnStructure(Faction.Compact, 'fusionCore', 200, 300, 1);
     world.spawnStructure(Faction.Compact, 'radarMast', 500, 0, 1);
     world.spawnUnit(Faction.Choir, 'vanguard', 1_000, 0);
     const preview = world.previewBallistic(battery.id, 1_000, 0, Faction.Compact)!;
@@ -104,6 +130,7 @@ describe('victory and match flow', () => {
     world.step();
 
     expect(compact.alive).toBe(true);
+    expect(world.status).toBe('completed');
     expect(world.winner).toBe(Faction.Compact);
     expect(world.endReason).toContain('Bastion');
   });
@@ -141,6 +168,26 @@ describe('victory and match flow', () => {
     expect(world.stateHash()).toBe(hash);
   });
 
+  it('completes an equal-Dominance time cap as a draw and stops all commands', () => {
+    const world = emptyWorld(73, 1 / 30);
+    const compact = world.spawnStructure(Faction.Compact, 'bastion', 0, 0, 1);
+    world.spawnStructure(Faction.Choir, 'bastion', 10_000, 0, 1);
+    const foundry = world.spawnStructure(Faction.Compact, 'mechFoundry', 200, 0, 1);
+    world.players[Faction.Compact].salvage = 10_000;
+
+    world.step();
+    const hash = world.stateHash();
+
+    expect(world.status).toBe('completed');
+    expect(world.winner).toBeNull();
+    expect(world.endReason).toContain('draw');
+    expect(world.tryQueueUnit(foundry.id, 'wisp')).toBe(false);
+    expect(world.tryPlaceStructure(Faction.Compact, 'solarArray', 300, 0)).toBeNull();
+    world.applyDamage(compact.id, 100, 'explosive', Faction.Choir);
+    for (let tick = 0; tick < 30; tick++) world.step();
+    expect(world.stateHash()).toBe(hash);
+  });
+
   it('resolves a seeded AI match no later than the time cap', () => {
     const timeLimit = 60;
     const world = emptyWorld(72, timeLimit);
@@ -149,14 +196,14 @@ describe('victory and match flow', () => {
     const choir = new AiOpponent(Faction.Choir, 'commander', 72);
     const maxTicks = Math.ceil(timeLimit * 30) + 1;
 
-    for (let tick = 0; tick < maxTicks && world.winner === null; tick++) {
+    for (let tick = 0; tick < maxTicks && world.status === 'running'; tick++) {
       world.step();
       compact.update(world, 1 / 30);
       choir.update(world, 1 / 30);
       world.drainEvents();
     }
 
-    expect(world.winner).not.toBeNull();
+    expect(world.status).toBe('completed');
     expect(world.time).toBeLessThanOrEqual(timeLimit + 1 / 30);
   });
 });

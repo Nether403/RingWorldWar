@@ -80,6 +80,14 @@ export class Rng {
   snapshot(): number {
     return this.state;
   }
+
+  /** Restore a previously captured deterministic state without re-scrambling it. */
+  restore(state: number): void {
+    if (!Number.isInteger(state) || state < 0 || state > 0xffffffff) {
+      throw new RangeError('Rng state must be an unsigned 32-bit integer');
+    }
+    this.state = state >>> 0;
+  }
 }
 
 /** Convenience: turn a string into a numeric seed. */

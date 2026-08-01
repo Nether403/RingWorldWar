@@ -59,6 +59,7 @@ export class Effects {
   private puffVel: Float32Array;
   private puffColor: Float32Array;
   private puffHead = 0;
+  private particleCap = MAX_PUFFS;
 
   private lights: THREE.PointLight[] = [];
   private lightLife: number[] = [];
@@ -214,6 +215,17 @@ export class Effects {
 
   // -------------------------------------------------------------------------
 
+  setParticleCap(cap: number): void {
+    const next = Math.max(1, Math.min(MAX_PUFFS, Math.floor(cap)));
+    if (next === this.particleCap) return;
+    this.particleCap = next;
+    this.puffHead %= next;
+    for (let i = next; i < MAX_PUFFS; i++) this.puffData[i * 4 + 1] = 0;
+    this.puffs.geometry.attributes.aData!.needsUpdate = true;
+  }
+
+  // -------------------------------------------------------------------------
+
   /** Handle a batch of simulation events. */
   consume(events: SimEvent[], world: World, anchor: RenderAnchor, viewer: Faction): void {
     this.shake = 0;
@@ -316,7 +328,7 @@ export class Effects {
     const c = new THREE.Color(color);
     for (let i = 0; i < n; i++) {
       const idx = this.puffHead;
-      this.puffHead = (this.puffHead + 1) % MAX_PUFFS;
+      this.puffHead = (this.puffHead + 1) % this.particleCap;
 
       this.puffPos[idx * 3] = pos.x;
       this.puffPos[idx * 3 + 1] = pos.y;
@@ -490,7 +502,7 @@ export class Effects {
   }
 
   private updateParticles(dt: number): void {
-    for (let i = 0; i < MAX_PUFFS; i++) {
+    for (let i = 0; i < this.particleCap; i++) {
       const life = this.puffData[i * 4 + 1]!;
       if (life <= 0) continue;
       const age = this.puffData[i * 4]! + dt;
@@ -522,7 +534,7 @@ export class Effects {
 
   /** Particles live in render space, so they must shift when the anchor moves. */
   rebase(delta: THREE.Vector3): void {
-    for (let i = 0; i < MAX_PUFFS; i++) {
+    for (let i = 0; i < this.particleCap; i++) {
       if (this.puffData[i * 4 + 1]! <= 0) continue;
       this.puffPos[i * 3] = this.puffPos[i * 3]! + delta.x;
       this.puffPos[i * 3 + 1] = this.puffPos[i * 3 + 1]! + delta.y;

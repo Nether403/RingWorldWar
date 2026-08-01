@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { RING_CIRCUMFERENCE } from '@core/constants';
 import type { Terrain } from '@gen/terrain';
 import { Faction } from '@sim/data';
 import { World, type Projectile } from '@sim/world';
@@ -32,6 +33,7 @@ describe('authoritative vision', () => {
   it('reveals an artillery unit after it fires and hides it again after the flash', () => {
     const world = battlefield();
     const enemy = world.spawnStructure(Faction.Choir, 'rocketBattery', 1_000, 0, 1);
+    world.spawnStructure(Faction.Choir, 'fusionCore', 1_100, 300, 1);
     world.spawnStructure(Faction.Choir, 'radarMast', 500, 0, 1);
     world.spawnUnit(Faction.Compact, 'vanguard', 0, 0);
 
@@ -39,6 +41,7 @@ describe('authoritative vision', () => {
     expect(world.fireBallisticAt(enemy.id, 0, 0, Faction.Choir)).toBe(true);
     expect(world.isEntityVisible(Faction.Compact, enemy.id)).toBe(true);
     for (let i = 0; i < 190; i++) world.step();
+    expect(enemy.revealed).toBe(0);
     expect(world.isEntityVisible(Faction.Compact, enemy.id)).toBe(false);
   });
 
@@ -51,6 +54,38 @@ describe('authoritative vision', () => {
     const world = new World(terrain, 92);
     world.spawnUnit(Faction.Compact, 'wisp', 0, 0);
     const enemy = world.spawnUnit(Faction.Choir, 'vanguard', 100, 0);
+
+    expect(world.isEntityVisible(Faction.Compact, enemy.id)).toBe(false);
+  });
+
+  it('uses a living mech wreck as short-range line-of-sight cover', () => {
+    const world = battlefield();
+    world.spawnUnit(Faction.Compact, 'wisp', 0, 0);
+    const cover = world.spawnUnit(Faction.Compact, 'vanguard', 50, 0);
+    const enemy = world.spawnUnit(Faction.Choir, 'vanguard', 100, 0);
+    world.applyDamage(cover.id, 100_000, 'explosive', Faction.Choir);
+
+    const wreck = world.wreckages[0]!;
+    expect(world.isEntityVisible(Faction.Compact, wreck.id)).toBe(true);
+    expect(world.isEntityVisible(Faction.Compact, enemy.id)).toBe(false);
+  });
+
+  it('does not block sight when a wreck misses the surface sight line', () => {
+    const world = battlefield();
+    world.spawnUnit(Faction.Compact, 'wisp', 0, 0);
+    const cover = world.spawnUnit(Faction.Compact, 'vanguard', 50, 30);
+    const enemy = world.spawnUnit(Faction.Choir, 'vanguard', 100, 0);
+    world.applyDamage(cover.id, 100_000, 'explosive', Faction.Choir);
+
+    expect(world.isEntityVisible(Faction.Compact, enemy.id)).toBe(true);
+  });
+
+  it('applies wreck cover across the wrapped surface seam', () => {
+    const world = battlefield();
+    world.spawnUnit(Faction.Compact, 'wisp', RING_CIRCUMFERENCE - 50, 0);
+    const cover = world.spawnUnit(Faction.Compact, 'vanguard', RING_CIRCUMFERENCE - 15, 0);
+    const enemy = world.spawnUnit(Faction.Choir, 'vanguard', 20, 0);
+    world.applyDamage(cover.id, 100_000, 'explosive', Faction.Choir);
 
     expect(world.isEntityVisible(Faction.Compact, enemy.id)).toBe(false);
   });

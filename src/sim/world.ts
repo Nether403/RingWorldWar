@@ -13,11 +13,12 @@
  */
 
 import {
+  ATMOSPHERE_HEIGHT,
   RING_CIRCUMFERENCE,
   RING_HALF_WIDTH,
   SIM_DT,
 } from '@core/constants';
-import { deltaS, surfaceDist, wrapS } from '@core/ringMath';
+import { deltaS, surfaceDist, surfaceDistSq, wrapS } from '@core/ringMath';
 import { Rng } from '@core/rng';
 import type { Terrain } from '@gen/terrain';
 import {
@@ -34,12 +35,18 @@ import {
   STRUCTURES,
   UNITS,
   WEAPONS,
+  WRECK_HP_MULTIPLIER,
+  WRECK_LIFETIME,
+  effectiveStructureStats,
+  effectiveUnitStats,
   type StructureKind,
   type UnitKind,
   type WeaponDef,
 } from './data';
+import { ABILITIES, createAbilityState, type AbilityState } from './abilities';
 import {
   inertialToRing,
+  isWithinDragAimEnvelope,
   launchToInertial,
   sampleTrajectory,
   solveAim,
@@ -51,6 +58,10 @@ import {
 import { SurfaceNav, type NavDirection } from './nav';
 
 const BALLISTIC_COEFFICIENT = 4000;
+const WEAPON_POWER_PULSE_TICKS = Math.round(1 / SIM_DT);
+const WRECK_COVER_MAX_DISTANCE = 260;
+const WRECK_COVER_RADIUS_MULTIPLIER = 1.1;
+const WRECK_COVER_HEIGHT_MULTIPLIER = 0.5;
 
 // ---------------------------------------------------------------------------
 // Entities
@@ -84,6 +95,10 @@ export interface Unit {
   prevAimYaw: number;
   speed: number;
   hp: number;
+  maxHp: number;
+  vision: number;
+  buildDuration: number;
+  salvageCost: number;
   order: Order;
   /** Per-weapon cooldown timers. */
   cd: number[];
@@ -100,6 +115,12 @@ export interface Unit {
   /** Set while building; counts down the structure's build time. */
   buildTimer: number;
   buildTargetId: number;
+  ability: AbilityState | null;
+  cloaked: boolean;
+  stationaryTime: number;
+  damageState: 0 | 1 | 2;
+  /** Recomputed from current state every tick; never multiplied in place. */
+  speedMultiplier: number;
 }
 
 export interface Structure {
@@ -111,6 +132,10 @@ export interface Structure {
   z: number;
   yaw: number;
   hp: number;
+  maxHp: number;
+  vision: number;
+  buildDuration: number;
+  salvageCost: number;
   /** 0..1. Below 1 the structure is a construction site and does not function. */
   progress: number;
   cd: number[];
@@ -135,6 +160,7 @@ export interface Projectile {
   p: RingPoint;
   weapon: string;
   ballistic: boolean;
+  flightMode: 'direct' | 'ballistic' | 'cruise' | 'chord';
   /** For direct fire, the entity being tracked. */
   targetId: number;
   life: number;
@@ -143,6 +169,27 @@ export interface Projectile {
   impactZ: number;
   /** Set by interceptors. */
   doomed: boolean;
+  sourceS: number;
+  sourceZ: number;
+}
+
+export interface Wreck {
+  id: number;
+  alive: boolean;
+  faction: Faction;
+  kind: UnitKind;
+  s: number;
+  z: number;
+  yaw: number;
+  hp: number;
+  maxHp: number;
+  lifetime: number;
+}
+
+export interface DamageSourceContext {
+  s: number;
+  z: number;
+  projectileId?: number;
 }
 
 export interface Deposit {
@@ -162,7 +209,8 @@ export type SimEventKind =
   | 'unitComplete'
   | 'intercepted'
   | 'footfall'
-  | 'nodeCaptured';
+  | 'nodeCaptured'
+  | 'damageStateChanged';
 
 export interface SimEvent {
   kind: SimEventKind;
@@ -174,6 +222,8 @@ export interface SimEvent {
   scale: number;
   id: number;
   weapon?: string;
+  entityKind?: UnitKind | StructureKind;
+  sourceFaction?: Faction;
 }
 
 export interface PlayerState {
@@ -183,9 +233,50 @@ export interface PlayerState {
   commandCap: number;
   energyProduced: number;
   energyDrawn: number;
+  weaponEnergyLoad: number;
+  weaponEnergySchedule: number[];
   dominance: number;
   /** Structures that exist, so the build bar can gate on prerequisites. */
   unlocked: Set<StructureKind>;
+}
+
+export type MatchStatus = 'running' | 'completed';
+
+export interface WorldPlayerPersistenceState {
+  salvage: number;
+  commandUsed: number;
+  commandCap: number;
+  energyProduced: number;
+  energyDrawn: number;
+  /** One-second transient power draw from accepted weapon engagements. */
+  weaponEnergyLoad: number;
+  /** Ring buffer of pulse loads expiring on each future simulation tick. */
+  weaponEnergySchedule: number[];
+  dominance: number;
+  unlocked: StructureKind[];
+}
+
+export interface WorldPersistenceState {
+  worldSeed: number;
+  terrainSeed: number;
+  tick: number;
+  time: number;
+  rngState: number;
+  nextId: number;
+  timeLimit: number;
+  victoryArmed: boolean;
+  lastBastionAggressor: Faction | null;
+  result: {
+    status: MatchStatus;
+    winner: Faction | null;
+    endReason: string;
+  };
+  players: [WorldPlayerPersistenceState, WorldPlayerPersistenceState];
+  units: Unit[];
+  structures: Structure[];
+  projectiles: Projectile[];
+  deposits: Deposit[];
+  wreckages: Wreck[];
 }
 
 interface BallisticSource {
@@ -203,7 +294,10 @@ interface BallisticPlan {
   velocity: { vt: number; vh: number; vz: number };
   flightTime: number;
   path: TrajectorySample[];
+  flightMode: 'ballistic' | 'cruise' | 'chord';
 }
+
+type IndexedEntity = Unit | Structure | Wreck;
 
 // ---------------------------------------------------------------------------
 // World
@@ -213,17 +307,21 @@ export class World {
   readonly terrain: Terrain;
   readonly rng: Rng;
   readonly nav: SurfaceNav;
+  worldSeed: number;
+  terrainSeed: number;
 
   units: Unit[] = [];
   structures: Structure[] = [];
   projectiles: Projectile[] = [];
+  wreckages: Wreck[] = [];
   deposits: Deposit[] = [];
 
   players: Record<Faction, PlayerState>;
 
   time = 0;
   tick = 0;
-  /** null while the match is running. */
+  status: MatchStatus = 'running';
+  /** The winner of a completed win, or null for a draw/running match. */
   winner: Faction | null = null;
   endReason = '';
   private victoryArmed = false;
@@ -234,8 +332,22 @@ export class World {
 
   private nextId = 1;
   /** Coarse spatial buckets, rebuilt each tick, to keep targeting linear-ish. */
-  private buckets = new Map<number, number[]>();
   private static readonly BUCKET = 220;
+  private readonly bucketCols = Math.floor(RING_CIRCUMFERENCE / World.BUCKET) + 1;
+  private readonly bucketRows = Math.floor((RING_HALF_WIDTH * 2) / World.BUCKET) + 1;
+  private readonly radiusOneBucketIndices = this.createRadiusOneBucketIndices();
+  private readonly buckets: Array<number[] | undefined> = Array.from({
+    length: this.bucketCols * this.bucketRows,
+  });
+  private readonly usedBuckets: number[] = [];
+  private readonly nearbyCache: Array<number[] | undefined> = [];
+  private readonly nearbyCacheGeneration: number[] = [];
+  private readonly emptyNearby: readonly number[] = [];
+  private bucketGeneration = 0;
+  private bucketsDirty = true;
+  private readonly entityBucketById: number[] = [];
+  /** Derived O(1) lookup index. Stable arrays remain authoritative and serialized. */
+  private entitiesById: Array<IndexedEntity | undefined> = [];
   private readonly navDirection: NavDirection = { ds: 0, dz: 0, reachable: false };
   private visibilityTick = -1;
   private readonly visibleEntities: Record<Faction, Map<number, boolean>> = {
@@ -243,8 +355,11 @@ export class World {
     [Faction.Choir]: new Map(),
   };
 
-  constructor(terrain: Terrain, seed: number, private readonly timeLimit = MATCH_TIME_LIMIT) {
+  constructor(terrain: Terrain, seed: number, private timeLimit = MATCH_TIME_LIMIT) {
+    validateSeed(seed, 'World seed');
     this.terrain = terrain;
+    this.worldSeed = seed;
+    this.terrainSeed = resolveTerrainSeed(terrain, seed);
     this.rng = new Rng(seed);
     this.nav = new SurfaceNav(terrain);
     this.players = {
@@ -305,6 +420,7 @@ export class World {
 
   spawnUnit(faction: Faction, kind: UnitKind, s: number, z: number): Unit {
     const def = UNITS[kind];
+    const effective = effectiveUnitStats(faction, kind);
     const u: Unit = {
       id: this.nextId++,
       alive: true,
@@ -319,7 +435,11 @@ export class World {
       aimYaw: 0,
       prevAimYaw: 0,
       speed: 0,
-      hp: def.hp,
+      hp: effective.maxHp,
+      maxHp: effective.maxHp,
+      vision: effective.vision,
+      buildDuration: effective.buildDuration,
+      salvageCost: effective.salvageCost,
       order: { kind: 'idle', s: 0, z: 0, targetId: 0 },
       cd: def.weapons.map(() => 0),
       burst: def.weapons.map(() => 0),
@@ -330,8 +450,15 @@ export class World {
       manualAimYaw: null,
       buildTimer: 0,
       buildTargetId: 0,
+      ability: createAbilityState(kind),
+      cloaked: false,
+      stationaryTime: 0,
+      damageState: 0,
+      speedMultiplier: 1,
     };
     this.units.push(u);
+    this.entitiesById[u.id] = u;
+    this.bucketsDirty = true;
     this.clearVisibilityCache();
     if (def.cost.command) this.players[faction].commandUsed += def.cost.command;
     return u;
@@ -345,6 +472,7 @@ export class World {
     progress: number,
   ): Structure {
     const def = STRUCTURES[kind];
+    const effective = effectiveStructureStats(faction, kind);
     const st: Structure = {
       id: this.nextId++,
       alive: true,
@@ -353,7 +481,11 @@ export class World {
       s: wrapS(s),
       z: clampAxial(z),
       yaw: faction === Faction.Choir ? Math.PI : 0,
-      hp: def.hp * (progress < 1 ? 0.25 : 1),
+      hp: effective.maxHp * (progress < 1 ? 0.25 : 1),
+      maxHp: effective.maxHp,
+      vision: effective.vision,
+      buildDuration: effective.buildDuration,
+      salvageCost: effective.salvageCost,
       progress,
       cd: def.weapons.map(() => 0),
       burst: def.weapons.map(() => 0),
@@ -365,6 +497,8 @@ export class World {
       capture: 0,
     };
     this.structures.push(st);
+    this.entitiesById[st.id] = st;
+    this.bucketsDirty = true;
     this.clearVisibilityCache();
     if (faction >= 0 && progress >= 1) this.players[faction as Faction].unlocked.add(kind);
     if (kind === 'bastion') {
@@ -384,13 +518,18 @@ export class World {
   // -------------------------------------------------------------------------
 
   unitById(id: number): Unit | undefined {
-    for (const u of this.units) if (u.id === id && u.alive) return u;
-    return undefined;
+    const entity = this.entitiesById[id];
+    return entity?.alive && 'order' in entity ? entity : undefined;
   }
 
   structureById(id: number): Structure | undefined {
-    for (const s of this.structures) if (s.id === id && s.alive) return s;
-    return undefined;
+    const entity = this.entitiesById[id];
+    return entity?.alive && 'progress' in entity ? entity : undefined;
+  }
+
+  wreckById(id: number): Wreck | undefined {
+    const entity = this.entitiesById[id];
+    return entity?.alive && !('order' in entity) && !('progress' in entity) ? entity : undefined;
   }
 
   /** Position of any entity, or null if it is gone. */
@@ -401,6 +540,14 @@ export class World {
     if (st) {
       return { s: st.s, z: st.z, h: this.terrain.heightAt(st.s, st.z) + STRUCTURES[st.kind].height * 0.4 };
     }
+    const wreck = this.wreckById(id);
+    if (wreck) {
+      return {
+        s: wreck.s,
+        z: wreck.z,
+        h: this.terrain.heightAt(wreck.s, wreck.z) + UNITS[wreck.kind].height * 0.25,
+      };
+    }
     return null;
   }
 
@@ -409,7 +556,7 @@ export class World {
   // -------------------------------------------------------------------------
 
   step(): void {
-    if (this.winner !== null) return;
+    if (this.status === 'completed') return;
     const dt = SIM_DT;
     for (const unit of this.units) {
       if (!unit.alive) continue;
@@ -427,6 +574,7 @@ export class World {
     this.stepUnits(dt);
     this.stepStructures(dt);
     this.stepProjectiles(dt);
+    this.stepWrecks(dt);
     this.stepCapture(dt);
     this.stepCleanup();
     this.stepVictory();
@@ -434,41 +582,107 @@ export class World {
 
   // ---- Spatial index ------------------------------------------------------
 
-  private bucketKey(s: number, z: number): number {
+  private bucketIndex(s: number, z: number): number {
     const bs = Math.floor(s / World.BUCKET);
     const bz = Math.floor((z + RING_HALF_WIDTH) / World.BUCKET);
-    return bs * 1000 + bz;
+    return bs * this.bucketRows + bz;
   }
 
   private rebuildBuckets(): void {
-    this.buckets.clear();
+    if (!this.bucketsDirty && !this.hasEntityChangedBucket()) return;
+    this.bucketGeneration++;
+    for (const index of this.usedBuckets) this.buckets[index]!.length = 0;
+    this.usedBuckets.length = 0;
     const add = (s: number, z: number, id: number): void => {
-      const k = this.bucketKey(s, z);
-      let arr = this.buckets.get(k);
+      const index = this.bucketIndex(s, z);
+      let arr = this.buckets[index];
       if (!arr) {
         arr = [];
-        this.buckets.set(k, arr);
+        this.buckets[index] = arr;
       }
+      if (arr.length === 0) this.usedBuckets.push(index);
       arr.push(id);
+      this.entityBucketById[id] = index;
     };
     for (const u of this.units) if (u.alive) add(u.s, u.z, u.id);
     for (const s of this.structures) if (s.alive) add(s.s, s.z, s.id);
+    for (const wreck of this.wreckages) if (wreck.alive) add(wreck.s, wreck.z, wreck.id);
+    this.bucketsDirty = false;
+  }
+
+  private hasEntityChangedBucket(): boolean {
+    for (const unit of this.units) {
+      if (unit.alive && this.entityBucketById[unit.id] !== this.bucketIndex(unit.s, unit.z)) return true;
+    }
+    for (const structure of this.structures) {
+      if (structure.alive && this.entityBucketById[structure.id] !== this.bucketIndex(structure.s, structure.z)) return true;
+    }
+    for (const wreck of this.wreckages) {
+      if (wreck.alive && this.entityBucketById[wreck.id] !== this.bucketIndex(wreck.s, wreck.z)) return true;
+    }
+    return false;
   }
 
   /** Ids near a point. Approximate: returns everything in the 3x3 bucket block. */
-  private nearby(s: number, z: number, radius: number, out: number[]): void {
-    out.length = 0;
+  private nearby(s: number, z: number, radius: number): readonly number[] {
     const r = Math.ceil(radius / World.BUCKET);
-    const bs = Math.floor(s / World.BUCKET);
+    const bs = ((Math.floor(s / World.BUCKET) % this.bucketCols) + this.bucketCols) % this.bucketCols;
     const bz = Math.floor((z + RING_HALF_WIDTH) / World.BUCKET);
-    const span = Math.floor(RING_CIRCUMFERENCE / World.BUCKET) + 1;
-    for (let dz = -r; dz <= r; dz++) {
-      for (let ds = -r; ds <= r; ds++) {
-        const k = (((bs + ds) % span) + span) % span * 1000 + (bz + dz);
-        const arr = this.buckets.get(k);
-        if (arr) for (const id of arr) out.push(id);
+    if (bz < 0 || bz >= this.bucketRows) return this.emptyNearby;
+    const bucketCount = this.bucketCols * this.bucketRows;
+    const cacheKey = r * bucketCount + bs * this.bucketRows + bz;
+    let cached = this.nearbyCache[cacheKey];
+    if (this.nearbyCacheGeneration[cacheKey] === this.bucketGeneration) {
+      return cached ?? this.emptyNearby;
+    }
+    if (!cached) {
+      cached = [];
+      this.nearbyCache[cacheKey] = cached;
+    } else {
+      cached.length = 0;
+    }
+    if (r === 1) {
+      const offset = (bs * this.bucketRows + bz) * 9;
+      for (let index = offset; index < offset + 9; index++) {
+        const bucketIndex = this.radiusOneBucketIndices[index]!;
+        if (bucketIndex < 0) continue;
+        const arr = this.buckets[bucketIndex];
+        if (arr) for (const id of arr) cached.push(id);
+      }
+    } else {
+      for (let dz = -r; dz <= r; dz++) {
+        const row = bz + dz;
+        if (row < 0 || row >= this.bucketRows) continue;
+        for (let ds = -r; ds <= r; ds++) {
+          const col = (((bs + ds) % this.bucketCols) + this.bucketCols) % this.bucketCols;
+          const arr = this.buckets[col * this.bucketRows + row];
+          if (arr) for (const id of arr) cached.push(id);
+        }
       }
     }
+    this.nearbyCacheGeneration[cacheKey] = this.bucketGeneration;
+    return cached;
+  }
+
+  private createRadiusOneBucketIndices(): Int32Array {
+    const indices = new Int32Array(this.bucketCols * this.bucketRows * 9);
+    indices.fill(-1);
+    for (let col = 0; col < this.bucketCols; col++) {
+      for (let row = 0; row < this.bucketRows; row++) {
+        let offset = (col * this.bucketRows + row) * 9;
+        for (let dz = -1; dz <= 1; dz++) {
+          const neighborRow = row + dz;
+          for (let ds = -1; ds <= 1; ds++) {
+            if (neighborRow >= 0 && neighborRow < this.bucketRows) {
+              const neighborCol = (col + ds + this.bucketCols) % this.bucketCols;
+              indices[offset] = neighborCol * this.bucketRows + neighborRow;
+            }
+            offset++;
+          }
+        }
+      }
+    }
+    return indices;
   }
 
   // ---- Economy ------------------------------------------------------------
@@ -476,8 +690,11 @@ export class World {
   private stepEconomy(dt: number): void {
     for (const f of [Faction.Compact, Faction.Choir]) {
       const p = this.players[f];
+      const expiryIndex = this.tick % WEAPON_POWER_PULSE_TICKS;
+      p.weaponEnergyLoad = Math.max(0, p.weaponEnergyLoad - p.weaponEnergySchedule[expiryIndex]!);
+      p.weaponEnergySchedule[expiryIndex] = 0;
       p.energyProduced = BASE_ENERGY;
-      p.energyDrawn = 0;
+      p.energyDrawn = p.weaponEnergyLoad;
     }
 
     for (const st of this.structures) {
@@ -510,6 +727,20 @@ export class World {
       const def = UNITS[u.kind];
       if (def.upkeep) this.players[u.faction].energyDrawn += def.upkeep;
     }
+
+    // Ability energy is rate draw, not a stockpile. Stable unit order decides
+    // which active abilities remain admitted when production is oversubscribed.
+    for (const u of this.units) {
+      if (!u.alive || !u.ability?.active) continue;
+      const rate = ABILITIES[u.ability.id].energyPerSecond;
+      if (rate <= 0) continue;
+      const player = this.players[u.faction];
+      if (player.energyDrawn + rate <= player.energyProduced + 1e-9) {
+        player.energyDrawn += rate;
+      } else {
+        this.deactivateUnitAbility(u, true);
+      }
+    }
   }
 
   /** Direct sunlight fraction at an arc position. Mirrors the render side. */
@@ -527,8 +758,86 @@ export class World {
     return Math.max(0.3, p.energyProduced / Math.max(p.energyDrawn, 0.001));
   }
 
+  activateAbility(unitId: number, active = true): boolean {
+    if (this.status === 'completed') return false;
+    const unit = this.unitById(unitId);
+    if (!unit?.ability || unit.ability.id === 'cloak' || unit.ability.active === active) return false;
+    if (!active) {
+      this.deactivateUnitAbility(unit, false);
+      return true;
+    }
+    if (unit.ability.cooldown > 0) return false;
+    const def = ABILITIES[unit.ability.id];
+    if (def.energyPerSecond > 0 && !this.hasAbilityPower(unit.faction, def.energyPerSecond)) return false;
+    unit.ability.active = true;
+    if (unit.ability.id === 'siegeMode') {
+      unit.ability.transitionTimer = ABILITIES.siegeMode.transitionDuration;
+      unit.speed = 0;
+    }
+    this.refreshSpeedMultiplier(unit);
+    return true;
+  }
+
+  private hasAbilityPower(faction: Faction, additionalRate: number): boolean {
+    const { produced, drawn } = this.instantaneousEnergy(faction);
+    return drawn + additionalRate <= produced + 1e-9;
+  }
+
+  private instantaneousEnergy(faction: Faction): { produced: number; drawn: number } {
+    let produced = BASE_ENERGY;
+    let drawn = this.players[faction].weaponEnergyLoad;
+    for (const structure of this.structures) {
+      if (!structure.alive || structure.progress < 1 || structure.faction !== faction) continue;
+      const def = STRUCTURES[structure.kind];
+      if (def.energy > 0) produced += def.energy * (def.solar ? this.daylightAt(structure.s) : 1);
+      else drawn += -def.energy;
+    }
+    for (const unit of this.units) {
+      if (!unit.alive || unit.faction !== faction) continue;
+      drawn += UNITS[unit.kind].upkeep ?? 0;
+      if (unit.ability?.active) drawn += ABILITIES[unit.ability.id].energyPerSecond;
+    }
+    return { produced, drawn };
+  }
+
+  private hasWeaponPower(faction: Faction, weapon: WeaponDef): boolean {
+    const cost = weapon.energyPerShot ?? 0;
+    if (cost <= 0) return true;
+    const { produced, drawn } = this.instantaneousEnergy(faction);
+    return drawn + cost <= produced + 1e-9;
+  }
+
+  private consumeWeaponPower(faction: Faction, weapon: WeaponDef): boolean {
+    const cost = weapon.energyPerShot ?? 0;
+    if (cost <= 0) return true;
+    const { produced, drawn } = this.instantaneousEnergy(faction);
+    const player = this.players[faction];
+    player.energyProduced = produced;
+    player.energyDrawn = drawn;
+    if (drawn + cost > produced + 1e-9) return false;
+    player.weaponEnergyLoad += cost;
+    player.weaponEnergySchedule[this.tick % WEAPON_POWER_PULSE_TICKS]! += cost;
+    player.energyDrawn += cost;
+    return true;
+  }
+
+  private deactivateUnitAbility(unit: Unit, forced: boolean): void {
+    const ability = unit.ability;
+    if (!ability?.active) return;
+    ability.active = false;
+    const def = ABILITIES[ability.id];
+    if (forced || def.cooldownAfterDeactivation > 0) {
+      ability.cooldown = Math.max(ability.cooldown, def.cooldownAfterDeactivation);
+    }
+    if (ability.id === 'siegeMode') {
+      ability.transitionTimer = ABILITIES.siegeMode.transitionDuration;
+      unit.speed = 0;
+    }
+    this.refreshSpeedMultiplier(unit);
+  }
+
   depositAt(s: number, z: number): Deposit | undefined {
-    for (const d of this.deposits) if (surfaceDist(d.s, d.z, s, z) < 70) return d;
+    for (const d of this.deposits) if (surfaceDistSq(d.s, d.z, s, z) < 70 * 70) return d;
     return undefined;
   }
 
@@ -550,33 +859,34 @@ export class World {
       if (!st.alive || st.faction < 0 || st.progress < 1 || st.queue.length === 0) continue;
       const kind = st.queue[0]!;
       const def = UNITS[kind];
+      const effective = effectiveUnitStats(st.faction as Faction, kind);
       const player = this.players[st.faction as Faction];
       if ((def.cost.command ?? 0) + player.commandUsed > player.commandCap) continue;
       // Production slows during a brownout instead of stalling outright.
       st.queueTimer += dt * this.powerRatio(st.faction as Faction);
-      if (st.queueTimer >= def.buildTime) {
+      if (st.queueTimer >= effective.buildDuration) {
         st.queue.shift();
         st.queueTimer = 0;
         const forward = STRUCTURES[st.kind].radius + 16;
         const lateral = ((this.nextId % 7) - 3) * (UNITS[kind].radius * 2.2);
         const outS = st.s + Math.cos(st.yaw) * forward - Math.sin(st.yaw) * lateral;
         const outZ = st.z + Math.sin(st.yaw) * forward + Math.cos(st.yaw) * lateral;
-        this.spawnUnit(st.faction as Faction, kind, outS, clampAxial(outZ));
-        this.emit('unitComplete', outS, clampAxial(outZ), 0, st.faction, 1, st.id);
+        const unit = this.spawnUnit(st.faction as Faction, kind, outS, clampAxial(outZ));
+        this.emit('unitComplete', outS, clampAxial(outZ), 0, st.faction, 1, unit.id, undefined, kind);
       }
     }
   }
 
   /** Queue a unit if it can be afforded. Returns false if it cannot. */
   tryQueueUnit(structureId: number, kind: UnitKind): boolean {
-    if (this.winner !== null) return false;
+    if (this.status === 'completed') return false;
     const st = this.structureById(structureId);
     if (!st || st.faction < 0 || st.progress < 1) return false;
     if (!STRUCTURES[st.kind].produces?.includes(kind)) return false;
     const f = st.faction as Faction;
     const p = this.players[f];
     const def = UNITS[kind];
-    const cost = def.cost.salvage ?? 0;
+    const cost = effectiveUnitStats(f, kind).salvageCost;
     if (p.salvage < cost) return false;
     if (def.cost.command && p.commandUsed + this.queuedCommand(f) + def.cost.command > p.commandCap) return false;
     p.salvage -= cost;
@@ -586,13 +896,14 @@ export class World {
 
   /** Place a construction site. Returns the structure, or null if invalid. */
   tryPlaceStructure(f: Faction, kind: StructureKind, s: number, z: number): Structure | null {
-    if (this.winner !== null) return null;
+    if (this.status === 'completed') return null;
     const def = STRUCTURES[kind];
     const p = this.players[f];
+    const cost = effectiveStructureStats(f, kind).salvageCost;
     if (def.neutral) return null;
-    if (p.salvage < (def.cost.salvage ?? 0)) return null;
+    if (p.salvage < cost) return null;
     if (!this.canPlace(f, kind, s, z)) return null;
-    p.salvage -= def.cost.salvage ?? 0;
+    p.salvage -= cost;
     const st = this.spawnStructure(f, kind, s, z, 0);
     if (def.needsDeposit) {
       const d = this.depositAt(s, z);
@@ -602,7 +913,7 @@ export class World {
   }
 
   canPlace(f: Faction, kind: StructureKind, s: number, z: number): boolean {
-    if (this.winner !== null) return false;
+    if (this.status === 'completed') return false;
     const def = STRUCTURES[kind];
     if (def.requires && !this.players[f].unlocked.has(def.requires)) return false;
     if (!this.terrain.isBuildable(s, z)) return false;
@@ -642,12 +953,19 @@ export class World {
   // ---- Units --------------------------------------------------------------
 
   private stepUnits(dt: number): void {
-    const near: number[] = [];
-
     for (const u of this.units) {
       if (!u.alive) continue;
       const def = UNITS[u.kind];
-      if (u.revealed > 0) u.revealed -= dt;
+      u.revealed = Math.max(0, u.revealed - dt);
+      if (u.ability) {
+        u.ability.cooldown = Math.max(0, u.ability.cooldown - dt);
+        const wasTransitioning = u.ability.transitionTimer > 0;
+        u.ability.transitionTimer = Math.max(0, u.ability.transitionTimer - dt);
+        if (wasTransitioning && u.ability.transitionTimer === 0 && u.ability.id === 'siegeMode') {
+          this.refreshSpeedMultiplier(u);
+        }
+      }
+      this.updateDamageState(u);
 
       for (let i = 0; i < def.weapons.length; i++) {
         const weapon = WEAPONS[def.weapons[i]!]!;
@@ -663,10 +981,11 @@ export class World {
         if (!site || site.progress >= 1) {
           u.order = { kind: 'idle', s: 0, z: 0, targetId: 0 };
           u.buildTargetId = 0;
-        } else if (surfaceDist(u.s, u.z, site.s, site.z) < STRUCTURES[site.kind].radius + 24) {
-          const sdef = STRUCTURES[site.kind];
-          site.progress = Math.min(1, site.progress + dt / sdef.buildTime);
-          site.hp = sdef.hp * (0.25 + 0.75 * site.progress);
+        } else if (
+          surfaceDistSq(u.s, u.z, site.s, site.z) < (STRUCTURES[site.kind].radius + 24) ** 2
+        ) {
+          site.progress = Math.min(1, site.progress + dt / site.buildDuration);
+          site.hp = site.maxHp * (0.25 + 0.75 * site.progress);
           if (site.progress >= 1) {
             this.players[site.faction as Faction].unlocked.add(site.kind);
             this.recomputeCommandCaps();
@@ -685,7 +1004,7 @@ export class World {
 
       // --- Target acquisition ----------------------------------------------
       if (def.weapons.length > 0) {
-        const maxRange = this.bestRange(def.weapons);
+        const maxRange = this.bestRange(def.weapons, u);
         if (u.order.kind === 'attack' && u.order.targetId) {
           if (this.isValidTarget(u.faction, u.order.targetId, u.s, u.z, maxRange)) {
             u.targetId = u.order.targetId;
@@ -694,15 +1013,18 @@ export class World {
             u.order = { kind: 'idle', s: 0, z: 0, targetId: 0 };
           }
         } else if (!u.targetId || !this.isValidTarget(u.faction, u.targetId, u.s, u.z, maxRange)) {
-          u.targetId = this.findTarget(u.faction, u.s, u.z, maxRange, near);
+          u.targetId = this.findTarget(u.faction, u.s, u.z, maxRange);
         }
       }
 
       // --- Movement ---------------------------------------------------------
       const tgt = u.targetId ? this.positionOf(u.targetId) : null;
       let moved = false;
+      const immobilized = this.isSiegeImmobilized(u);
 
-      if (u.order.kind === 'move' || u.order.kind === 'attackMove') {
+      if (immobilized) {
+        u.speed = 0;
+      } else if (u.order.kind === 'move' || u.order.kind === 'attackMove') {
         const d = surfaceDist(u.s, u.z, u.order.s, u.order.z);
         if (d < 14) {
           u.order = { kind: 'idle', s: 0, z: 0, targetId: 0 };
@@ -711,17 +1033,18 @@ export class World {
           // On attack-move, stop to shoot anything in range.
           const engaged =
             u.order.kind === 'attackMove' && tgt !== null &&
-            surfaceDist(u.s, u.z, tgt.s, tgt.z) < this.bestRange(def.weapons) * 0.85;
+            this.canEngageTarget(u, def.weapons, tgt, 0.85);
           if (!engaged) {
             this.moveToward(u, u.order.s, u.order.z, dt, def);
             moved = true;
           }
         }
       } else if (u.order.kind === 'attack' && tgt) {
-        // Close to within 80% of range, then hold.
-        const d = surfaceDist(u.s, u.z, tgt.s, tgt.z);
-        const want = this.bestRange(def.weapons) * 0.8;
-        if (d > want) {
+        // Ballistic reach is directional on the ring. A nominal-range check can
+        // park artillery in geometry where no trajectory exists, retrying the
+        // expensive solver forever. Keep closing until at least one weapon can
+        // actually engage from this position.
+        if (!this.canEngageTarget(u, def.weapons, tgt, 0.8)) {
           this.moveToward(u, tgt.s, tgt.z, dt, def);
           moved = true;
         }
@@ -734,7 +1057,7 @@ export class World {
         const dz = tgt.z - u.z;
         const want = Math.atan2(dz, ds);
         u.aimYaw = turnToward(u.aimYaw, want, def.turnRate * 1.9 * dt);
-        if (!moved) this.faceToward(u, tgt.s, tgt.z, dt, def.turnRate);
+        if (!moved && !immobilized) this.faceToward(u, tgt.s, tgt.z, dt, def.turnRate);
         this.fireWeapons(u, def.weapons, tgt, dt, u.faction, u.s, u.z, true);
       } else {
         for (let i = 0; i < u.cd.length; i++) {
@@ -746,17 +1069,76 @@ export class World {
       }
 
       u.gait += u.speed * dt;
+      this.updateCloak(u, dt);
     }
 
     this.separateUnits(dt);
+    for (const unit of this.units) {
+      if (!unit.alive || unit.ability?.id !== 'cloak') continue;
+      if (surfaceDist(unit.prevS, unit.prevZ, unit.s, unit.z) > 1e-6) this.breakCloak(unit);
+    }
   }
 
-  private bestRange(weapons: string[]): number {
+  private bestRange(weapons: string[], ent?: Unit | Structure): number {
     let r = 0;
     for (const w of weapons) {
-      if (WEAPONS[w]!.kind !== 'interceptor') r = Math.max(r, WEAPONS[w]!.range);
+      if (WEAPONS[w]!.kind !== 'interceptor') {
+        r = Math.max(r, this.weaponRange(ent, WEAPONS[w]!));
+      }
     }
     return r || 60;
+  }
+
+  private canEngageTarget(
+    ent: Unit | Structure,
+    weapons: readonly string[],
+    target: { s: number; z: number },
+    rangeScale: number,
+  ): boolean {
+    const distanceSquared = surfaceDistSq(ent.s, ent.z, target.s, target.z);
+    for (const weaponId of weapons) {
+      const weapon = WEAPONS[weaponId]!;
+      if (weapon.kind === 'interceptor') continue;
+      const range = this.weaponRange(ent, weapon) * rangeScale;
+      if (distanceSquared > range * range) continue;
+      if (
+        weapon.kind !== 'ballistic' ||
+        this.isBallisticTargetWithinReachEnvelope(
+          ent.id,
+          target.s,
+          target.z,
+          ent.faction as Faction,
+          weaponId,
+        )
+      ) return true;
+    }
+    return false;
+  }
+
+  effectiveWeaponRange(entityId: number, weaponId: string): number {
+    const ent = this.unitById(entityId) ?? this.structureById(entityId);
+    const weapon = WEAPONS[weaponId];
+    if (!ent || !weapon) return 0;
+    return this.weaponRange(ent, weapon);
+  }
+
+  effectiveWeaponCooldown(entityId: number, weaponId: string): number {
+    const ent = this.unitById(entityId) ?? this.structureById(entityId);
+    const weapon = WEAPONS[weaponId];
+    if (!ent || !weapon) return 0;
+    return this.weaponCooldown(ent, weapon);
+  }
+
+  private weaponRange(ent: Unit | Structure | undefined, weapon: WeaponDef): number {
+    return ent && 'ability' in ent && ent.ability?.id === 'siegeMode' && ent.ability.active
+      ? weapon.range * ABILITIES.siegeMode.rangeMultiplier
+      : weapon.range;
+  }
+
+  private weaponCooldown(ent: Unit | Structure, weapon: WeaponDef): number {
+    return 'ability' in ent && ent.ability?.id === 'siegeMode' && ent.ability.active
+      ? weapon.cooldown / ABILITIES.siegeMode.fireRateMultiplier
+      : weapon.cooldown;
   }
 
   private moveToward(u: Unit, ts: number, tz: number, dt: number, def: (typeof UNITS)[UnitKind]): void {
@@ -773,7 +1155,7 @@ export class World {
     const align = Math.max(0, Math.cos(angleDelta(u.yaw, want)));
     const slope = this.terrain.slopeAt(u.s, u.z);
     const slowdown = 1 / (1 + slope * 2.4);
-    const target = nav.reachable ? def.speed * align * slowdown : 0;
+    const target = nav.reachable ? def.speed * u.speedMultiplier * align * slowdown : 0;
     u.speed += (target - u.speed) * Math.min(1, dt * 3.5);
 
     const step = Math.min(u.speed * dt, d);
@@ -782,6 +1164,7 @@ export class World {
     if (this.nav.segmentPassable(u.s, u.z, nextS, nextZ)) {
       u.s = nextS;
       u.z = nextZ;
+      if (step > 1e-6) this.breakCloak(u);
     } else {
       u.speed = 0;
     }
@@ -794,15 +1177,15 @@ export class World {
 
   /** Push overlapping units apart so they do not stack into one pile. */
   private separateUnits(dt: number): void {
-    const near: number[] = [];
     for (const a of this.units) {
       if (!a.alive) continue;
       const ra = UNITS[a.kind].radius;
-      this.nearby(a.s, a.z, 40, near);
+      const near = this.nearby(a.s, a.z, 40);
       for (const id of near) {
         if (id <= a.id) continue;
-        const b = this.unitById(id);
-        if (!b || !b.alive) continue;
+        const entity = this.entitiesById[id];
+        if (!entity?.alive || !('order' in entity)) continue;
+        const b = entity;
         const rb = UNITS[b.kind].radius;
         const min = ra + rb;
         const ds = deltaS(a.s, b.s);
@@ -836,28 +1219,25 @@ export class World {
     if (!p) return false;
     const u = this.unitById(id);
     const st = this.structureById(id);
-    const of = u ? u.faction : st ? st.faction : -1;
+    const wreck = u || st ? undefined : this.wreckById(id);
+    const of = u ? u.faction : st ? st.faction : wreck ? wreck.faction : -1;
     if (of === f || of < 0) return false;
-    return this.isEntityVisible(f, id) && surfaceDist(s, z, p.s, p.z) <= range;
+    return this.isEntityVisible(f, id) && surfaceDistSq(s, z, p.s, p.z) <= range * range;
   }
 
   /** Nearest enemy in range. Prefers units over buildings. */
-  private findTarget(f: Faction, s: number, z: number, range: number, near: number[]): number {
-    this.nearby(s, z, range, near);
+  private findTarget(f: Faction, s: number, z: number, range: number): number {
+    const near = this.nearby(s, z, range);
     let best = 0;
     let bestScore = Infinity;
     for (const id of near) {
-      const u = this.unitById(id);
-      const st = u ? undefined : this.structureById(id);
-      const of = u ? u.faction : st ? st.faction : -1;
-      if (of === f || of < 0) continue;
+      const entity = this.entitiesById[id];
+      if (!entity?.alive || entity.faction === f || entity.faction < 0) continue;
       if (!this.isEntityVisible(f, id)) continue;
-      const ps = u ? u.s : st!.s;
-      const pz = u ? u.z : st!.z;
-      const d = surfaceDist(s, z, ps, pz);
+      const d = surfaceDist(s, z, entity.s, entity.z);
       if (d > range) continue;
       // Buildings are shot only once nothing living is in reach.
-      const score = d + (u ? 0 : range * 0.9);
+      const score = d + ('order' in entity ? 0 : 'progress' in entity ? range * 0.9 : range * 1.2);
       if (score < bestScore) {
         bestScore = score;
         best = id;
@@ -873,42 +1253,140 @@ export class World {
     targetS: number,
     targetZ: number,
     faction: Faction,
+    weaponId?: string,
   ): TrajectorySample[] | null {
-    if (this.winner !== null) return null;
-    const source = this.ballisticSource(sourceId, faction);
-    if (!source || !this.isVisible(faction, targetS, targetZ)) return null;
+    if (this.status === 'completed') return null;
+    const source = this.ballisticSource(sourceId, faction, weaponId);
+    if (!source) return null;
+    if (source.weapon.flightMode !== 'chord' && !this.isVisible(faction, targetS, targetZ)) return null;
     return this.planBallistic(source, targetS, targetZ)?.path ?? null;
   }
 
-  fireBallisticAt(sourceId: number, targetS: number, targetZ: number, faction: Faction): boolean {
-    if (this.winner !== null) return false;
-    const source = this.ballisticSource(sourceId, faction);
+  private isSiegeImmobilized(unit: Unit): boolean {
+    return unit.ability?.id === 'siegeMode' && (unit.ability.active || unit.ability.transitionTimer > 0);
+  }
+
+  private refreshSpeedMultiplier(unit: Unit): void {
+    let multiplier = unit.damageState === 2 ? 0.8 : 1;
+    if (unit.ability?.id === 'shieldWall' && unit.ability.active) {
+      multiplier *= ABILITIES.shieldWall.speedMultiplier;
+    }
+    if (this.isSiegeImmobilized(unit)) multiplier = 0;
+    unit.speedMultiplier = multiplier;
+  }
+
+  private updateDamageState(unit: Unit): void {
+    if (!UNITS[unit.kind].isMech) return;
+    const ratio = unit.hp / Math.max(1, unit.maxHp);
+    const next: 0 | 1 | 2 = ratio < 0.33 ? 2 : ratio < 0.66 ? 1 : 0;
+    if (next === unit.damageState) return;
+    unit.damageState = next;
+    this.refreshSpeedMultiplier(unit);
+    this.emit('damageStateChanged', unit.s, unit.z, 0, unit.faction, next, unit.id);
+  }
+
+  private updateCloak(unit: Unit, dt: number): void {
+    if (unit.ability?.id !== 'cloak') return;
+    if (unit.speed > 0.05) {
+      this.breakCloak(unit);
+      return;
+    }
+    unit.stationaryTime += dt;
+    if (unit.stationaryTime + 1e-9 >= ABILITIES.cloak.stationaryDelay) {
+      if (unit.cloaked && unit.ability.active) return;
+      unit.ability.active = true;
+      unit.cloaked = true;
+      this.clearVisibilityCache();
+    }
+  }
+
+  private breakCloak(unit: Unit): void {
+    if (unit.ability?.id !== 'cloak') return;
+    unit.stationaryTime = 0;
+    if (!unit.cloaked && !unit.ability.active) return;
+    unit.cloaked = false;
+    unit.ability.active = false;
+    unit.revealed = Math.max(unit.revealed, ABILITIES.cloak.breakRevealTime);
+    this.clearVisibilityCache();
+  }
+
+  fireBallisticAt(
+    sourceId: number,
+    targetS: number,
+    targetZ: number,
+    faction: Faction,
+    weaponId?: string,
+  ): boolean {
+    if (this.status === 'completed') return false;
+    const source = this.ballisticSource(sourceId, faction, weaponId);
     if (!source || source.ent.cd[source.weaponIndex]! > 0) return false;
-    if (!this.isVisible(faction, targetS, targetZ)) return false;
-    const plan = this.planBallistic(source, targetS, targetZ);
+    if (!this.hasWeaponPower(faction, source.weapon)) return false;
+    const visible = this.isVisible(faction, targetS, targetZ);
+    if (source.weapon.flightMode !== 'chord' && !visible) return false;
+    const spread = source.weapon.flightMode === 'chord' && !visible ? 80 : 0;
+    const actualS = spread > 0 ? wrapS(targetS + this.rng.gaussian() * spread) : wrapS(targetS);
+    const actualZ = spread > 0 ? clampAxial(targetZ + this.rng.gaussian() * spread) : clampAxial(targetZ);
+    const plan = this.planBallistic(source, actualS, actualZ);
     if (!plan) return false;
+    if (!this.consumeWeaponPower(faction, source.weapon)) return false;
 
     source.ent.cd[source.weaponIndex] =
-      source.weapon.cooldown / Math.max(0.35, this.powerRatio(faction));
+      this.weaponCooldown(source.ent, source.weapon) / Math.max(0.35, this.powerRatio(faction));
     this.commitBallistic(source, plan);
     return true;
   }
 
-  private ballisticSource(sourceId: number, faction: Faction): BallisticSource | null {
+  isBallisticTargetWithinReachEnvelope(
+    sourceId: number,
+    targetS: number,
+    targetZ: number,
+    faction: Faction,
+    weaponId?: string,
+  ): boolean {
+    const source = this.ballisticSource(sourceId, faction, weaponId);
+    if (!source || source.weapon.flightMode === 'cruise' || source.weapon.flightMode === 'chord') {
+      return source !== null;
+    }
+    const groundH = this.terrain.heightAt(source.s, source.z);
+    const sourceHeight = source.isUnit
+      ? UNITS[(source.ent as Unit).kind].height
+      : STRUCTURES[(source.ent as Structure).kind].height;
+    const from: RingPoint = {
+      s: source.s,
+      h: groundH + sourceHeight * (source.isUnit ? 0.62 : 0.7),
+      z: source.z,
+    };
+    const toS = wrapS(targetS);
+    const toZ = clampAxial(targetZ);
+    const to: RingPoint = { s: toS, h: this.terrain.heightAt(toS, toZ), z: toZ };
+    return isWithinDragAimEnvelope(
+      from,
+      to,
+      this.time,
+      source.weapon.launchSpeed ?? 120,
+      60,
+    );
+  }
+
+  private ballisticSource(sourceId: number, faction: Faction, weaponId?: string): BallisticSource | null {
     const unit = this.unitById(sourceId);
     const structure = unit ? undefined : this.structureById(sourceId);
     const ent = unit ?? structure;
     if (!ent || ent.faction !== faction || (structure && structure.progress < 1)) return null;
     const weapons = unit ? UNITS[unit.kind].weapons : STRUCTURES[structure!.kind].weapons;
-    const weaponIndex = weapons.findIndex((id) => WEAPONS[id]!.kind === 'ballistic');
+    const weaponIndex = weaponId
+      ? weapons.findIndex((id) => id === weaponId && WEAPONS[id]!.kind === 'ballistic')
+      : weapons.findIndex((id) => WEAPONS[id]!.kind === 'ballistic');
     if (weaponIndex < 0) return null;
+    const weapon = WEAPONS[weapons[weaponIndex]!]!;
+    if (weapon.flightMode === 'chord' && structure?.kind !== 'silo') return null;
     return {
       ent,
       faction,
       s: ent.s,
       z: ent.z,
       isUnit: Boolean(unit),
-      weapon: WEAPONS[weapons[weaponIndex]!]!,
+      weapon,
       weaponIndex,
     };
   }
@@ -923,6 +1401,12 @@ export class World {
       h: groundH + sourceHeight * (source.isUnit ? 0.62 : 0.7),
       z: source.z,
     };
+    if (source.weapon.flightMode === 'cruise') {
+      return this.planCruise(source.weapon, from, targetS, targetZ);
+    }
+    if (source.weapon.flightMode === 'chord') {
+      return this.planChord(source.weapon, from, targetS, targetZ);
+    }
     const to: RingPoint = {
       s: wrapS(targetS),
       h: this.terrain.heightAt(targetS, targetZ),
@@ -943,12 +1427,93 @@ export class World {
       groundAt: (s, z) => this.terrain.heightAt(s, z),
       stopOnImpact: true,
     });
-    return { from, velocity: solution.velocity, flightTime: solution.flightTime, path };
+    return {
+      from,
+      velocity: solution.velocity,
+      flightTime: solution.flightTime,
+      path,
+      flightMode: 'ballistic',
+    };
+  }
+
+  private planChord(
+    weapon: WeaponDef,
+    from: RingPoint,
+    targetS: number,
+    targetZ: number,
+  ): BallisticPlan | null {
+    const desiredS = wrapS(targetS);
+    const desiredZ = clampAxial(targetZ);
+    let aimS = desiredS;
+    let aimZ = desiredZ;
+    let lastPlan: BallisticPlan | null = null;
+    for (let iteration = 0; iteration < 6; iteration++) {
+      const solution = solveAim(
+        from,
+        { s: aimS, h: this.terrain.heightAt(aimS, aimZ), z: aimZ },
+        this.time,
+        { speed: weapon.launchSpeed ?? 400, lofted: true, maxFlightTime: 120 },
+      );
+      if (!solution) return null;
+      const path = sampleTrajectory(from, solution.velocity, this.time, {
+        maxTime: solution.flightTime + 8,
+        dt: SIM_DT,
+        ballisticCoefficient: weapon.ballisticCoefficient ?? BALLISTIC_COEFFICIENT,
+        groundAt: (s, z) => this.terrain.heightAt(s, z),
+        stopOnImpact: true,
+      });
+      const impact = path[path.length - 1]!;
+      lastPlan = {
+        from,
+        velocity: solution.velocity,
+        flightTime: impact.t,
+        path,
+        flightMode: 'chord',
+      };
+      const missS = deltaS(desiredS, impact.s);
+      const missZ = impact.z - desiredZ;
+      if (Math.hypot(missS, missZ) < 2) return lastPlan;
+      aimS = wrapS(aimS - missS);
+      aimZ = clampAxial(aimZ - missZ);
+    }
+    return lastPlan;
+  }
+
+  private planCruise(
+    weapon: WeaponDef,
+    from: RingPoint,
+    targetS: number,
+    targetZ: number,
+  ): BallisticPlan {
+    const toS = wrapS(targetS);
+    const toZ = clampAxial(targetZ);
+    const ds = deltaS(from.s, toS);
+    const dz = toZ - from.z;
+    const distance = Math.hypot(ds, dz);
+    const speed = weapon.launchSpeed ?? 55;
+    const altitude = weapon.cruiseAltitude ?? 50;
+    const steps = Math.max(1, Math.ceil(distance / (speed * SIM_DT)));
+    const path: TrajectorySample[] = [{ ...from, t: 0 }];
+    for (let step = 1; step <= steps; step++) {
+      const ratio = step / steps;
+      const s = wrapS(from.s + ds * ratio);
+      const z = from.z + dz * ratio;
+      const floor = this.terrain.heightAt(s, z);
+      path.push({ s, z, h: step === steps ? floor : floor + altitude, t: step * SIM_DT });
+    }
+    return {
+      from,
+      velocity: { vt: 0, vh: 0, vz: 0 },
+      flightTime: steps * SIM_DT,
+      path,
+      flightMode: 'cruise',
+    };
   }
 
   private commitBallistic(source: BallisticSource, plan: BallisticPlan): void {
     const impact = plan.path[plan.path.length - 1]!;
-    source.ent.revealed = FIRING_REVEAL_TIME;
+    source.ent.revealed = Math.max(source.ent.revealed, FIRING_REVEAL_TIME);
+    if (source.isUnit) this.breakCloak(source.ent as Unit);
     this.clearVisibilityCache();
     this.emit(
       'weaponFired',
@@ -968,11 +1533,14 @@ export class World {
       p: { ...plan.from },
       weapon: source.weapon.id,
       ballistic: true,
+      flightMode: plan.flightMode,
       targetId: source.ent.id,
       life: Math.max(plan.flightTime + 8, impact.t + 1),
       impactS: impact.s,
       impactZ: impact.z,
       doomed: false,
+      sourceS: source.s,
+      sourceZ: source.z,
     });
   }
 
@@ -1001,8 +1569,12 @@ export class World {
       }
       ent.cd[i] = Math.max(0, (ent.cd[i] ?? 0) - dt);
 
-      const d = surfaceDist(s, z, tgt.s, tgt.z);
-      if (d > w.range) continue;
+      const range = this.weaponRange(ent, w);
+      if (surfaceDistSq(s, z, tgt.s, tgt.z) > range * range) continue;
+      if (
+        w.kind === 'ballistic' &&
+        !this.isBallisticTargetWithinReachEnvelope(ent.id, tgt.s, tgt.z, faction, w.id)
+      ) continue;
 
       // Mid-burst?
       if ((ent.burst[i] ?? 0) > 0) {
@@ -1020,11 +1592,16 @@ export class World {
 
       if (ent.cd[i]! > 0) continue;
       if (this.launch(ent, w, faction, s, z, tgt, isUnit)) {
-        ent.cd[i] = w.cooldown / Math.max(0.35, power);
+        ent.cd[i] = this.weaponCooldown(ent, w) / Math.max(0.35, power);
         if (w.burst && w.burst > 1) {
           ent.burst[i] = w.burst - 1;
           ent.burstTimer[i] = w.burstDelay ?? 0.1;
         }
+      } else if (w.kind === 'ballistic') {
+        // A conservative envelope can still contain terrain-blocked or
+        // drag-unsolved shots. Back off briefly instead of solving the same
+        // impossible geometry on every 30 Hz tick.
+        ent.cd[i] = Math.max(ent.cd[i] ?? 0, 1);
       }
     }
   }
@@ -1038,6 +1615,7 @@ export class World {
     tgt: { s: number; z: number; h: number },
     isUnit: boolean,
   ): boolean {
+    if (!this.hasWeaponPower(faction, w)) return false;
     const groundH = this.terrain.heightAt(s, z);
     const muzzleH = groundH + (isUnit ? UNITS[(ent as Unit).kind].height * 0.62 : STRUCTURES[(ent as Structure).kind].height * 0.7);
 
@@ -1053,11 +1631,14 @@ export class World {
       };
       const plan = this.planBallistic(source, tgt.s, tgt.z);
       if (!plan) return false;
+      if (!this.consumeWeaponPower(faction, w)) return false;
       this.commitBallistic(source, plan);
       return true;
     }
 
+    if (!this.consumeWeaponPower(faction, w)) return false;
     this.emit('weaponFired', s, z, muzzleH, faction, w.muzzleFlashScale ?? 1, ent.id, w.id);
+    if (isUnit) this.breakCloak(ent as Unit);
 
     // Direct fire: a fast tracer that leads its target.
     const speed = w.projectileSpeed ?? 400;
@@ -1091,11 +1672,14 @@ export class World {
       p: { s, h: muzzleH, z },
       weapon: w.id,
       ballistic: false,
+      flightMode: 'direct',
       targetId: 0,
       life: Math.min(4, flight * 1.4 + 0.4),
       impactS: aimS,
       impactZ: aimZ,
       doomed: false,
+      sourceS: s,
+      sourceZ: z,
     });
     return true;
   }
@@ -1115,12 +1699,64 @@ export class World {
 
     for (const pr of this.projectiles) {
       if (!pr.alive || pr.faction === faction || pr.doomed || !pr.ballistic) continue;
-      // Only worth intercepting things heading for something we care about.
-      if (surfaceDist(s, z, pr.impactS, pr.impactZ) > effectiveRange) continue;
-      if (surfaceDist(s, z, pr.p.s, pr.p.z) > effectiveRange * 1.6) continue;
+      // Chord shots cross the ring interior and re-enter too steeply and quickly
+      // for terminal point defence. Their counterplay is the expensive,
+      // counter-battery-visible Silo and midcourse Laser Grid coverage.
+      if (pr.flightMode === 'chord') continue;
+      const protectedImpact =
+        'ability' in ent && ent.kind === 'aegis'
+          ? this.aegisProtectsImpact(ent, pr.impactS, pr.impactZ)
+          : surfaceDistSq(s, z, pr.impactS, pr.impactZ) <= effectiveRange * effectiveRange;
+      if (!protectedImpact) continue;
+      const engagementRange =
+        'ability' in ent && ent.ability?.id === 'umbrella' && ent.ability.active
+          ? effectiveRange + ABILITIES.umbrella.protectionRadius
+          : effectiveRange;
+      if (surfaceDistSq(s, z, pr.p.s, pr.p.z) > (engagementRange * 1.6) ** 2) continue;
+      if (!this.consumeWeaponPower(faction, w)) return;
       pr.doomed = true;
-      ent.cd[i] = w.cooldown / power;
+      ent.cd[i] = this.weaponCooldown(ent, w) / power;
       this.emit('intercepted', pr.p.s, pr.p.z, pr.p.h, faction, 1, pr.id);
+      break;
+    }
+  }
+
+  private aegisProtectsImpact(aegis: Unit, impactS: number, impactZ: number): boolean {
+    if (aegis.ability?.id !== 'umbrella' || !aegis.ability.active) {
+      return surfaceDistSq(aegis.s, aegis.z, impactS, impactZ) <=
+        ABILITIES.umbrella.baseProtectionRadius ** 2;
+    }
+    for (const unit of this.units) {
+      if (!unit.alive || unit.faction !== aegis.faction) continue;
+      if (surfaceDistSq(aegis.s, aegis.z, unit.s, unit.z) > ABILITIES.umbrella.protectionRadius ** 2) continue;
+      if (surfaceDistSq(unit.s, unit.z, impactS, impactZ) <= (UNITS[unit.kind].radius + 20) ** 2) return true;
+    }
+    for (const structure of this.structures) {
+      if (!structure.alive || structure.faction !== aegis.faction) continue;
+      if (surfaceDistSq(aegis.s, aegis.z, structure.s, structure.z) > ABILITIES.umbrella.protectionRadius ** 2) {
+        continue;
+      }
+      if (surfaceDistSq(structure.s, structure.z, impactS, impactZ) <= (STRUCTURES[structure.kind].radius + 20) ** 2) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private runLaserGrid(grid: Structure, weapon: WeaponDef): void {
+    if (grid.cd[0]! > 0 || this.powerRatio(grid.faction as Faction) < (weapon.minPowerRatio ?? 1)) return;
+    const coverage = STRUCTURES.laserGrid.coverageArc ?? weapon.range;
+    for (const projectile of this.projectiles) {
+      if (!projectile.alive || projectile.doomed || projectile.faction === grid.faction || !projectile.ballistic) {
+        continue;
+      }
+      if (projectile.flightMode === 'cruise') continue;
+      if (projectile.flightMode === 'chord' && projectile.p.h > ATMOSPHERE_HEIGHT) continue;
+      if (projectile.p.h < 200 || Math.abs(deltaS(grid.s, projectile.p.s)) > coverage) continue;
+      if (!this.consumeWeaponPower(grid.faction as Faction, weapon)) return;
+      projectile.doomed = true;
+      grid.cd[0] = weapon.cooldown / this.powerRatio(grid.faction as Faction);
+      this.emit('intercepted', projectile.p.s, projectile.p.z, projectile.p.h, grid.faction, 1, projectile.id);
       break;
     }
   }
@@ -1128,23 +1764,28 @@ export class World {
   // ---- Structures ---------------------------------------------------------
 
   private stepStructures(dt: number): void {
-    const near: number[] = [];
     for (const st of this.structures) {
       if (!st.alive || st.faction < 0 || st.progress < 1) continue;
-      if (st.revealed > 0) st.revealed -= dt;
+      st.revealed = Math.max(0, st.revealed - dt);
       const def = STRUCTURES[st.kind];
       if (def.weapons.length === 0) continue;
 
+      if (st.kind === 'laserGrid') {
+        st.cd[0] = Math.max(0, st.cd[0]! - dt);
+        this.runLaserGrid(st, WEAPONS.gridLaser);
+        continue;
+      }
+
       // The human player's Rocket Battery is ground-targeted explicitly. AI
       // batteries retain autonomous fire so the opponent can use the weapon.
-      if (st.kind === 'rocketBattery') {
+      if (st.kind === 'rocketBattery' || st.kind === 'silo') {
         for (let i = 0; i < st.cd.length; i++) st.cd[i] = Math.max(0, st.cd[i]! - dt);
         continue;
       }
 
-      const maxRange = this.bestRange(def.weapons);
+      const maxRange = this.bestRange(def.weapons, st);
       if (!st.targetId || !this.isValidTarget(st.faction as Faction, st.targetId, st.s, st.z, maxRange)) {
-        st.targetId = this.findTarget(st.faction as Faction, st.s, st.z, maxRange, near);
+        st.targetId = this.findTarget(st.faction as Faction, st.s, st.z, maxRange);
       }
       const tgt = st.targetId ? this.positionOf(st.targetId) : null;
       if (tgt) {
@@ -1166,8 +1807,6 @@ export class World {
   // ---- Projectiles --------------------------------------------------------
 
   private stepProjectiles(dt: number): void {
-    const near: number[] = [];
-
     for (const pr of this.projectiles) {
       if (!pr.alive) continue;
       pr.life -= dt;
@@ -1188,38 +1827,55 @@ export class World {
       const sdt = dt / substeps;
       let hit = false;
 
-      for (let k = 0; k < substeps && !hit; k++) {
-        stepWithDrag(pr.st, sdt, BALLISTIC_COEFFICIENT);
-        inertialToRing(pr.st, pr.p);
+      if (pr.flightMode === 'cruise') {
+        hit = this.stepCruiseProjectile(pr, w, dt);
+      } else {
+        for (let k = 0; k < substeps && !hit; k++) {
+          stepWithDrag(pr.st, sdt, w.ballisticCoefficient ?? BALLISTIC_COEFFICIENT);
+          inertialToRing(pr.st, pr.p);
 
-        const floor = this.terrain.heightAt(pr.p.s, pr.p.z);
-        if (pr.p.h <= floor) {
-          pr.p.h = floor;
-          hit = true;
-          break;
-        }
+          const floor = this.terrain.heightAt(pr.p.s, pr.p.z);
+          if (pr.p.h <= floor) {
+            pr.p.h = floor;
+            hit = true;
+            break;
+          }
 
-        // Direct-fire rounds hit the first thing they pass through.
-        if (!pr.ballistic) {
-          this.nearby(pr.p.s, pr.p.z, 30, near);
-          for (const id of near) {
-            const u = this.unitById(id);
-            const stx = u ? undefined : this.structureById(id);
-            const of = u ? u.faction : stx ? stx.faction : -1;
-            if (of === pr.faction || of < 0) continue;
-            const ps = u ? u.s : stx!.s;
-            const pz = u ? u.z : stx!.z;
-            const rad = u ? UNITS[u.kind].radius : STRUCTURES[stx!.kind].radius;
-            const hgt = u ? UNITS[u.kind].height : STRUCTURES[stx!.kind].height;
-            const gh = this.terrain.heightAt(ps, pz);
-            if (
-              surfaceDist(pr.p.s, pr.p.z, ps, pz) < rad + 2 &&
-              pr.p.h > gh - 2 &&
-              pr.p.h < gh + hgt
-            ) {
-              this.applyDamage(id, w.damage, w.damageType, pr.faction);
-              hit = true;
-              break;
+          // Direct-fire rounds hit the first thing they pass through.
+          if (!pr.ballistic) {
+            const near = this.nearby(pr.p.s, pr.p.z, 30);
+            for (const id of near) {
+              const u = this.unitById(id);
+              const stx = u ? undefined : this.structureById(id);
+              const wreck = u || stx ? undefined : this.wreckById(id);
+              const of = u ? u.faction : stx ? stx.faction : wreck ? wreck.faction : -1;
+              if (of === pr.faction || of < 0) continue;
+              const ps = u ? u.s : stx ? stx.s : wreck!.s;
+              const pz = u ? u.z : stx ? stx.z : wreck!.z;
+              const rad = u
+                ? UNITS[u.kind].radius
+                : stx
+                  ? STRUCTURES[stx.kind].radius
+                  : UNITS[wreck!.kind].radius;
+              const hgt = u
+                ? UNITS[u.kind].height
+                : stx
+                  ? STRUCTURES[stx.kind].height
+                  : UNITS[wreck!.kind].height * 0.5;
+              const gh = this.terrain.heightAt(ps, pz);
+              if (
+                surfaceDist(pr.p.s, pr.p.z, ps, pz) < rad + 2 &&
+                pr.p.h > gh - 2 &&
+                pr.p.h < gh + hgt
+              ) {
+                this.applyDamage(id, w.damage, w.damageType, pr.faction, {
+                  s: pr.sourceS,
+                  z: pr.sourceZ,
+                  projectileId: pr.id,
+                });
+                hit = true;
+                break;
+              }
             }
           }
         }
@@ -1243,6 +1899,25 @@ export class World {
     }
   }
 
+  private stepCruiseProjectile(projectile: Projectile, weapon: WeaponDef, dt: number): boolean {
+    const ds = deltaS(projectile.p.s, projectile.impactS);
+    const dz = projectile.impactZ - projectile.p.z;
+    const remaining = Math.hypot(ds, dz);
+    const travel = (weapon.launchSpeed ?? 55) * dt;
+    if (remaining <= travel + 1e-9) {
+      projectile.p.s = projectile.impactS;
+      projectile.p.z = projectile.impactZ;
+      projectile.p.h = this.terrain.heightAt(projectile.p.s, projectile.p.z);
+      return true;
+    }
+    const ratio = travel / remaining;
+    projectile.p.s = wrapS(projectile.p.s + ds * ratio);
+    projectile.p.z += dz * ratio;
+    projectile.p.h =
+      this.terrain.heightAt(projectile.p.s, projectile.p.z) + (weapon.cruiseAltitude ?? 50);
+    return false;
+  }
+
   private applySplash(
     s: number,
     z: number,
@@ -1251,30 +1926,38 @@ export class World {
     type: (typeof DAMAGE_TABLE)[keyof typeof DAMAGE_TABLE] extends never ? never : keyof typeof DAMAGE_TABLE,
     from: Faction,
   ): void {
-    const near: number[] = [];
-    this.nearby(s, z, radius + 40, near);
+    const near = this.nearby(s, z, radius + 40);
     for (const id of near) {
       const p = this.positionOf(id);
       if (!p) continue;
       const u = this.unitById(id);
       const st = u ? undefined : this.structureById(id);
-      const of = u ? u.faction : st ? st.faction : -1;
+      const wreck = u || st ? undefined : this.wreckById(id);
+      const of = u ? u.faction : st ? st.faction : wreck ? wreck.faction : -1;
       if (of < 0 || of === from) continue;
       const d = surfaceDist(s, z, p.s, p.z);
       if (d > radius) continue;
       // Linear falloff; full damage inside the inner third.
       const falloff = 1 - Math.max(0, (d - radius * 0.33) / (radius * 0.67));
-      this.applyDamage(id, damage * falloff, type, from);
+      this.applyDamage(id, damage * falloff, type, from, { s, z });
     }
   }
 
-  applyDamage(id: number, amount: number, type: keyof typeof DAMAGE_TABLE, from: Faction): void {
-    if (this.winner !== null) return;
+  applyDamage(
+    id: number,
+    amount: number,
+    type: keyof typeof DAMAGE_TABLE,
+    from: Faction,
+    source?: DamageSourceContext,
+  ): void {
+    if (this.status === 'completed') return;
     const u = this.unitById(id);
     if (u) {
       const mul = DAMAGE_TABLE[type][UNITS[u.kind].armor];
-      u.hp -= amount * mul;
-      if (u.hp <= 0) this.killUnit(u);
+      const shield = this.shieldDamageMultiplier(u, source);
+      u.hp -= amount * mul * shield;
+      this.updateDamageState(u);
+      if (u.hp <= 0) this.killUnit(u, from);
       return;
     }
     const st = this.structureById(id);
@@ -1282,23 +1965,69 @@ export class World {
       const mul = DAMAGE_TABLE[type][STRUCTURES[st.kind].armor];
       st.hp -= amount * mul;
       if (st.hp <= 0) this.killStructure(st, from);
+      return;
+    }
+    const wreck = this.wreckById(id);
+    if (!wreck) return;
+    wreck.hp -= amount;
+    if (wreck.hp <= 0) {
+      wreck.alive = false;
+      this.bucketsDirty = true;
+      this.clearVisibilityCache();
     }
   }
 
-  private killUnit(u: Unit): void {
+  private shieldDamageMultiplier(unit: Unit, source?: DamageSourceContext): number {
+    if (unit.ability?.id !== 'shieldWall' || !unit.ability.active || !source) return 1;
+    const sourceYaw = Math.atan2(source.z - unit.z, deltaS(unit.s, source.s));
+    return Math.abs(angleDelta(unit.yaw, sourceYaw)) <= ABILITIES.shieldWall.forwardArc * 0.5
+      ? ABILITIES.shieldWall.damageMultiplier
+      : 1;
+  }
+
+  private killUnit(u: Unit, from: Faction): void {
     u.alive = false;
+    this.bucketsDirty = true;
     this.clearVisibilityCache();
     const def = UNITS[u.kind];
     if (def.cost.command) {
       this.players[u.faction].commandUsed -= def.cost.command;
     }
-    this.emit('unitDied', u.s, u.z, this.terrain.heightAt(u.s, u.z), u.faction, def.height / 8, u.id);
+    if (def.isMech) {
+      const maxHp = Math.max(1, Math.round(u.maxHp * WRECK_HP_MULTIPLIER));
+      const wreck: Wreck = {
+        id: this.nextId++,
+        alive: true,
+        faction: u.faction,
+        kind: u.kind,
+        s: u.s,
+        z: u.z,
+        yaw: u.yaw,
+        hp: maxHp,
+        maxHp,
+        lifetime: WRECK_LIFETIME,
+      };
+      this.wreckages.push(wreck);
+      this.entitiesById[wreck.id] = wreck;
+    }
+    this.emit(
+      'unitDied',
+      u.s,
+      u.z,
+      this.terrain.heightAt(u.s, u.z),
+      u.faction,
+      def.height / 8,
+      u.id,
+      undefined,
+      u.kind,
+      from,
+    );
   }
 
   private killStructure(st: Structure, from: Faction): void {
     if (st.kind === 'spinalNode') {
       // Nodes are captured, never destroyed; knock it back to neutral instead.
-      st.hp = STRUCTURES.spinalNode.hp * 0.35;
+      st.hp = st.maxHp * 0.35;
       st.faction = -1;
       st.capture = 0;
       this.clearVisibilityCache();
@@ -1306,12 +2035,24 @@ export class World {
       return;
     }
     st.alive = false;
+    this.bucketsDirty = true;
     if (st.kind === 'bastion') this.lastBastionAggressor = from;
     this.clearVisibilityCache();
     const def = STRUCTURES[st.kind];
     // A fusion core going up is a genuine tactical event, not just a corpse.
     const blast = st.kind === 'fusionCore' ? 5 : def.radius / 8;
-    this.emit('structureDied', st.s, st.z, this.terrain.heightAt(st.s, st.z), st.faction, blast, st.id);
+    this.emit(
+      'structureDied',
+      st.s,
+      st.z,
+      this.terrain.heightAt(st.s, st.z),
+      st.faction,
+      blast,
+      st.id,
+      undefined,
+      st.kind,
+      from,
+    );
     if (st.kind === 'fusionCore') {
       this.applySplash(st.s, st.z, 120, 700, 'explosive', other(st.faction as Faction));
     }
@@ -1327,18 +2068,31 @@ export class World {
 
   // ---- Capture ------------------------------------------------------------
 
+  private stepWrecks(dt: number): void {
+    for (const wreck of this.wreckages) {
+      if (!wreck.alive) continue;
+      wreck.lifetime = Math.max(0, wreck.lifetime - dt);
+      if (wreck.lifetime <= 1e-9) {
+        wreck.lifetime = 0;
+        wreck.alive = false;
+        this.bucketsDirty = true;
+        this.clearVisibilityCache();
+      }
+    }
+  }
+
   private stepCapture(dt: number): void {
-    const near: number[] = [];
     for (const st of this.structures) {
       if (!st.alive || st.kind !== 'spinalNode') continue;
-      this.nearby(st.s, st.z, 130, near);
+      const near = this.nearby(st.s, st.z, 130);
 
       let compact = 0;
       let choir = 0;
       for (const id of near) {
-        const u = this.unitById(id);
-        if (!u || !u.alive) continue;
-        if (surfaceDist(u.s, u.z, st.s, st.z) > 110) continue;
+        const entity = this.entitiesById[id];
+        if (!entity?.alive || !('order' in entity)) continue;
+        const u = entity;
+        if (surfaceDistSq(u.s, u.z, st.s, st.z) > 110 * 110) continue;
         if (u.faction === Faction.Compact) compact++;
         else choir++;
       }
@@ -1381,10 +2135,11 @@ export class World {
     this.units = this.units.filter((u) => u.alive);
     this.structures = this.structures.filter((s) => s.alive);
     this.projectiles = this.projectiles.filter((p) => p.alive);
+    this.wreckages = this.wreckages.filter((wreck) => wreck.alive);
   }
 
   private stepVictory(): void {
-    if (this.winner !== null || !this.victoryArmed) return;
+    if (this.status === 'completed' || !this.victoryArmed) return;
 
     let compactBastion = false;
     let choirBastion = false;
@@ -1396,15 +2151,27 @@ export class World {
     if (!choirBastion && !compactBastion) {
       this.winner = this.lastBastionAggressor ?? this.tieBreakWinner();
       this.endReason = 'Both Bastions destroyed — last strike decides';
+      this.status = 'completed';
     } else if (!choirBastion) {
       this.winner = Faction.Compact;
       this.endReason = 'Enemy Bastion destroyed';
+      this.status = 'completed';
     } else if (!compactBastion) {
       this.winner = Faction.Choir;
       this.endReason = 'Your Bastion was destroyed';
-    } else if (this.time >= this.timeLimit) {
-      this.winner = this.tieBreakWinner();
-      this.endReason = 'Time limit — decided on Dominance';
+      this.status = 'completed';
+    } else if (this.time + SIM_DT * 1e-6 >= this.timeLimit) {
+      const compact = this.players[Faction.Compact].dominance;
+      const choir = this.players[Faction.Choir].dominance;
+      this.winner = compact === choir
+        ? null
+        : compact > choir
+          ? Faction.Compact
+          : Faction.Choir;
+      this.endReason = this.winner === null
+        ? 'Time limit — equal Dominance draw'
+        : 'Time limit — decided on Dominance';
+      this.status = 'completed';
     }
   }
 
@@ -1439,8 +2206,10 @@ export class World {
     scale: number,
     id: number,
     weapon?: string,
+    entityKind?: UnitKind | StructureKind,
+    sourceFaction?: Faction,
   ): void {
-    this.events.push({ kind, s, z, h, faction, scale, id, weapon });
+    this.events.push({ kind, s, z, h, faction, scale, id, weapon, entityKind, sourceFaction });
   }
 
   drainEvents(): SimEvent[] {
@@ -1449,27 +2218,121 @@ export class World {
     return e;
   }
 
-  /** Stable checksum for replay and determinism verification. */
-  stateHash(): string {
-    const state = JSON.stringify({
+  exportPersistenceState(): WorldPersistenceState {
+    return {
+      worldSeed: this.worldSeed,
+      terrainSeed: this.terrainSeed,
       tick: this.tick,
       time: this.time,
+      rngState: this.rng.snapshot(),
       nextId: this.nextId,
-      winner: this.winner,
-      endReason: this.endReason,
-      rng: this.rng.snapshot(),
-      players: [Faction.Compact, Faction.Choir].map((faction) => ({
-        ...this.players[faction],
-        unlocked: [...this.players[faction].unlocked].sort(),
-      })),
-      units: this.units,
-      structures: this.structures,
-      projectiles: this.projectiles,
-      deposits: this.deposits,
       timeLimit: this.timeLimit,
       victoryArmed: this.victoryArmed,
       lastBastionAggressor: this.lastBastionAggressor,
-    });
+      result: {
+        status: this.status,
+        winner: this.winner,
+        endReason: this.endReason,
+      },
+      players: [
+        snapshotPlayer(this.players[Faction.Compact]),
+        snapshotPlayer(this.players[Faction.Choir]),
+      ],
+      units: this.units.map((unit) => ({
+        ...unit,
+        order: { ...unit.order },
+        cd: [...unit.cd],
+        burst: [...unit.burst],
+        burstTimer: [...unit.burstTimer],
+        ability: unit.ability ? { ...unit.ability } : null,
+      })),
+      structures: this.structures.map((structure) => ({
+        ...structure,
+        cd: [...structure.cd],
+        burst: [...structure.burst],
+        burstTimer: [...structure.burstTimer],
+        queue: [...structure.queue],
+      })),
+      projectiles: this.projectiles.map((projectile) => ({
+        ...projectile,
+        st: { ...projectile.st },
+        p: { ...projectile.p },
+      })),
+      deposits: this.deposits.map((deposit) => ({ ...deposit })),
+      wreckages: this.wreckages.map((wreck) => ({ ...wreck })),
+    };
+  }
+
+  /** Replace authority from a state that has already passed snapshot validation. */
+  restorePersistenceState(state: WorldPersistenceState): void {
+    const suppliedTerrainSeed = resolveTerrainSeed(this.terrain, state.worldSeed);
+    if (suppliedTerrainSeed !== state.terrainSeed) {
+      throw new Error(`Terrain seed mismatch: save requires ${state.terrainSeed}, supplied ${suppliedTerrainSeed}`);
+    }
+    const players: Record<Faction, PlayerState> = {
+      [Faction.Compact]: restorePlayer(state.players[Faction.Compact]),
+      [Faction.Choir]: restorePlayer(state.players[Faction.Choir]),
+    };
+    const units = state.units.map((unit) => ({
+      ...unit,
+      order: { ...unit.order },
+      cd: [...unit.cd],
+      burst: [...unit.burst],
+      burstTimer: [...unit.burstTimer],
+      ability: unit.ability ? { ...unit.ability } : null,
+    }));
+    const structures = state.structures.map((structure) => ({
+      ...structure,
+      cd: [...structure.cd],
+      burst: [...structure.burst],
+      burstTimer: [...structure.burstTimer],
+      queue: [...structure.queue],
+    }));
+    const projectiles = state.projectiles.map((projectile) => ({
+      ...projectile,
+      st: { ...projectile.st },
+      p: { ...projectile.p },
+    }));
+    const deposits = state.deposits.map((deposit) => ({ ...deposit }));
+    const wreckages = state.wreckages.map((wreck) => ({ ...wreck }));
+
+    this.rng.restore(state.rngState);
+    this.worldSeed = state.worldSeed;
+    this.terrainSeed = state.terrainSeed;
+    this.tick = state.tick;
+    this.time = state.time;
+    this.nextId = state.nextId;
+    this.timeLimit = state.timeLimit;
+    this.victoryArmed = state.victoryArmed;
+    this.lastBastionAggressor = state.lastBastionAggressor;
+    this.status = state.result.status;
+    this.winner = state.result.winner;
+    this.endReason = state.result.endReason;
+    this.players = players;
+    this.units = units;
+    this.structures = structures;
+    this.projectiles = projectiles;
+    this.deposits = deposits;
+    this.wreckages = wreckages;
+    this.rebuildEntityIndex();
+    this.events = [];
+    for (const index of this.usedBuckets) this.buckets[index]!.length = 0;
+    this.usedBuckets.length = 0;
+    this.bucketGeneration++;
+    this.bucketsDirty = true;
+    this.clearVisibilityCache();
+  }
+
+  private rebuildEntityIndex(): void {
+    this.entitiesById = [];
+    for (const unit of this.units) this.entitiesById[unit.id] = unit;
+    for (const structure of this.structures) this.entitiesById[structure.id] = structure;
+    for (const wreck of this.wreckages) this.entitiesById[wreck.id] = wreck;
+  }
+
+  /** Stable checksum for replay and determinism verification. */
+  stateHash(): string {
+    const state = JSON.stringify(this.exportPersistenceState());
     let hash = 2166136261 >>> 0;
     for (let i = 0; i < state.length; i++) {
       hash ^= state.charCodeAt(i);
@@ -1489,14 +2352,14 @@ export class World {
     for (const u of this.units) {
       if (!u.alive || u.faction !== faction) continue;
       if (
-        surfaceDist(u.s, u.z, s, z) < UNITS[u.kind].vision * sensorScale &&
+        surfaceDistSq(u.s, u.z, s, z) < (u.vision * sensorScale) ** 2 &&
         this.hasLineOfSight(u.s, u.z, UNITS[u.kind].height * 0.8, s, z)
       ) return true;
     }
     for (const st of this.structures) {
       if (!st.alive || st.faction !== faction || st.progress < 1) continue;
       if (
-        surfaceDist(st.s, st.z, s, z) < STRUCTURES[st.kind].vision * sensorScale &&
+        surfaceDistSq(st.s, st.z, s, z) < (st.vision * sensorScale) ** 2 &&
         this.hasLineOfSight(st.s, st.z, STRUCTURES[st.kind].height * 0.8, s, z)
       ) return true;
     }
@@ -1509,7 +2372,12 @@ export class World {
     if (cached !== undefined) return cached;
     const unit = this.unitById(id);
     if (unit) {
-      const visible = unit.faction === faction || unit.revealed > 0 || this.isVisible(faction, unit.s, unit.z);
+      const visible =
+        unit.faction === faction ||
+        unit.revealed > 0 ||
+        (unit.cloaked
+          ? this.hasCloakProximityReveal(faction, unit)
+          : this.isVisible(faction, unit.s, unit.z));
       this.visibleEntities[faction].set(id, visible);
       return visible;
     }
@@ -1523,12 +2391,29 @@ export class World {
       this.visibleEntities[faction].set(id, visible);
       return visible;
     }
+    const wreck = this.wreckById(id);
+    if (wreck) {
+      const visible = wreck.faction === faction || this.isVisible(faction, wreck.s, wreck.z);
+      this.visibleEntities[faction].set(id, visible);
+      return visible;
+    }
+    return false;
+  }
+
+  private hasCloakProximityReveal(faction: Faction, cloaked: Unit): boolean {
+    for (const unit of this.units) {
+      if (!unit.alive || unit.faction !== faction) continue;
+      if (surfaceDistSq(unit.s, unit.z, cloaked.s, cloaked.z) <= ABILITIES.cloak.detectionRadius ** 2) {
+        return true;
+      }
+    }
     return false;
   }
 
   isProjectileVisible(faction: Faction, projectile: Projectile): boolean {
     return (
       projectile.faction === faction ||
+      (projectile.flightMode === 'chord' && projectile.p.h > ATMOSPHERE_HEIGHT) ||
       (projectile.targetId !== 0 && this.isEntityVisible(faction, projectile.targetId)) ||
       this.isVisible(faction, projectile.p.s, projectile.p.z) ||
       (projectile.ballistic && this.isVisible(faction, projectile.impactS, projectile.impactZ))
@@ -1556,6 +2441,21 @@ export class World {
       const sightHeight = fromHeight + (toHeight - fromHeight) * t;
       if (this.terrain.heightAt(s, z) + 2 > sightHeight) return false;
     }
+    for (const wreck of this.wreckages) {
+      if (!wreck.alive) continue;
+      const radius = UNITS[wreck.kind].radius * WRECK_COVER_RADIUS_MULTIPLIER;
+      if (surfaceDistSq(wreck.s, wreck.z, toS, toZ) <= radius * radius) continue;
+      const wreckS = deltaS(fromS, wreck.s);
+      const wreckZ = wreck.z - fromZ;
+      const along = (wreckS * ds + wreckZ * dz) / (distance * distance);
+      if (along <= 0 || along >= 1) continue;
+      if (Math.hypot(wreckS, wreckZ) > WRECK_COVER_MAX_DISTANCE) continue;
+      if (Math.hypot(wreckS - ds * along, wreckZ - dz * along) > radius) continue;
+      const sightHeight = fromHeight + (toHeight - fromHeight) * along;
+      const coverTop = this.terrain.heightAt(wreck.s, wreck.z) +
+        UNITS[wreck.kind].height * WRECK_COVER_HEIGHT_MULTIPLIER;
+      if (coverTop > sightHeight) return false;
+    }
     return true;
   }
 }
@@ -1571,14 +2471,56 @@ function newPlayer(): PlayerState {
     commandCap: STARTING_COMMAND,
     energyProduced: BASE_ENERGY,
     energyDrawn: 0,
+    weaponEnergyLoad: 0,
+    weaponEnergySchedule: Array.from({ length: WEAPON_POWER_PULSE_TICKS }, () => 0),
     dominance: 0,
     unlocked: new Set<StructureKind>(),
+  };
+}
+
+function snapshotPlayer(state: PlayerState): WorldPlayerPersistenceState {
+  return {
+    salvage: state.salvage,
+    commandUsed: state.commandUsed,
+    commandCap: state.commandCap,
+    energyProduced: state.energyProduced,
+    energyDrawn: state.energyDrawn,
+    weaponEnergyLoad: state.weaponEnergyLoad,
+    weaponEnergySchedule: [...state.weaponEnergySchedule],
+    dominance: state.dominance,
+    unlocked: [...state.unlocked].sort(),
+  };
+}
+
+function restorePlayer(state: WorldPlayerPersistenceState): PlayerState {
+  return {
+    salvage: state.salvage,
+    commandUsed: state.commandUsed,
+    commandCap: state.commandCap,
+    energyProduced: state.energyProduced,
+    energyDrawn: state.energyDrawn,
+    weaponEnergyLoad: state.weaponEnergyLoad,
+    weaponEnergySchedule: [...state.weaponEnergySchedule],
+    dominance: state.dominance,
+    unlocked: new Set(state.unlocked),
   };
 }
 
 function clampAxial(z: number): number {
   const lim = RING_HALF_WIDTH - 40;
   return z < -lim ? -lim : z > lim ? lim : z;
+}
+
+export function resolveTerrainSeed(terrain: Terrain, worldSeed: number): number {
+  const seed = (terrain as unknown as { seed?: unknown }).seed;
+  if (seed === undefined) return worldSeed;
+  if (typeof seed !== 'number') throw new TypeError('Terrain seed must be a safe integer');
+  validateSeed(seed, 'Terrain seed');
+  return seed;
+}
+
+function validateSeed(seed: number, label: string): void {
+  if (!Number.isSafeInteger(seed)) throw new TypeError(`${label} must be a safe integer`);
 }
 
 function clamp(v: number, lo: number, hi: number): number {

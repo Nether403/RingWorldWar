@@ -155,7 +155,6 @@ export class CameraRig {
     // there is no reason for a far plane in the tens of kilometres -- and a
     // huge near/far ratio wrecks depth precision for any screen-space effect.
     this.camera.near = clamp(this.distance * 0.05, 2, 40);
-    this.camera.far = 26000;
     this.camera.updateProjectionMatrix();
 
     // --- Build the camera transform in the local tangent frame --------------

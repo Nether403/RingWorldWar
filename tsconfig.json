@@ -23,6 +23,7 @@
       "@render/*": ["./src/render/*"],
       "@gen/*": ["./src/gen/*"],
       "@ai/*": ["./src/ai/*"],
+      "@headless/*": ["./src/headless/*"],
       "@ui/*": ["./src/ui/*"]
     }
   },

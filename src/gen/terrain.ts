@@ -32,10 +32,20 @@ export interface TerrainFeature {
   radius: number;
 }
 
+interface TerrainCorridor {
+  fromS: number;
+  fromZ: number;
+  toS: number;
+  toZ: number;
+  radius: number;
+}
+
 export interface TerrainConfig {
   seed: number;
   /** Flat zones carved for the two starting bases and expansions. */
   flatZones: TerrainFeature[];
+  /** Optional narrow routes that keep required strategic locations connected. */
+  corridors?: TerrainCorridor[];
 }
 
 export class Terrain {
@@ -45,6 +55,8 @@ export class Terrain {
   /** Steepness (0 flat, 1 sheer) precomputed for pathing and build validation. */
   readonly slope: Float32Array;
   readonly seed: number;
+  private blockedSlopePrefix: Uint32Array | null = null;
+  private blockedSlopeMaximum = Number.NaN;
 
   constructor(cfg: TerrainConfig) {
     this.seed = cfg.seed;
@@ -141,6 +153,17 @@ export class Terrain {
     // Flatten the requested zones so bases have somewhere sane to sit.
     for (const zone of cfg.flatZones) this.flatten(zone);
 
+    // Capture all route endpoint heights before carving so shared junctions use
+    // exactly the same elevation regardless of corridor order.
+    const corridors = cfg.corridors?.map((corridor) => ({
+      corridor,
+      fromHeight: this.heightAt(corridor.fromS, corridor.fromZ),
+      toHeight: this.heightAt(corridor.toS, corridor.toZ),
+    })) ?? [];
+    for (const route of corridors) {
+      this.carveCorridor(route.corridor, route.fromHeight, route.toHeight);
+    }
+
     this.computeSlopes();
   }
 
@@ -163,6 +186,39 @@ export class Terrain {
         if (t <= 0) continue;
         const idx = j * this.cols + i;
         this.heights[idx] = this.heights[idx]! * (1 - t) + target * t;
+      }
+    }
+  }
+
+  /** Blend a narrow route toward a shallow linear grade with soft shoulders. */
+  private carveCorridor(corridor: TerrainCorridor, fromHeight: number, toHeight: number): void {
+    const routeS = deltaWrapped(corridor.fromS, corridor.toS);
+    const routeZ = corridor.toZ - corridor.fromZ;
+    const lengthSquared = routeS * routeS + routeZ * routeZ;
+    const outerRadius = corridor.radius * 1.5;
+
+    for (let j = 0; j < this.rows; j++) {
+      const z = -RING_HALF_WIDTH + j * TERRAIN_CELL;
+      if (
+        z < Math.min(corridor.fromZ, corridor.toZ) - outerRadius ||
+        z > Math.max(corridor.fromZ, corridor.toZ) + outerRadius
+      ) continue;
+
+      for (let i = 0; i < this.cols; i++) {
+        const s = i * TERRAIN_CELL;
+        const pointS = deltaWrapped(corridor.fromS, s);
+        const pointZ = z - corridor.fromZ;
+        const along = lengthSquared === 0
+          ? 0
+          : clamp01((pointS * routeS + pointZ * routeZ) / lengthSquared);
+        const nearestS = routeS * along;
+        const nearestZ = routeZ * along;
+        const distance = Math.hypot(pointS - nearestS, pointZ - nearestZ);
+        const blend = 1 - smoothstep(corridor.radius, outerRadius, distance);
+        if (blend <= 0) continue;
+        const target = fromHeight + (toHeight - fromHeight) * along;
+        const index = j * this.cols + i;
+        this.heights[index] = this.heights[index]! * (1 - blend) + target * blend;
       }
     }
   }
@@ -214,10 +270,99 @@ export class Terrain {
 
   /** Steepness at a surface point, 0 (flat) to 1 (sheer). */
   slopeAt(s: number, z: number): number {
-    const { cols, rows, slope } = this;
-    const i = ((Math.round(wrapS(s) / TERRAIN_CELL) % cols) + cols) % cols;
-    const j = Math.min(rows - 1, Math.max(0, Math.round((clampAxial(z) + RING_HALF_WIDTH) / TERRAIN_CELL)));
-    return slope[j * cols + i]!;
+    return this.slope[this.slopeIndexAt(s, z)]!;
+  }
+
+  /**
+   * Test the same fixed samples as repeated slopeAt calls while avoiding
+   * duplicate reads when several 4 m samples round to one 16 m terrain cell.
+   */
+  segmentSlopePassable(
+    fromS: number,
+    fromZ: number,
+    toS: number,
+    toZ: number,
+    samples: number,
+    maximum: number,
+  ): boolean {
+    if (this.segmentBoundsClear(fromS, fromZ, toS, toZ, maximum)) return true;
+    const ds = deltaWrapped(fromS, toS);
+    const dz = toZ - fromZ;
+    let previousIndex = -1;
+    for (let i = 1; i <= samples; i++) {
+      const t = i / samples;
+      const index = this.slopeIndexAt(fromS + ds * t, fromZ + dz * t);
+      if (index === previousIndex) continue;
+      if (this.slope[index]! >= maximum) return false;
+      previousIndex = index;
+    }
+    return true;
+  }
+
+  private segmentBoundsClear(
+    fromS: number,
+    fromZ: number,
+    toS: number,
+    toZ: number,
+    maximum: number,
+  ): boolean {
+    this.ensureBlockedSlopePrefix(maximum);
+    const startS = wrapS(fromS);
+    const endS = startS + deltaWrapped(fromS, toS);
+    const minS = Math.min(startS, endS);
+    const maxS = Math.max(startS, endS);
+    const minZ = Math.min(clampAxial(fromZ), clampAxial(toZ));
+    const maxZ = Math.max(clampAxial(fromZ), clampAxial(toZ));
+    const minCol = Math.floor(minS / TERRAIN_CELL) - 1;
+    const maxCol = Math.ceil(maxS / TERRAIN_CELL) + 1;
+    const minRow = Math.max(0, Math.floor((minZ + RING_HALF_WIDTH) / TERRAIN_CELL) - 1);
+    const maxRow = Math.min(
+      this.rows - 1,
+      Math.ceil((maxZ + RING_HALF_WIDTH) / TERRAIN_CELL) + 1,
+    );
+    const width = maxCol - minCol + 1;
+    if (width >= this.cols) return false;
+    const firstCol = ((minCol % this.cols) + this.cols) % this.cols;
+    const lastCol = firstCol + width - 1;
+    if (lastCol < this.cols) return !this.blockedInRect(firstCol, lastCol, minRow, maxRow);
+    return !this.blockedInRect(firstCol, this.cols - 1, minRow, maxRow) &&
+      !this.blockedInRect(0, lastCol - this.cols, minRow, maxRow);
+  }
+
+  private ensureBlockedSlopePrefix(maximum: number): void {
+    if (this.blockedSlopePrefix && this.blockedSlopeMaximum === maximum) return;
+    const stride = this.cols + 1;
+    const prefix = new Uint32Array((this.rows + 1) * stride);
+    for (let row = 0; row < this.rows; row++) {
+      let rowTotal = 0;
+      for (let col = 0; col < this.cols; col++) {
+        if (this.slope[row * this.cols + col]! >= maximum) rowTotal++;
+        prefix[(row + 1) * stride + col + 1] = prefix[row * stride + col + 1]! + rowTotal;
+      }
+    }
+    this.blockedSlopePrefix = prefix;
+    this.blockedSlopeMaximum = maximum;
+  }
+
+  private blockedInRect(minCol: number, maxCol: number, minRow: number, maxRow: number): boolean {
+    const prefix = this.blockedSlopePrefix!;
+    const stride = this.cols + 1;
+    const left = minCol;
+    const right = maxCol + 1;
+    const top = minRow;
+    const bottom = maxRow + 1;
+    const count = prefix[bottom * stride + right]! - prefix[top * stride + right]! -
+      prefix[bottom * stride + left]! + prefix[top * stride + left]!;
+    return count > 0;
+  }
+
+  private slopeIndexAt(s: number, z: number): number {
+    const i = ((Math.round(wrapS(s) / TERRAIN_CELL) % this.cols) + this.cols) % this.cols;
+    const j = Math.min(
+      this.rows - 1,
+      Math.max(0, Math.round((clampAxial(z) + RING_HALF_WIDTH) / TERRAIN_CELL)),
+    );
+    return j * this.cols + i;
   }
 
   /**
@@ -275,10 +420,52 @@ export function standardFlatZones(): TerrainFeature[] {
     { s: C * 0.88, z: -RING_HALF_WIDTH * 0.55, radius: 220 },
     { s: C * 0.38, z: -RING_HALF_WIDTH * 0.55, radius: 220 },
     { s: C * 0.62, z: RING_HALF_WIDTH * 0.55, radius: 220 },
+    // Exact Spinal Node pads from World.setup are applied last so they win any overlap.
+    { s: C * 0.25, z: 0, radius: 220 },
+    { s: C * 0.75, z: 0, radius: 220 },
+    { s: C * 0.125, z: RING_HALF_WIDTH * 0.6, radius: 220 },
+    { s: C * 0.625, z: -RING_HALF_WIDTH * 0.6, radius: 220 },
   ];
+}
+
+function standardCorridors(): TerrainCorridor[] {
+  const C = RING_CIRCUMFERENCE;
+  const radius = 160;
+  const centerFractions = [0, 0.125, 0.25, 0.5, 0.625, 0.75, 1];
+  const corridors: TerrainCorridor[] = [];
+  for (let i = 1; i < centerFractions.length; i++) {
+    corridors.push({
+      fromS: C * centerFractions[i - 1]!,
+      fromZ: 0,
+      toS: C * centerFractions[i]!,
+      toZ: 0,
+      radius,
+    });
+  }
+  corridors.push(
+    {
+      fromS: C * 0.125,
+      fromZ: 0,
+      toS: C * 0.125,
+      toZ: RING_HALF_WIDTH * 0.6,
+      radius,
+    },
+    {
+      fromS: C * 0.625,
+      fromZ: 0,
+      toS: C * 0.625,
+      toZ: -RING_HALF_WIDTH * 0.6,
+      radius,
+    },
+  );
+  return corridors;
 }
 
 /** Convenience: build the standard match terrain. */
 export function createTerrain(seed: number): Terrain {
-  return new Terrain({ seed, flatZones: standardFlatZones() });
+  return new Terrain({
+    seed,
+    flatZones: standardFlatZones(),
+    corridors: standardCorridors(),
+  });
 }

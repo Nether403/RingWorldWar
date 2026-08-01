@@ -1,0 +1,23 @@
+{
+  "schema": "ring-world-war/core-match-manifest",
+  "version": 1,
+  "id": "commander-vs-veteran",
+  "description": "Commander versus Veteran difficulty cohort with each role assigned to both factions per seed.",
+  "pairSeeds": [501, 1709, 2903, 4217, 5653, 6841, 7907, 9151, 10301, 11719],
+  "legsPerSeed": 2,
+  "tickLimit": 81000,
+  "telemetryCadenceTicks": 900,
+  "roles": [
+    { "id": "commander", "difficulty": "commander" },
+    { "id": "veteran", "difficulty": "veteran" }
+  ],
+  "gates": {
+    "expectedMatches": 20,
+    "meanDurationSeconds": { "minimum": 1200, "maximum": 2400 },
+    "maximumFactionWinRate": 0.7,
+    "maximumDrawRate": 0.35,
+    "roleWinRates": [
+      { "roleId": "commander", "minimum": 0.65 }
+    ]
+  }
+}

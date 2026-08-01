@@ -19,14 +19,18 @@ import { RING_CIRCUMFERENCE, RING_HALF_WIDTH } from '@core/constants';
 import { deltaS } from '@core/ringMath';
 import {
   BUILDABLE,
+  effectiveStructureStats,
+  effectiveUnitStats,
   FACTION_COLOR,
   FACTION_NAME,
   Faction,
   STRUCTURES,
   UNITS,
+  WEAPONS,
   type StructureKind,
   type UnitKind,
 } from '@sim/data';
+import type { AbilityId } from '@sim/abilities';
 import type { Structure, Unit, World } from '@sim/world';
 
 const CSS = `
@@ -114,6 +118,19 @@ const CSS = `
 
 export type BuildRequest = { kind: StructureKind } | null;
 
+const ARTILLERY_LABEL: Record<string, string> = {
+  batteryGun: 'Standard Rocket',
+  cruiseMissile: 'Cruise Missile',
+  chordShot: 'Chord Shot',
+};
+
+const ABILITY_LABEL: Record<AbilityId, string> = {
+  shieldWall: 'Shield Wall',
+  siegeMode: 'Siege Mode',
+  cloak: 'Cloak',
+  umbrella: 'Umbrella',
+};
+
 export class Hud {
   readonly root: HTMLDivElement;
   /** Structure kind the player is currently placing, if any. */
@@ -136,7 +153,9 @@ export class Hud {
   /** Callback wired by main: jump the camera to a surface position. */
   onMinimapClick: ((s: number, z: number) => void) | null = null;
   /** Begin a ground-targeted artillery command for a selected launcher. */
-  onArtilleryTarget: ((sourceId: number) => void) | null = null;
+  onArtilleryTarget: ((sourceId: number, weaponId: string) => void) | null = null;
+  /** Toggle the active ability on a single selected mech. */
+  onAbilityToggle: ((unitId: number) => void) | null = null;
   /** Route build mode changes through the game mode coordinator. */
   onBuildRequest: ((kind: StructureKind | null) => void) | null = null;
 
@@ -203,7 +222,7 @@ export class Hud {
     hint.innerHTML =
       'WASD / edge — pan &nbsp;·&nbsp; wheel — zoom &nbsp;·&nbsp; Q E — rotate<br>' +
       'left click — select &nbsp;·&nbsp; drag — box select &nbsp;·&nbsp; right click — move / attack<br>' +
-      'V — pilot mech &nbsp;·&nbsp; Alt/Ctrl+1..9 — group &nbsp;·&nbsp; esc — cancel / tactical &nbsp;·&nbsp; F3 — stats';
+      'V — pilot mech &nbsp;·&nbsp; X — ability &nbsp;·&nbsp; Alt/Ctrl+1..9 — group &nbsp;·&nbsp; esc — cancel / tactical &nbsp;·&nbsp; F3 — stats';
     this.root.appendChild(hint);
 
     document.body.appendChild(this.root);
@@ -213,6 +232,10 @@ export class Hud {
     this.alertEl.textContent = text;
     this.alertEl.style.opacity = '1';
     this.alertTimer = 2.6;
+  }
+
+  invalidate(): void {
+    this.selectionSignature = '';
   }
 
   // -------------------------------------------------------------------------
@@ -285,11 +308,18 @@ export class Hud {
       playerState.commandCap,
       [...playerState.unlocked].sort().join(','),
       this.placing ?? '',
-      units.map((unit) => `${unit.id}:${Math.ceil(unit.hp / 25)}:${unit.order.kind}`).join('|'),
+      units
+        .map((unit) =>
+          `${unit.id}:${Math.ceil(unit.hp / 25)}:${unit.order.kind}:` +
+          `${unit.ability?.active ?? false}:${Math.ceil((unit.ability?.cooldown ?? 0) * 10)}:` +
+          `${Math.ceil((unit.ability?.transitionTimer ?? 0) * 10)}`,
+        )
+        .join('|'),
       structs
         .map((structure) =>
           `${structure.id}:${Math.ceil(structure.hp / 50)}:${Math.ceil(structure.progress * 20)}:` +
-          `${structure.progress >= 1 ? 1 : 0}:${structure.queue.length}:${Math.ceil(structure.cd[0] ?? 0)}`,
+          `${structure.progress >= 1 ? 1 : 0}:${structure.queue.length}:` +
+          `${structure.cd.map((cooldown) => Math.ceil(cooldown * 10)).join(',')}`,
         )
         .join('|'),
     ].join(';');
@@ -308,7 +338,7 @@ export class Hud {
     if (structs.length === 1 && units.length === 0) {
       const st = structs[0]!;
       const def = STRUCTURES[st.kind];
-      const pct = Math.round((st.hp / def.hp) * 100);
+      const pct = Math.round((st.hp / st.maxHp) * 100);
       this.selEl.innerHTML =
         `<h3>${def.name}</h3><p>${def.role}</p>` +
         (st.progress < 1
@@ -326,16 +356,10 @@ export class Hud {
           this.cmdEl.appendChild(q);
         }
       }
-      if (st.faction === player && st.progress >= 1 && st.kind === 'rocketBattery') {
-        const ready = (st.cd[0] ?? 0) <= 0;
-        const target = button('rww-btn' + (ready ? '' : ' off'));
-        target.innerHTML = `<u>Target rocket</u><s>${ready ? 'ground target' : `${st.cd[0]!.toFixed(1)}s reload`}</s>`;
-        target.title = 'Preview the ring-physics trajectory, then click to fire';
-        target.onclick = (): void => {
-          if (ready) this.onArtilleryTarget?.(st.id);
-          else this.alert('Rocket Battery is reloading');
-        };
-        this.cmdEl.appendChild(target);
+      if (st.faction === player && st.progress >= 1) {
+        for (const weaponId of def.weapons) {
+          if (WEAPONS[weaponId]?.kind === 'ballistic') this.addArtilleryButton(st, weaponId);
+        }
       }
       return;
     }
@@ -345,7 +369,7 @@ export class Hud {
     if (first) {
       const def = UNITS[first.kind];
       if (units.length === 1) {
-        const pct = Math.round((first.hp / def.hp) * 100);
+        const pct = Math.round((first.hp / first.maxHp) * 100);
         this.selEl.innerHTML =
           `<h3>${def.name}</h3><p>${def.role}</p>` +
           `<div class="rww-hp"><i style="width:${pct}%;background:${pct > 50 ? '#6ee7a0' : pct > 25 ? '#f0c26e' : '#ff7a5e'}"></i></div>`;
@@ -360,26 +384,78 @@ export class Hud {
       if (units.some((u) => UNITS[u.kind].canBuild && u.faction === player)) {
         for (const kind of BUILDABLE) this.addBuildButton(world, player, kind);
       }
+      if (units.length === 1 && first.faction === player && first.ability && first.ability.id !== 'cloak') {
+        this.addAbilityButton(first);
+      }
     }
+  }
+
+  private addArtilleryButton(st: Structure, weaponId: string): void {
+    const weaponIndex = STRUCTURES[st.kind].weapons.indexOf(weaponId);
+    if (weaponIndex < 0) return;
+    const cooldown = st.cd[weaponIndex] ?? 0;
+    const ready = cooldown <= 0;
+    const label = ARTILLERY_LABEL[weaponId] ?? WEAPONS[weaponId]!.id;
+    const target = button('rww-btn' + (ready ? '' : ' off'));
+    target.setAttribute('aria-label', weaponId === 'batteryGun' ? `${label} - Target rocket` : label);
+    target.setAttribute('aria-disabled', String(!ready));
+    const targetKind = WEAPONS[weaponId]?.flightMode === 'chord' ? 'blind-fire ground target' : 'ground target';
+    target.innerHTML = `<u>${label}</u><s>${ready ? targetKind : `${cooldown.toFixed(1)}s reload`}</s>`;
+    target.title = 'Preview the ring-physics trajectory, then click to fire';
+    target.onclick = (): void => {
+      if (ready) this.onArtilleryTarget?.(st.id, weaponId);
+      else this.alert(`${label} is reloading`);
+    };
+    this.cmdEl.appendChild(target);
+  }
+
+  private addAbilityButton(unit: Unit): void {
+    const ability = unit.ability;
+    if (!ability || ability.id === 'cloak') return;
+    const label = ABILITY_LABEL[ability.id];
+    const transitioning = ability.transitionTimer > 0;
+    const coolingDown = !ability.active && ability.cooldown > 0;
+    const usable = !transitioning && !coolingDown;
+    const state = transitioning
+      ? `${ability.active ? 'deploying' : 'stowing'} ${ability.transitionTimer.toFixed(1)}s`
+      : ability.active
+        ? 'active - press X to disable'
+        : coolingDown
+          ? `cooldown ${ability.cooldown.toFixed(1)}s`
+          : 'ready - press X';
+    const control = button(
+      'rww-btn' + (usable ? '' : ' off') + (ability.active ? ' on' : ''),
+    );
+    control.setAttribute('aria-label', `${label} ability`);
+    control.setAttribute('aria-pressed', String(ability.active));
+    control.setAttribute('aria-disabled', String(!usable));
+    control.innerHTML = `<em>X</em><u>${label}</u><s>${state}</s>`;
+    control.onclick = (): void => {
+      if (transitioning) this.alert(`${label} is transitioning`);
+      else if (coolingDown) this.alert(`${label} cooldown: ${ability.cooldown.toFixed(1)}s`);
+      else this.onAbilityToggle?.(unit.id);
+    };
+    this.cmdEl.appendChild(control);
   }
 
   private addUnitButton(world: World, player: Faction, st: Structure, kind: UnitKind): void {
     const def = UNITS[kind];
+    const effective = effectiveUnitStats(player, kind);
     const p = world.players[player];
     const affordable =
-      p.salvage >= (def.cost.salvage ?? 0) &&
+      p.salvage >= effective.salvageCost &&
       (!def.cost.command || p.commandUsed + world.queuedCommand(player) + def.cost.command <= p.commandCap);
 
     const b = button('rww-btn' + (affordable ? '' : ' off'));
     b.innerHTML =
-      `<u>${def.name}</u><s>${def.cost.salvage ?? 0} slv` +
+      `<u>${def.name}</u><s>${effective.salvageCost} slv` +
       (def.cost.command ? ` · ${def.cost.command} cmd` : '') +
       `</s>`;
     b.title = def.role;
     b.onclick = (): void => {
       if (!world.tryQueueUnit(st.id, kind)) {
         this.alert(
-          p.salvage < (def.cost.salvage ?? 0) ? 'Not enough salvage' : 'Command cap reached',
+          p.salvage < effective.salvageCost ? 'Not enough salvage' : 'Command cap reached',
         );
       }
     };
@@ -388,16 +464,17 @@ export class Hud {
 
   private addBuildButton(world: World, player: Faction, kind: StructureKind): void {
     const def = STRUCTURES[kind];
+    const effective = effectiveStructureStats(player, kind);
     const p = world.players[player];
 
     const locked = Boolean(def.requires && !p.unlocked.has(def.requires));
-    const affordable = p.salvage >= (def.cost.salvage ?? 0);
+    const affordable = p.salvage >= effective.salvageCost;
     const usable = affordable && !locked;
 
     const b = button('rww-btn' + (usable ? '' : ' off') + (this.placing === kind ? ' on' : ''));
     b.innerHTML =
       (def.hotkey ? `<em>${def.hotkey}</em>` : '') +
-      `<u>${def.name}</u><s>${def.cost.salvage ?? 0} slv · ${def.energy >= 0 ? '+' : ''}${def.energy} pwr</s>`;
+      `<u>${def.name}</u><s>${effective.salvageCost} slv · ${def.energy >= 0 ? '+' : ''}${def.energy} pwr</s>`;
     b.title = locked ? `${def.role}  (requires ${STRUCTURES[def.requires!].name})` : def.role;
     b.onclick = (): void => {
       if (locked) {
@@ -498,7 +575,7 @@ export class Hud {
   }
 
   private drawEnd(world: World, player: Faction): void {
-    if (world.winner === null) {
+    if (world.status === 'running') {
       if (this.endEl) {
         this.endEl.remove();
         this.endEl = null;
@@ -507,15 +584,18 @@ export class Hud {
     }
     if (this.endEl) return;
 
+    const draw = world.winner === null;
     const won = world.winner === player;
     this.endEl = el('div', 'rww-end');
     this.endEl.setAttribute('role', 'dialog');
     this.endEl.setAttribute('aria-modal', 'true');
     const h = document.createElement('h1');
-    h.textContent = won ? 'Victory' : 'Defeat';
-    h.style.color = won ? '#8ce8b0' : '#ff7a5e';
+    h.textContent = draw ? 'Draw' : won ? 'Victory' : 'Defeat';
+    h.style.color = draw ? '#dbe3ec' : won ? '#8ce8b0' : '#ff7a5e';
     const p = document.createElement('p');
-    p.textContent = `${world.endReason} — ${FACTION_NAME[world.winner]} holds the ring`;
+    p.textContent = draw
+      ? world.endReason
+      : `${world.endReason} — ${FACTION_NAME[world.winner!]} holds the ring`;
     const b = document.createElement('button');
     b.textContent = 'Fight again';
     b.onclick = (): void => {

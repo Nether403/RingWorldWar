@@ -244,6 +244,28 @@ export function sampleTrajectory(
   t0: number,
   opts: TrajectoryOptions = {},
 ): TrajectorySample[] {
+  const out: TrajectorySample[] = [];
+  integrateTrajectory(from, v, t0, opts, out);
+  return out;
+}
+
+/** Return only the final sample while using the canonical trajectory integrator. */
+export function trajectoryImpact(
+  from: RingPoint,
+  v: RingVelocity,
+  t0: number,
+  opts: TrajectoryOptions = {},
+): TrajectorySample {
+  return integrateTrajectory(from, v, t0, opts);
+}
+
+function integrateTrajectory(
+  from: RingPoint,
+  v: RingVelocity,
+  t0: number,
+  opts: TrajectoryOptions,
+  out?: TrajectorySample[],
+): TrajectorySample {
   const maxTime = opts.maxTime ?? 60;
   const dt = opts.dt ?? 1 / 30;
   const bc = opts.ballisticCoefficient ?? 0;
@@ -252,7 +274,8 @@ export function sampleTrajectory(
 
   const st = launchToInertial(from, v, t0);
   const pt: RingPoint = { s: 0, h: 0, z: 0 };
-  const out: TrajectorySample[] = [{ s: from.s, h: from.h, z: from.z, t: 0 }];
+  let last: TrajectorySample = { s: from.s, h: from.h, z: from.z, t: 0 };
+  if (out) out.push(last);
 
   const steps = Math.ceil(maxTime / dt);
   for (let i = 0; i < steps; i++) {
@@ -262,13 +285,21 @@ export function sampleTrajectory(
     inertialToRing(st, pt);
     const floor = groundAt ? groundAt(pt.s, pt.z) : 0;
 
-    out.push({ s: pt.s, h: pt.h, z: pt.z, t: st.t - t0 });
+    if (out) {
+      last = { s: pt.s, h: pt.h, z: pt.z, t: st.t - t0 };
+      out.push(last);
+    } else {
+      last.s = pt.s;
+      last.h = pt.h;
+      last.z = pt.z;
+      last.t = st.t - t0;
+    }
 
     if (stopOnImpact && pt.h <= floor && i > 1) break;
     // A shot that reaches the far side of the ring has left the playfield.
     if (pt.h > RING_RADIUS * 1.98) break;
   }
-  return out;
+  return last;
 }
 
 // ---------------------------------------------------------------------------
@@ -352,6 +383,36 @@ export interface AimOptions {
 }
 
 /**
+ * Cheap necessary reach check for the expensive drag solver.
+ *
+ * Drag cannot create projectile energy relative to the co-rotating air. We
+ * therefore compare against the best drag-free launch over the same time
+ * window, with a generous margin for integration and terrain effects. The
+ * signed ring displacement is retained, so the envelope preserves the ring's
+ * spinward/antispinward asymmetry.
+ */
+export function isWithinDragAimEnvelope(
+  from: RingPoint,
+  to: RingPoint,
+  t0: number,
+  speed: number,
+  maxFlightTime = 60,
+): boolean {
+  const samples = 32;
+  const margin = 1.25;
+  const velocity: RingVelocity = { vt: 0, vh: 0, vz: 0 };
+  let minimumRequired = Infinity;
+  for (let index = 0; index <= samples; index++) {
+    const flightTime = 0.25 + (maxFlightTime - 0.25) * (index / samples);
+    minimumRequired = Math.min(
+      minimumRequired,
+      requiredLaunch(from, to, t0, flightTime, velocity),
+    );
+  }
+  return minimumRequired <= speed * margin;
+}
+
+/**
  * Find a launch velocity that hits the target at the given launch speed.
  *
  * Method: `requiredLaunch` gives the speed needed for any candidate flight
@@ -370,6 +431,9 @@ export function solveAim(
   opts: AimOptions,
 ): AimSolution | null {
   if ((opts.ballisticCoefficient ?? 0) > 0 && opts.groundAt) {
+    if (!isWithinDragAimEnvelope(from, to, t0, opts.speed, opts.maxFlightTime ?? 60)) {
+      return null;
+    }
     return solveDragAim(from, to, t0, opts);
   }
   const maxT = opts.maxFlightTime ?? 45;
@@ -479,21 +543,24 @@ function refineDragSolution(
   let azimuth = Math.atan2(initial.velocity.vz, initial.velocity.vt);
   let elevation = initial.elevation;
 
-  const evaluate = (az: number, el: number): { es: number; ez: number; time: number; velocity: RingVelocity } => {
+  const evaluate = (
+    az: number,
+    el: number,
+    dt: number,
+  ): { es: number; ez: number; time: number; velocity: RingVelocity } => {
     const horizontal = Math.cos(el) * speed;
     const velocity = {
       vt: Math.cos(az) * horizontal,
       vh: Math.sin(el) * speed,
       vz: Math.sin(az) * horizontal,
     };
-    const path = sampleTrajectory(from, velocity, t0, {
+    const impact = trajectoryImpact(from, velocity, t0, {
       maxTime: opts.maxFlightTime ?? 60,
-      dt: 1 / 30,
+      dt,
       ballisticCoefficient: coefficient,
       groundAt,
       stopOnImpact: true,
     });
-    const impact = path[path.length - 1]!;
     return {
       es: deltaS(to.s, impact.s),
       ez: impact.z - to.z,
@@ -502,34 +569,33 @@ function refineDragSolution(
     };
   };
 
-  for (let iteration = 0; iteration < 10; iteration++) {
-    const base = evaluate(azimuth, elevation);
-    if (Math.hypot(base.es, base.ez) < 2) {
-      return {
-        velocity: base.velocity,
-        flightTime: base.time,
-        speed,
-        elevation,
-      };
+  const refine = (dt: number, iterations: number, tolerance: number): boolean => {
+    for (let iteration = 0; iteration < iterations; iteration++) {
+      const base = evaluate(azimuth, elevation, dt);
+      if (Math.hypot(base.es, base.ez) < tolerance) return true;
+
+      const epsilon = 0.002;
+      const byAzimuth = evaluate(azimuth + epsilon, elevation, dt);
+      const byElevation = evaluate(azimuth, elevation + epsilon, dt);
+      const a = (byAzimuth.es - base.es) / epsilon;
+      const b = (byElevation.es - base.es) / epsilon;
+      const c = (byAzimuth.ez - base.ez) / epsilon;
+      const d = (byElevation.ez - base.ez) / epsilon;
+      const determinant = a * d - b * c;
+      if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-5) return false;
+
+      const deltaAzimuth = (-base.es * d + b * base.ez) / determinant;
+      const deltaElevation = (c * base.es - a * base.ez) / determinant;
+      azimuth += clamp(deltaAzimuth, -0.16, 0.16);
+      elevation = clamp(elevation + clamp(deltaElevation, -0.12, 0.12), 0.03, Math.PI * 0.49);
     }
+    const final = evaluate(azimuth, elevation, dt);
+    return Math.hypot(final.es, final.ez) < tolerance;
+  };
 
-    const epsilon = 0.002;
-    const byAzimuth = evaluate(azimuth + epsilon, elevation);
-    const byElevation = evaluate(azimuth, elevation + epsilon);
-    const a = (byAzimuth.es - base.es) / epsilon;
-    const b = (byElevation.es - base.es) / epsilon;
-    const c = (byAzimuth.ez - base.ez) / epsilon;
-    const d = (byElevation.ez - base.ez) / epsilon;
-    const determinant = a * d - b * c;
-    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-5) return null;
-
-    const deltaAzimuth = (-base.es * d + b * base.ez) / determinant;
-    const deltaElevation = (c * base.es - a * base.ez) / determinant;
-    azimuth += clamp(deltaAzimuth, -0.16, 0.16);
-    elevation = clamp(elevation + clamp(deltaElevation, -0.12, 0.12), 0.03, Math.PI * 0.49);
-  }
-
-  const final = evaluate(azimuth, elevation);
+  if (!refine(0.2, 8, 20)) return null;
+  refine(1 / 30, 6, 2);
+  const final = evaluate(azimuth, elevation, 1 / 30);
   if (Math.hypot(final.es, final.ez) >= 4) return null;
   return { velocity: final.velocity, flightTime: final.time, speed, elevation };
 }

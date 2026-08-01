@@ -22,6 +22,7 @@ export class InputController {
    *  camera does not drift on load while the cursor sits at 0,0. */
   private edgePanArmed = false;
   private direct = false;
+  private enabled = true;
 
   constructor(
     private readonly el: HTMLElement,
@@ -45,6 +46,7 @@ export class InputController {
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
+    if (!this.enabled) return;
     this.keys.add(e.code);
   };
 
@@ -53,6 +55,7 @@ export class InputController {
   };
 
   private onPointerMove = (e: PointerEvent): void => {
+    if (!this.enabled) return;
     const rect = this.el.getBoundingClientRect();
     this.pointerX = e.clientX - rect.left;
     this.pointerY = e.clientY - rect.top;
@@ -66,6 +69,7 @@ export class InputController {
   };
 
   private onPointerDown = (e: PointerEvent): void => {
+    if (!this.enabled) return;
     this.el.focus();
     if (this.direct) return;
     if (e.button === 1 || (e.button === 2 && e.shiftKey)) {
@@ -80,12 +84,14 @@ export class InputController {
   };
 
   private onWheel = (e: WheelEvent): void => {
+    if (!this.enabled) return;
     e.preventDefault();
     if (this.direct) return;
     this.rig.zoom(Math.sign(e.deltaY) * (e.shiftKey ? 3 : 1));
   };
 
   update(dt: number): void {
+    if (!this.enabled) return;
     const speed = 320 * dt;
     let right = 0;
     let forward = 0;
@@ -122,16 +128,25 @@ export class InputController {
     this.direct = enabled;
   }
 
+  setEnabled(enabled: boolean): void {
+    if (enabled === this.enabled) return;
+    this.enabled = enabled;
+    this.rotating = false;
+    this.keys.clear();
+  }
+
   consume(code: string): void {
     this.keys.delete(code);
   }
 
   get moveForward(): number {
+    if (!this.enabled) return 0;
     return (this.keys.has('KeyW') || this.keys.has('ArrowUp') ? 1 : 0) -
       (this.keys.has('KeyS') || this.keys.has('ArrowDown') ? 1 : 0);
   }
 
   get moveRight(): number {
+    if (!this.enabled) return 0;
     return (this.keys.has('KeyD') || this.keys.has('ArrowRight') ? 1 : 0) -
       (this.keys.has('KeyA') || this.keys.has('ArrowLeft') ? 1 : 0);
   }

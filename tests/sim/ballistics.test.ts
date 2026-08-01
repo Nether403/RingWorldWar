@@ -11,12 +11,14 @@ import { deltaS } from '@core/ringMath';
 import {
   inertialToRing,
   inertialToRingVelocity,
+  isWithinDragAimEnvelope,
   launchToInertial,
   maxRangeInDirection,
   requiredLaunch,
   sampleTrajectory,
   solveAim,
   stepFree,
+  trajectoryImpact,
   type RingPoint,
   type RingVelocity,
 } from '@sim/ballistics';
@@ -130,6 +132,28 @@ describe('aim solver', () => {
   it('returns null for an unreachable target', () => {
     const target: RingPoint = { s: RING_CIRCUMFERENCE * 0.5, h: 0, z: 0 };
     expect(solveAim(origin, target, 0, { speed: 5, maxFlightTime: 20 })).toBeNull();
+  });
+
+  it('conservatively rejects far-side drag solves without excluding long antispinward fire', () => {
+    const longAntispinward: RingPoint = { s: RING_CIRCUMFERENCE - 1_800, h: 0, z: 0 };
+    const farSide: RingPoint = { s: RING_CIRCUMFERENCE * 0.5, h: 0, z: 0 };
+
+    expect(isWithinDragAimEnvelope(origin, longAntispinward, 0, 132, 60)).toBe(true);
+    expect(isWithinDragAimEnvelope(origin, farSide, 0, 132, 60)).toBe(false);
+  });
+
+  it('uses the canonical trajectory integration for impact-only evaluations', () => {
+    const velocity: RingVelocity = { vt: -100, vh: 70, vz: 18 };
+    const options = {
+      maxTime: 60,
+      dt: 1 / 30,
+      ballisticCoefficient: 4_000,
+      groundAt: () => 0,
+      stopOnImpact: true,
+    };
+    const path = sampleTrajectory(origin, velocity, 0, options);
+
+    expect(trajectoryImpact(origin, velocity, 0, options)).toEqual(path[path.length - 1]);
   });
 });
 

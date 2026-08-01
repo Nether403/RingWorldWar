@@ -4,7 +4,7 @@ import type { Terrain } from '@gen/terrain';
 
 const TARGET_CELL = 128;
 const MAX_SLOPE = 0.72;
-const CACHE_LIMIT = 64;
+const CACHE_LIMIT = 128;
 const SQRT2 = Math.SQRT2;
 
 const NEIGHBORS = [
@@ -31,7 +31,10 @@ export class SurfaceNav {
 
   private readonly passable = new Uint8Array(this.cols * this.rows);
   private readonly slope = new Float32Array(this.cols * this.rows);
-  private readonly fields = new Map<number, FlowField>();
+  private readonly fields: Array<FlowField | undefined> = Array.from({ length: this.passable.length });
+  private readonly fieldLastUsed = new Float64Array(this.passable.length);
+  private fieldCount = 0;
+  private fieldUseCounter = 0;
   private builds = 0;
 
   constructor(private readonly terrain: Terrain) {
@@ -55,7 +58,7 @@ export class SurfaceNav {
   }
 
   get cachedFieldCount(): number {
-    return this.fields.size;
+    return this.fieldCount;
   }
 
   get fieldBuildCount(): number {
@@ -138,11 +141,16 @@ export class SurfaceNav {
     const ds = deltaS(fromS, toS);
     const dz = toZ - fromZ;
     const steps = Math.max(1, Math.ceil(Math.hypot(ds, dz) / 4));
+    const firstZ = fromZ + dz / steps;
+    if (Math.max(Math.abs(firstZ), Math.abs(toZ)) > RING_HALF_WIDTH - 60) return false;
+    if (typeof this.terrain.segmentSlopePassable === 'function') {
+      return this.terrain.segmentSlopePassable(fromS, fromZ, toS, toZ, steps, MAX_SLOPE);
+    }
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
       const s = wrapS(fromS + ds * t);
       const z = fromZ + dz * t;
-      if (Math.abs(z) > RING_HALF_WIDTH - 60 || this.terrain.slopeAt(s, z) >= MAX_SLOPE) return false;
+      if (this.terrain.slopeAt(s, z) >= MAX_SLOPE) return false;
     }
     return true;
   }
@@ -155,17 +163,32 @@ export class SurfaceNav {
   }
 
   private getField(goal: number): FlowField {
-    const cached = this.fields.get(goal);
+    const cached = this.fields[goal];
     if (cached) {
-      this.fields.delete(goal);
-      this.fields.set(goal, cached);
+      this.fieldLastUsed[goal] = ++this.fieldUseCounter;
       return cached;
     }
 
     const field = this.buildField(goal);
-    this.fields.set(goal, field);
-    if (this.fields.size > CACHE_LIMIT) this.fields.delete(this.fields.keys().next().value!);
+    this.fields[goal] = field;
+    this.fieldLastUsed[goal] = ++this.fieldUseCounter;
+    this.fieldCount++;
+    if (this.fieldCount > CACHE_LIMIT) this.evictOldestField();
     return field;
+  }
+
+  private evictOldestField(): void {
+    let oldestGoal = -1;
+    let oldestUse = Infinity;
+    for (let goal = 0; goal < this.fields.length; goal++) {
+      if (!this.fields[goal] || this.fieldLastUsed[goal]! >= oldestUse) continue;
+      oldestGoal = goal;
+      oldestUse = this.fieldLastUsed[goal]!;
+    }
+    if (oldestGoal < 0) return;
+    this.fields[oldestGoal] = undefined;
+    this.fieldLastUsed[oldestGoal] = 0;
+    this.fieldCount--;
   }
 
   private buildField(goal: number): FlowField {

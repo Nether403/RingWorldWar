@@ -18,6 +18,12 @@ export interface QualitySettings {
   shadows: boolean;
   /** Terrain detail-normal strength. */
   detailFade: number;
+  /** Camera far plane in world metres. */
+  drawDistance: number;
+  /** Maximum live effect particles. */
+  particleCap: number;
+  /** The stable direct renderer deliberately has no post-processing path. */
+  postProcessingLevel: 'none';
 }
 
 export const QUALITY: Record<QualityLevel, QualitySettings> = {
@@ -26,24 +32,36 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     shadowMapSize: 1024,
     shadows: false,
     detailFade: 0.4,
+    drawDistance: 8_000,
+    particleCap: 225,
+    postProcessingLevel: 'none',
   },
   medium: {
     pixelRatio: 1,
     shadowMapSize: 1536,
     shadows: true,
     detailFade: 0.8,
+    drawDistance: 12_000,
+    particleCap: 450,
+    postProcessingLevel: 'none',
   },
   high: {
     pixelRatio: 1.25,
     shadowMapSize: 2048,
     shadows: true,
     detailFade: 1,
+    drawDistance: 18_000,
+    particleCap: 675,
+    postProcessingLevel: 'none',
   },
   ultra: {
     pixelRatio: 1.5,
     shadowMapSize: 4096,
     shadows: true,
     detailFade: 1,
+    drawDistance: 26_000,
+    particleCap: 900,
+    postProcessingLevel: 'none',
   },
 };
 
@@ -112,6 +130,8 @@ export class Renderer {
   private applyQuality(): void {
     this.gl.setPixelRatio(snapRatio(window.devicePixelRatio, this.settings.pixelRatio));
     this.gl.shadowMap.enabled = this.settings.shadows;
+    this.camera.far = this.settings.drawDistance;
+    this.camera.updateProjectionMatrix();
   }
 
   resize(width: number, height: number): void {

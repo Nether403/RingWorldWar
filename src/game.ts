@@ -10,7 +10,15 @@ import { RING_HALF_WIDTH, RING_RADIUS, SIM_DT } from '@core/constants';
 import { deltaS, surfaceDist, wrapS } from '@core/ringMath';
 import { createTerrain, type Terrain } from '@gen/terrain';
 import { AiOpponent, type Difficulty } from '@ai/opponent';
-import { Faction, STRUCTURES, UNITS, type StructureKind } from '@sim/data';
+import { deserializeMatchSession, serializeMatchSession } from '@headless/session';
+import {
+  effectiveStructureStats,
+  Faction,
+  STRUCTURES,
+  UNITS,
+  WEAPONS,
+  type StructureKind,
+} from '@sim/data';
 import { World } from '@sim/world';
 import type { TrajectorySample } from '@sim/ballistics';
 import { RenderAnchor } from '@render/anchor';
@@ -21,6 +29,12 @@ import { Hud } from '@ui/hud';
 import { Markers } from '@render/markers';
 
 export const PLAYER: Faction = Faction.Compact;
+export const SAVE_SLOT_KEY = 'ring-world-war/save-slot';
+
+export interface SaveActionResult {
+  ok: boolean;
+  message: string;
+}
 
 export class Game {
   readonly world: World;
@@ -36,10 +50,13 @@ export class Game {
   cursor = { s: 0, z: 0, valid: false };
   trajectoryPreview: TrajectorySample[] | null = null;
   private artillerySourceId = 0;
+  private artilleryWeaponId = '';
   private directUnitId = 0;
   private readonly controlGroups = new Map<number, number[]>();
   private previewDirty = false;
   private previewCooldown = 0;
+  /** Duration of the most recent fixed simulation step, excluding AI work. */
+  simStepMs = 0;
 
   private acc = 0;
   private readonly _ray = new THREE.Raycaster();
@@ -48,10 +65,10 @@ export class Game {
   private readonly _prevAnchor = new THREE.Vector3();
 
   constructor(
-    seed: number,
+    private readonly seed: number,
     private readonly anchor: RenderAnchor,
     private readonly rig: CameraRig,
-    difficulty: Difficulty = 'veteran',
+    private readonly difficulty: Difficulty = 'veteran',
   ) {
     this.terrain = createTerrain(seed);
     this.world = new World(this.terrain, seed);
@@ -66,7 +83,8 @@ export class Game {
     this.hud.onMinimapClick = (s, z) => {
       this.rig.setFocus(s, z);
     };
-    this.hud.onArtilleryTarget = (sourceId) => this.beginArtilleryTarget(sourceId);
+    this.hud.onArtilleryTarget = (sourceId, weaponId) => this.beginArtilleryTarget(sourceId, weaponId);
+    this.hud.onAbilityToggle = (unitId) => this.toggleAbility(unitId);
     this.hud.onBuildRequest = (kind) => this.setBuild(kind);
   }
 
@@ -84,6 +102,7 @@ export class Game {
         this.cursor.s,
         this.cursor.z,
         PLAYER,
+        this.artilleryWeaponId,
       );
       this.previewDirty = false;
       this.previewCooldown = 0.1;
@@ -92,12 +111,16 @@ export class Game {
     // shader compile) cannot trigger a death spiral of catch-up ticks.
     this.acc += dt;
     let steps = 0;
+    let simStepTotal = 0;
     while (this.acc >= SIM_DT && steps < 6) {
+      const stepStart = performance.now();
       this.world.step();
+      simStepTotal += performance.now() - stepStart;
       this.ai.update(this.world, SIM_DT);
       this.acc -= SIM_DT;
       steps++;
     }
+    if (steps > 0) this.simStepMs = simStepTotal / steps;
     if (steps === 6) this.acc = 0;
 
     const events = this.world.drainEvents();
@@ -213,6 +236,15 @@ export class Game {
         best = st.id;
       }
     }
+    if (best) return best;
+    for (const wreck of this.world.wreckages) {
+      if (!wreck.alive || !this.world.isEntityVisible(PLAYER, wreck.id)) continue;
+      const d = surfaceDist(wreck.s, wreck.z, s, z);
+      if (d < UNITS[wreck.kind].radius + 4 && d < bestD) {
+        bestD = d;
+        best = wreck.id;
+      }
+    }
     return best;
   }
 
@@ -224,12 +256,16 @@ export class Game {
     return this.artillerySourceId !== 0;
   }
 
+  get artilleryWeapon(): string | null {
+    return this.artilleryWeaponId || null;
+  }
+
   get directControlActive(): boolean {
     return this.directUnitId !== 0;
   }
 
   enterDirectControl(): boolean {
-    if (this.world.winner !== null) return false;
+    if (this.world.status === 'completed') return false;
     if (this.selection.size !== 1) return false;
     const id = this.selection.values().next().value as number | undefined;
     const unit = id ? this.world.unitById(id) : undefined;
@@ -244,7 +280,7 @@ export class Game {
   }
 
   updateDirectControl(forward: number, right: number): void {
-    if (this.world.winner !== null) return;
+    if (this.world.status === 'completed') return;
     if (!this.directUnitId) return;
     const unit = this.world.unitById(this.directUnitId);
     if (!unit) {
@@ -276,12 +312,13 @@ export class Game {
   }
 
   directAttack(s: number, z: number): void {
-    if (this.world.winner !== null) return;
+    if (this.world.status === 'completed') return;
     if (!this.directUnitId) return;
     const targetId = this.pickEntity(s, z);
     const targetUnit = targetId ? this.world.unitById(targetId) : undefined;
     const targetStructure = targetId ? this.world.structureById(targetId) : undefined;
-    const targetFaction = targetUnit?.faction ?? targetStructure?.faction ?? -1;
+    const targetWreck = targetId ? this.world.wreckById(targetId) : undefined;
+    const targetFaction = targetUnit?.faction ?? targetStructure?.faction ?? targetWreck?.faction ?? -1;
     const unit = this.world.unitById(this.directUnitId);
     if (!unit || targetFaction < 0 || targetFaction === PLAYER) return;
     unit.order = { kind: 'attack', s, z, targetId };
@@ -300,15 +337,23 @@ export class Game {
     this.hud.alert('Tactical control restored');
   }
 
-  beginArtilleryTarget(sourceId: number): void {
-    if (this.world.winner !== null) return;
+  beginArtilleryTarget(sourceId: number, weaponId?: string): void {
+    if (this.world.status === 'completed') return;
     const source = this.world.structureById(sourceId);
-    if (!source || source.faction !== PLAYER || source.kind !== 'rocketBattery') return;
+    if (!source || source.faction !== PLAYER) return;
+    const selectedWeapon = weaponId ?? STRUCTURES[source.kind].weapons.find((id) => WEAPONS[id]?.kind === 'ballistic');
+    if (!selectedWeapon || !STRUCTURES[source.kind].weapons.includes(selectedWeapon)) return;
+    if (WEAPONS[selectedWeapon]?.kind !== 'ballistic') return;
     this.hud.placing = null;
     this.artillerySourceId = sourceId;
+    this.artilleryWeaponId = selectedWeapon;
     this.trajectoryPreview = null;
     this.previewDirty = true;
-    this.hud.alert('Choose a spotted target — antispinward carries farther; click to fire');
+    this.hud.alert(
+      WEAPONS[selectedWeapon]?.flightMode === 'chord'
+        ? 'Choose a target - Chord Shot can blind-fire anywhere on the ring'
+        : 'Choose a spotted target - antispinward carries farther; click to fire',
+    );
     if (this.cursor.valid) this.updateCursor(this.cursor.s, this.cursor.z);
   }
 
@@ -321,16 +366,48 @@ export class Game {
 
   fireArtilleryTarget(s: number, z: number): boolean {
     if (!this.artillerySourceId) return false;
-    const fired = this.world.fireBallisticAt(this.artillerySourceId, s, z, PLAYER);
-    this.hud.alert(fired ? 'Rocket away' : 'Target unreachable, unspotted, or launcher reloading');
+    const weaponId = this.artilleryWeaponId;
+    const fired = this.world.fireBallisticAt(this.artillerySourceId, s, z, PLAYER, weaponId);
+    const blindFire = WEAPONS[weaponId]?.flightMode === 'chord';
+    this.hud.alert(
+      fired
+        ? blindFire ? 'Chord Shot away' : 'Rocket away'
+        : blindFire
+          ? 'Target unreachable or launcher reloading'
+          : 'Target unreachable, unspotted, or launcher reloading',
+    );
     if (fired) this.cancelArtilleryTarget();
     return fired;
   }
 
   cancelArtilleryTarget(): void {
     this.artillerySourceId = 0;
+    this.artilleryWeaponId = '';
     this.trajectoryPreview = null;
     this.previewDirty = false;
+  }
+
+  toggleSelectedAbility(): boolean {
+    if (this.selection.size !== 1) return false;
+    const unitId = this.selection.values().next().value as number | undefined;
+    return unitId ? this.toggleAbility(unitId) : false;
+  }
+
+  private toggleAbility(unitId: number): boolean {
+    const unit = this.world.unitById(unitId);
+    const ability = unit?.ability;
+    if (!unit || unit.faction !== PLAYER || !ability || ability.id === 'cloak') return false;
+    const next = !ability.active;
+    const changed = this.world.activateAbility(unit.id, next);
+    if (changed) {
+      this.hud.alert(`${abilityName(ability.id)} ${next ? 'activated' : 'deactivated'}`);
+      this.hud.invalidate();
+    } else if (ability.cooldown > 0) {
+      this.hud.alert(`${abilityName(ability.id)} cooldown: ${ability.cooldown.toFixed(1)}s`);
+    } else {
+      this.hud.alert(`Cannot activate ${abilityName(ability.id)} - check power and transition state`);
+    }
+    return changed;
   }
 
   selectAt(s: number, z: number, additive: boolean): void {
@@ -402,12 +479,13 @@ export class Game {
 
   /** Right-click: move, attack, or assist, depending on what is under it. */
   issueOrder(s: number, z: number, attackMove: boolean): void {
-    if (this.world.winner !== null) return;
+    if (this.world.status === 'completed') return;
     this.cancelArtilleryTarget();
     const targetId = this.pickEntity(s, z);
     const targetUnit = targetId ? this.world.unitById(targetId) : undefined;
     const targetStruct = targetId ? this.world.structureById(targetId) : undefined;
-    const targetFaction = targetUnit?.faction ?? targetStruct?.faction ?? -1;
+    const targetWreck = targetId ? this.world.wreckById(targetId) : undefined;
+    const targetFaction = targetUnit?.faction ?? targetStruct?.faction ?? targetWreck?.faction ?? -1;
     const hostile = targetId !== 0 && targetFaction >= 0 && targetFaction !== PLAYER;
 
     // Spread the group out around the destination so they do not all pile onto
@@ -449,13 +527,13 @@ export class Game {
 
   /** Try to place the structure the player is holding. */
   tryBuild(s: number, z: number): boolean {
-    if (this.world.winner !== null) return false;
+    if (this.world.status === 'completed') return false;
     const kind = this.hud.placing;
     if (!kind) return false;
     const site = this.world.tryPlaceStructure(PLAYER, kind, s, z);
     if (!site) {
       this.hud.alert(
-        this.world.players[PLAYER].salvage < (STRUCTURES[kind].cost.salvage ?? 0)
+        this.world.players[PLAYER].salvage < effectiveStructureStats(PLAYER, kind).salvageCost
           ? 'Not enough salvage'
           : 'Cannot build there',
       );
@@ -498,9 +576,70 @@ export class Game {
   }
 
   setBuild(kind: StructureKind | null): void {
-    if (this.world.winner !== null || this.directControlActive) return;
+    if (this.world.status === 'completed' || this.directControlActive) return;
     if (kind) this.cancelArtilleryTarget();
     this.hud.placing = kind;
+  }
+
+  cancelInteractions(): void {
+    if (this.directControlActive) this.exitDirectControl();
+    this.cancelArtilleryTarget();
+    this.hud.placing = null;
+    this.selection.clear();
+    this.hud.invalidate();
+  }
+
+  saveGame(): SaveActionResult {
+    try {
+      const inactivePlayerController = new AiOpponent(PLAYER, this.difficulty, this.seed);
+      const serialized = serializeMatchSession(this.world, [inactivePlayerController, this.ai]);
+      localStorage.setItem(SAVE_SLOT_KEY, serialized);
+      this.hud.alert('Game saved');
+      return { ok: true, message: 'Game saved to this browser' };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.hud.alert('Save failed');
+      return { ok: false, message: `Could not save: ${message}` };
+    }
+  }
+
+  loadGame(): SaveActionResult {
+    try {
+      const saved = localStorage.getItem(SAVE_SLOT_KEY);
+      if (!saved) return { ok: false, message: 'Could not load: no saved game in this browser' };
+
+      // Deserialize the complete session first. Only after world and both AI
+      // controllers pass validation do we replace any live authority.
+      const session = deserializeMatchSession(saved, this.terrain);
+      const opponent = session.controllers.find(
+        (controller) => controller.exportPersistenceState().faction === Faction.Choir,
+      );
+      if (!opponent) throw new Error('save has no Choir controller');
+
+      this.world.restorePersistenceState(session.world.exportPersistenceState());
+      this.ai = opponent;
+      this.resetTransientState();
+      this.hud.alert('Game loaded');
+      return { ok: true, message: 'Game loaded' };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.hud.alert('Load rejected');
+      return { ok: false, message: `Could not load: ${message}` };
+    }
+  }
+
+  private resetTransientState(): void {
+    this.selection.clear();
+    this.controlGroups.clear();
+    this.cancelArtilleryTarget();
+    this.hud.placing = null;
+    this.hud.invalidate();
+    this.cursor.valid = false;
+    this.directUnitId = 0;
+    this.rig.exitDirect();
+    this.acc = 0;
+    this.previewCooldown = 0;
+    this.entities.resetTransientState();
   }
 
   dispose(): void {
@@ -510,4 +649,13 @@ export class Game {
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+function abilityName(id: NonNullable<World['units'][number]['ability']>['id']): string {
+  switch (id) {
+    case 'shieldWall': return 'Shield Wall';
+    case 'siegeMode': return 'Siege Mode';
+    case 'umbrella': return 'Umbrella';
+    case 'cloak': return 'Cloak';
+  }
 }

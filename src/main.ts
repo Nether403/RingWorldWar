@@ -12,10 +12,12 @@ import { CameraRig } from '@render/cameraRig';
 import { Environment } from '@render/environment';
 import { InputController } from '@render/input';
 import { Renderer, type QualityLevel } from '@render/renderer';
+import { Settings } from '@render/settings';
 import { RingMesh } from '@render/ringMesh';
 import { BUILDABLE, STRUCTURES } from '@sim/data';
 import { Game } from './game';
 import { DebugOverlay } from '@ui/debugOverlay';
+import { SettingsMenu } from '@ui/settingsMenu';
 
 const boot = {
   el: document.getElementById('boot')!,
@@ -43,6 +45,7 @@ async function start(): Promise<void> {
   const container = document.getElementById('app')!;
   const params = new URLSearchParams(location.search);
   const seed = Number(params.get('seed') ?? '20260731') || 20260731;
+  const settings = new Settings({ search: params });
 
   await boot.step(0.08, 'surveying the ring');
   const anchor = new RenderAnchor();
@@ -50,10 +53,8 @@ async function start(): Promise<void> {
   rig.setFocus(0, 0);
   anchor.set(0, 0);
 
-  const renderer = new Renderer(container, rig.camera, pickQuality(params));
-  // An explicit ?quality= means the player asked for that level; do not let the
-  // adaptive governor override a deliberate choice.
-  if (params.get('quality')) renderer.autoQuality = false;
+  const renderer = new Renderer(container, rig.camera, settings.quality);
+  renderer.autoQuality = settings.adaptiveQuality;
 
   await boot.step(0.3, 'generating terrain');
   const game = new Game(seed, anchor, rig);
@@ -66,13 +67,23 @@ async function start(): Promise<void> {
   const environment = new Environment(seed);
   renderer.scene.add(environment.group);
   environment.buildEnvironment(renderer.gl, renderer.scene);
-  const applyShadowQuality = (): void => {
-    environment.keyLight.shadow.mapSize.setScalar(renderer.currentSettings.shadowMapSize);
-    environment.keyLight.shadow.map?.dispose();
-    environment.keyLight.shadow.map = null;
+  const applyRenderQuality = (): void => {
+    const quality = renderer.currentSettings;
+    environment.keyLight.shadow.mapSize.setScalar(quality.shadowMapSize);
+    // Three's shadow renderer can still reference the current target during a
+    // quality transition. Disposing it after shadows were disabled invalidates
+    // the following forward pass on some ANGLE backends, leaving only the
+    // background and custom star shader. Keep the dormant map on Low; when
+    // shadows are enabled, rebuilding it is safe and applies the new size.
+    if (quality.shadows) {
+      environment.keyLight.shadow.map?.dispose();
+      environment.keyLight.shadow.map = null;
+    }
+    ringMesh.uniforms.uDetailFade.value = quality.detailFade;
+    game.effects.setParticleCap(quality.particleCap);
   };
-  renderer.onQualityChange = applyShadowQuality;
-  applyShadowQuality();
+  renderer.onQualityChange = applyRenderQuality;
+  applyRenderQuality();
   for (const o of game.objects) renderer.scene.add(o);
 
   // Aerial perspective. Inside a ring you are always looking through kilometres
@@ -83,9 +94,12 @@ async function start(): Promise<void> {
 
   const input = new InputController(renderer.gl.domElement, rig);
   const overlay = new DebugOverlay();
+  const menu = new SettingsMenu(settings, renderer, (open) => input.setEnabled(!open));
+  menu.onSave = () => game.saveGame();
+  menu.onLoad = () => game.loadGame();
 
-  wireCommands(renderer.gl.domElement, game, rig);
-  wireKeys(game, renderer, overlay, input);
+  wireCommands(renderer.gl.domElement, game, rig, () => !menu.isOpen);
+  wireKeys(game, renderer, overlay, input, settings, menu);
 
   await boot.step(1.0, 'ready');
   boot.hide();
@@ -128,7 +142,7 @@ async function start(): Promise<void> {
     (renderer.scene.background as THREE.Color).copy(environment.fogColor).multiplyScalar(0.5);
 
     renderer.render(dt);
-    overlay.update(dt, renderer, rig, environment);
+    overlay.update(dt, renderer, game, rig, environment);
 
     if (game.hud.restartRequested) location.reload();
   }
@@ -139,6 +153,8 @@ async function start(): Promise<void> {
     rig,
     anchor,
     renderer,
+    settings,
+    menu,
     environment,
     ringMesh,
     probe: () => ({
@@ -170,7 +186,12 @@ async function start(): Promise<void> {
  * Mouse commands. Left selects (click or drag box), right issues orders, and
  * while a structure is held the left button places it instead.
  */
-function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
+function wireCommands(
+  canvas: HTMLElement,
+  game: Game,
+  rig: CameraRig,
+  gameplayInputEnabled: () => boolean,
+): void {
   let dragging = false;
   let dragStart: { s: number; z: number } | null = null;
   let downX = 0;
@@ -187,6 +208,7 @@ function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
   };
 
   canvas.addEventListener('pointermove', (e) => {
+    if (!gameplayInputEnabled()) return;
     const p = ndc(e);
     const hit = game.pickGround(p.x, p.y, rig.camera);
     if (hit) {
@@ -197,6 +219,7 @@ function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
   });
 
   canvas.addEventListener('pointerdown', (e) => {
+    if (!gameplayInputEnabled()) return;
     activePointer = e.pointerId;
     suppressCommand = e.button === 2 && e.shiftKey;
     canvas.setPointerCapture(e.pointerId);
@@ -213,6 +236,13 @@ function wireCommands(canvas: HTMLElement, game: Game, rig: CameraRig): void {
   });
 
   window.addEventListener('pointerup', (e) => {
+    if (!gameplayInputEnabled()) {
+      activePointer = -1;
+      dragging = false;
+      dragStart = null;
+      suppressCommand = false;
+      return;
+    }
     if (e.pointerId !== activePointer) return;
     activePointer = -1;
     if (suppressCommand) {
@@ -257,16 +287,20 @@ function wireKeys(
   renderer: Renderer,
   overlay: DebugOverlay,
   input: InputController,
+  settings: Settings,
+  menu: SettingsMenu,
 ): void {
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
       input.consume(e.code);
-      if (game.directControlActive) {
-        game.exitDirectControl();
+      e.preventDefault();
+      if (menu.isOpen) {
+        menu.close();
+      } else {
+        game.cancelInteractions();
         input.setDirectMode(false);
-      } else if (game.artilleryTargeting) game.cancelArtilleryTarget();
-      else if (game.hud.placing) game.hud.placing = null;
-      else game.selection.clear();
+        menu.open();
+      }
       return;
     }
     if (e.code === 'KeyV' && !e.ctrlKey && !e.shiftKey && !game.directControlActive) {
@@ -281,6 +315,16 @@ function wireKeys(
       input.consume(e.code);
       e.preventDefault();
       overlay.toggle();
+      return;
+    }
+    if (menu.isOpen) {
+      input.consume(e.code);
+      return;
+    }
+    if (e.code === 'KeyX' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+      input.consume(e.code);
+      e.preventDefault();
+      game.toggleSelectedAbility();
       return;
     }
     if (game.directControlActive) return;
@@ -328,28 +372,18 @@ function wireKeys(
     if (level && e.shiftKey) {
       // Choosing a preset by hand turns the governor off; the player has said
       // what they want and having it silently overridden would be maddening.
-      renderer.autoQuality = false;
+      settings.setQuality(level);
+      settings.apply(renderer);
       input.consume(e.code);
-      renderer.setQuality(level);
       overlay.flash(`quality: ${level} (auto off)`);
     }
     if (e.code === 'KeyP' && e.shiftKey) {
       input.consume(e.code);
-      renderer.autoQuality = !renderer.autoQuality;
+      settings.setAdaptiveQuality(!renderer.autoQuality, renderer.quality);
+      settings.apply(renderer);
       overlay.flash(`adaptive quality: ${renderer.autoQuality ? 'on' : 'off'}`);
     }
   });
-}
-
-function pickQuality(params: URLSearchParams): QualityLevel {
-  const forced = params.get('quality');
-  if (forced === 'low' || forced === 'medium' || forced === 'high' || forced === 'ultra') {
-    return forced;
-  }
-  const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8;
-  const cores = navigator.hardwareConcurrency ?? 4;
-  if (mem <= 4 || cores <= 4) return 'medium';
-  return 'high';
 }
 
 function checkWebGL2(): boolean {

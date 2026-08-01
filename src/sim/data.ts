@@ -1,3 +1,5 @@
+import { RING_CIRCUMFERENCE } from '@core/constants';
+
 /**
  * Game data.
  *
@@ -23,6 +25,28 @@ export const FACTION_COLOR: Record<Faction, number> = {
 export const FACTION_NAME: Record<Faction, string> = {
   [Faction.Compact]: 'Meridian Compact',
   [Faction.Choir]: 'Axiom Choir',
+};
+
+export interface FactionModifiers {
+  buildTimeMultiplier: number;
+  visionMultiplier: number;
+  mechHpMultiplier: number;
+  ballisticCostMultiplier: number;
+}
+
+export const FACTION_MODS: Record<Faction, FactionModifiers> = {
+  [Faction.Compact]: {
+    buildTimeMultiplier: 1,
+    visionMultiplier: 1,
+    mechHpMultiplier: 1.15,
+    ballisticCostMultiplier: 0.85,
+  },
+  [Faction.Choir]: {
+    buildTimeMultiplier: 0.85,
+    visionMultiplier: 1.2,
+    mechHpMultiplier: 0.85,
+    ballisticCostMultiplier: 1,
+  },
 };
 
 export function other(f: Faction): Faction {
@@ -85,11 +109,19 @@ export interface WeaponDef {
   splash?: number;
   /** Projectile travel speed for direct fire, m/s. 0 = hitscan. */
   projectileSpeed?: number;
-  /** Energy drawn per shot. Firing during a brownout is less accurate. */
+  /** One-second transient power draw added by each accepted shot. */
   energyPerShot?: number;
   /** Degrees of spread. */
   spread?: number;
   muzzleFlashScale?: number;
+  /** Non-standard ballistic propagation. Omitted means a conventional arc. */
+  flightMode?: 'cruise' | 'chord';
+  /** Cruise only: height maintained above the local terrain. */
+  cruiseAltitude?: number;
+  /** Interceptors may require a healthy power network rather than degrading. */
+  minPowerRatio?: number;
+  /** Optional per-weapon drag resistance; larger values retain speed better. */
+  ballisticCoefficient?: number;
 }
 
 export const WEAPONS: Record<string, WeaponDef> = {
@@ -165,6 +197,46 @@ export const WEAPONS: Record<string, WeaponDef> = {
     splash: 34,
     energyPerShot: 6,
     muzzleFlashScale: 3,
+  },
+  cruiseMissile: {
+    id: 'cruiseMissile',
+    kind: 'ballistic',
+    damage: 380,
+    damageType: 'explosive',
+    cooldown: 18,
+    range: 3800,
+    launchSpeed: 55,
+    splash: 30,
+    energyPerShot: 10,
+    muzzleFlashScale: 2.5,
+    flightMode: 'cruise',
+    cruiseAltitude: 50,
+  },
+  chordShot: {
+    id: 'chordShot',
+    kind: 'ballistic',
+    damage: 1200,
+    damageType: 'explosive',
+    cooldown: 45,
+    range: RING_CIRCUMFERENCE * 0.5,
+    // Verified against the 1400 m atmosphere with the heavy-round drag profile.
+    launchSpeed: 400,
+    splash: 50,
+    energyPerShot: 30,
+    muzzleFlashScale: 4,
+    flightMode: 'chord',
+    ballisticCoefficient: 60_000,
+  },
+  gridLaser: {
+    id: 'gridLaser',
+    kind: 'interceptor',
+    damage: 100,
+    damageType: 'energy',
+    cooldown: 1.25,
+    range: 800,
+    energyPerShot: 8,
+    muzzleFlashScale: 1.5,
+    minPowerRatio: 0.75,
   },
   pdLaser: {
     id: 'pdLaser',
@@ -324,7 +396,9 @@ export type StructureKind =
   | 'mechFoundry'
   | 'rocketBattery'
   | 'pointDefense'
+  | 'laserGrid'
   | 'radarMast'
+  | 'silo'
   | 'spinalNode';
 
 export interface StructureDef {
@@ -356,6 +430,8 @@ export interface StructureDef {
   /** Completed structure required before this can be placed. */
   requires?: StructureKind;
   hotkey?: string;
+  /** Laser-grid coverage in either arc direction, metres. */
+  coverageArc?: number;
 }
 
 export const STRUCTURES: Record<StructureKind, StructureDef> = {
@@ -467,7 +543,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     radius: 12,
     height: 16,
     vision: 150,
-    weapons: ['batteryGun'],
+    weapons: ['batteryGun', 'cruiseMissile'],
     energy: -6,
     requires: 'fabricator',
     hotkey: 'R',
@@ -487,6 +563,23 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     energy: -5,
     hotkey: 'D',
   },
+  laserGrid: {
+    kind: 'laserGrid',
+    name: 'Laser Grid',
+    role: 'Burns ballistic rockets at midcourse. Cruise missiles fly under it.',
+    cost: { salvage: 350 },
+    buildTime: 18,
+    hp: 900,
+    armor: 'structure',
+    radius: 10,
+    height: 24,
+    vision: 200,
+    weapons: ['gridLaser'],
+    energy: -8,
+    requires: 'fabricator',
+    coverageArc: 800,
+    hotkey: 'L',
+  },
   radarMast: {
     kind: 'radarMast',
     name: 'Radar Mast',
@@ -501,6 +594,22 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     weapons: [],
     energy: -4,
     hotkey: 'V',
+  },
+  silo: {
+    kind: 'silo',
+    name: 'Silo',
+    role: 'Endgame cross-ring weapon. Expensive, visible, devastating.',
+    cost: { salvage: 1200 },
+    buildTime: 45,
+    hp: 2000,
+    armor: 'structure',
+    radius: 16,
+    height: 30,
+    vision: 180,
+    weapons: ['chordShot'],
+    energy: -12,
+    requires: 'mechFoundry',
+    hotkey: 'C',
   },
   spinalNode: {
     kind: 'spinalNode',
@@ -527,8 +636,10 @@ export const BUILDABLE: StructureKind[] = [
   'mechFoundry',
   'rocketBattery',
   'pointDefense',
+  'laserGrid',
   'radarMast',
   'fusionCore',
+  'silo',
 ];
 
 /** Command points granted per captured Spinal Node. */
@@ -540,3 +651,52 @@ export const MATCH_TIME_LIMIT = 45 * 60;
 
 /** How long a launcher stays revealed after firing (counter-battery flash). */
 export const FIRING_REVEAL_TIME = 6;
+
+export const WRECK_LIFETIME = 60;
+export const WRECK_HP_MULTIPLIER = 0.3;
+
+export interface EffectiveEntityStats {
+  maxHp: number;
+  vision: number;
+  buildDuration: number;
+  salvageCost: number;
+}
+
+export function effectiveUnitStats(faction: Faction, kind: UnitKind): EffectiveEntityStats {
+  const def = UNITS[kind];
+  const mods = FACTION_MODS[faction];
+  return {
+    maxHp: Math.round(def.hp * (def.isMech ? mods.mechHpMultiplier : 1)),
+    vision: Math.round(def.vision * mods.visionMultiplier),
+    buildDuration: def.buildTime * mods.buildTimeMultiplier,
+    salvageCost: effectiveSalvageCost(faction, def.cost.salvage ?? 0, def.weapons),
+  };
+}
+
+export function effectiveStructureStats(
+  faction: Faction | -1,
+  kind: StructureKind,
+): EffectiveEntityStats {
+  const def = STRUCTURES[kind];
+  if (faction < 0) {
+    return {
+      maxHp: def.hp,
+      vision: def.vision,
+      buildDuration: def.buildTime,
+      salvageCost: def.cost.salvage ?? 0,
+    };
+  }
+  const mods = FACTION_MODS[faction as Faction];
+  return {
+    maxHp: def.hp,
+    vision: Math.round(def.vision * mods.visionMultiplier),
+    buildDuration: def.buildTime * mods.buildTimeMultiplier,
+    salvageCost: effectiveSalvageCost(faction as Faction, def.cost.salvage ?? 0, def.weapons),
+  };
+}
+
+function effectiveSalvageCost(faction: Faction, base: number, weapons: string[]): number {
+  const hasBallisticWeapon = weapons.some((weaponId) => WEAPONS[weaponId]?.kind === 'ballistic');
+  const multiplier = hasBallisticWeapon ? FACTION_MODS[faction].ballisticCostMultiplier : 1;
+  return Math.round(base * multiplier);
+}

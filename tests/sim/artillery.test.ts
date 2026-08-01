@@ -63,6 +63,30 @@ describe('commanded artillery', () => {
     expect(world.previewBallistic(battery.id, 1_000, 0, Faction.Compact)).toBeNull();
     expect(world.fireBallisticAt(battery.id, 1_000, 0, Faction.Compact)).toBe(false);
   });
+
+  it('keeps mobile artillery advancing until its trajectory is directionally reachable', () => {
+    const world = battlefield();
+    const longbow = world.spawnUnit(Faction.Compact, 'longbow', 0, 0);
+    const targetS = [600, 900, 1_200, 1_500, 1_800, 2_100, 2_400].find(
+      (candidate) => !world.isBallisticTargetWithinReachEnvelope(
+        longbow.id,
+        candidate,
+        0,
+        Faction.Compact,
+        'siegeMortar',
+      ),
+    );
+    expect(targetS).toBeDefined();
+    const target = world.spawnUnit(Faction.Choir, 'vanguard', targetS!, 0);
+    target.revealed = 30;
+    longbow.order = { kind: 'attack', s: target.s, z: target.z, targetId: target.id };
+
+    const start = longbow.s;
+    for (let tick = 0; tick < 30; tick++) world.step();
+
+    expect(surfaceDist(start, 0, longbow.s, longbow.z)).toBeGreaterThan(0.5);
+    expect(world.projectiles.some((projectile) => projectile.weapon === 'siegeMortar')).toBe(false);
+  });
 });
 
 function battlefield(): World {
@@ -74,5 +98,6 @@ function battlefield(): World {
   const world = new World(terrain, 19);
   world.spawnStructure(Faction.Compact, 'bastion', 20_000, -1_500, 1);
   world.spawnStructure(Faction.Choir, 'bastion', 10_000, 1_500, 1);
+  world.spawnStructure(Faction.Compact, 'fusionCore', 19_700, -1_200, 1);
   return world;
 }

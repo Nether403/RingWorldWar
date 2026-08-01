@@ -25,11 +25,13 @@ import {
   type MechRig,
   type StructureModel,
 } from '@gen/models';
+import { ABILITIES } from '@sim/abilities';
 import {
   FACTION_COLOR,
   Faction,
   STRUCTURES,
   UNITS,
+  WRECK_LIFETIME,
   type StructureKind,
 } from '@sim/data';
 import type { World } from '@sim/world';
@@ -56,6 +58,13 @@ export class EntityRenderer {
   private mechMeshes = new Map<string, THREE.InstancedMesh>();
   /** key: `${kind}|${faction}` */
   private structMeshes = new Map<string, THREE.InstancedMesh>();
+  /** Owner-only translucent Wisp parts. */
+  private cloakMeshes = new Map<string, THREE.InstancedMesh>();
+  private wreckMeshes = new Map<MechClass, THREE.InstancedMesh>();
+  private abilityMeshes = new Map<string, THREE.InstancedMesh>();
+  private damageMeshes = new Map<1 | 2, THREE.InstancedMesh>();
+  /** Fixed-capacity state buckets reset and uploaded together each frame. */
+  private presentationMeshes: THREE.InstancedMesh[] = [];
   private counts = new Map<string, number>();
 
   /** Engineers are drawn as a simple hull rather than as a walker. */
@@ -94,11 +103,47 @@ export class EntityRenderer {
           this.object.add(mesh);
         }
       }
+
+      const wreck = new THREE.InstancedMesh(
+        rig.parts.torso,
+        new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.9, metalness: 0.18 }),
+        MAX_PER_BUCKET,
+      );
+      wreck.name = `wreck:${cls}`;
+      wreck.frustumCulled = false;
+      wreck.castShadow = true;
+      wreck.receiveShadow = true;
+      wreck.count = 0;
+      this.wreckMeshes.set(cls, wreck);
+      this.presentationMeshes.push(wreck);
+      this.object.add(wreck);
+    }
+
+    // Cloaked Wisps need separate material buckets because opacity cannot vary
+    // per instance on the shared hull material without another shader channel.
+    for (const f of [Faction.Compact, Faction.Choir]) {
+      const cloak = makeHullMaterial(FACTION_COLOR[f]);
+      cloak.material.transparent = true;
+      cloak.material.opacity = 0.28;
+      cloak.material.depthWrite = false;
+      cloak.uniforms.uEmissive.value = 0.45;
+      const rig = this.rigs.get('wisp')!;
+      for (const part of PART_NAMES) {
+        const mesh = new THREE.InstancedMesh(rig.parts[part], cloak.material, MAX_PER_BUCKET);
+        mesh.name = `cloak:wisp:${part}:${f}`;
+        mesh.frustumCulled = false;
+        mesh.castShadow = false;
+        mesh.count = 0;
+        this.cloakMeshes.set(`${part}|${f}`, mesh);
+        this.presentationMeshes.push(mesh);
+        this.object.add(mesh);
+      }
     }
 
     const kinds: StructureKind[] = [
       'bastion', 'extractor', 'solarArray', 'fusionCore', 'fabricator',
-      'mechFoundry', 'rocketBattery', 'pointDefense', 'radarMast', 'spinalNode',
+      'mechFoundry', 'rocketBattery', 'pointDefense', 'laserGrid', 'radarMast',
+      'silo', 'spinalNode',
     ];
     for (const kind of kinds) {
       const model = buildStructure(kind, seed + kind.length * 104729);
@@ -109,10 +154,13 @@ export class EntityRenderer {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.count = 0;
+        mesh.name = `structure:${kind}:${f}`;
         this.structMeshes.set(`${kind}|${f}`, mesh);
         this.object.add(mesh);
       }
     }
+
+    this.createPresentationBuckets();
 
     // Engineers: a small hovering hull, visually distinct from the mechs.
     this.engineerGeo = buildStructure('pointDefense', seed).geometry.clone();
@@ -138,13 +186,16 @@ export class EntityRenderer {
     for (const m of this.mechMeshes.values()) m.count = 0;
     for (const m of this.structMeshes.values()) m.count = 0;
     for (const m of this.engineerMeshes) if (m) m.count = 0;
+    for (const m of this.presentationMeshes) m.count = 0;
 
     this.drawStructures(world, anchor, viewer);
+    this.drawWrecks(world, anchor, viewer);
     this.drawUnits(world, anchor, time, viewer, alpha);
 
     for (const m of this.mechMeshes.values()) if (m.count > 0) m.instanceMatrix.needsUpdate = true;
     for (const m of this.structMeshes.values()) if (m.count > 0) m.instanceMatrix.needsUpdate = true;
     for (const m of this.engineerMeshes) if (m && m.count > 0) m.instanceMatrix.needsUpdate = true;
+    for (const m of this.presentationMeshes) if (m.count > 0) m.instanceMatrix.needsUpdate = true;
 
     // Prune foot state for units that no longer exist, so the map cannot grow
     // without bound over a long match.
@@ -155,6 +206,81 @@ export class EntityRenderer {
   }
 
   // -------------------------------------------------------------------------
+
+  private createPresentationBuckets(): void {
+    const shieldGeometry = new THREE.PlaneGeometry(16, 9);
+    const coverageGeometry = new THREE.RingGeometry(0.965, 1, 64);
+    coverageGeometry.rotateX(-Math.PI / 2);
+    const siegeGeometry = new THREE.RingGeometry(0.68, 1, 32);
+    siegeGeometry.rotateX(-Math.PI / 2);
+
+    for (const f of [Faction.Compact, Faction.Choir]) {
+      const color = FACTION_COLOR[f];
+      const definitions: Array<[string, THREE.BufferGeometry, number]> = [
+        ['shieldWall', shieldGeometry, 0.36],
+        ['umbrella', coverageGeometry, 0.2],
+        ['siegeMode', siegeGeometry, 0.68],
+      ];
+      for (const [ability, geometry, opacity] of definitions) {
+        const material = new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        });
+        const mesh = new THREE.InstancedMesh(geometry, material, MAX_PER_BUCKET);
+        mesh.name = `ability:${ability}:${f}`;
+        mesh.frustumCulled = false;
+        mesh.count = 0;
+        this.abilityMeshes.set(`${ability}|${f}`, mesh);
+        this.presentationMeshes.push(mesh);
+        this.object.add(mesh);
+      }
+    }
+
+    const damageGeometry = new THREE.OctahedronGeometry(0.7, 0);
+    for (const state of [1, 2] as const) {
+      const material = new THREE.MeshBasicMaterial({
+        color: state === 1 ? 0xffad42 : 0xff3f27,
+        transparent: true,
+        opacity: state === 1 ? 0.75 : 0.95,
+        depthWrite: false,
+      });
+      const mesh = new THREE.InstancedMesh(damageGeometry, material, MAX_PER_BUCKET * 2);
+      mesh.name = `damage:${state}`;
+      mesh.frustumCulled = false;
+      mesh.count = 0;
+      this.damageMeshes.set(state, mesh);
+      this.presentationMeshes.push(mesh);
+      this.object.add(mesh);
+    }
+  }
+
+  private drawWrecks(world: World, anchor: RenderAnchor, viewer: Faction): void {
+    for (const wreck of world.wreckages) {
+      if (!wreck.alive || !UNITS[wreck.kind].isMech) continue;
+      if (!world.isEntityVisible(viewer, wreck.id)) continue;
+      if (Math.abs(deltaS(anchor.s, wreck.s)) > RING_CIRCUMFERENCE * 0.3) continue;
+      const mesh = this.wreckMeshes.get(wreck.kind as MechClass);
+      if (!mesh || mesh.count >= mesh.instanceMatrix.count) continue;
+
+      const ground = world.terrain.heightAt(wreck.s, wreck.z);
+      anchor.toVector(wreck.s, ground + 0.8, wreck.z, this._v);
+      anchor.orientation(wreck.s, wreck.yaw, this._q);
+      this._basis.compose(this._v, this._q, ONE);
+
+      const finalDecay = clampN(wreck.lifetime / Math.min(8, WRECK_LIFETIME), 0.16, 1);
+      _local.makeRotationZ(Math.PI * (0.42 + ((wreck.id * 37) % 17) / 170));
+      _rot.makeRotationY(((wreck.id * 97) % 360) * (Math.PI / 180));
+      _local.premultiply(_rot);
+      _local.scale(this._scale.set(finalDecay, finalDecay, finalDecay));
+      _local.setPosition(0, -0.5 * (1 - finalDecay), 0);
+      _tmp.multiplyMatrices(this._basis, _local);
+      mesh.setMatrixAt(mesh.count++, _tmp);
+    }
+  }
 
   private drawStructures(world: World, anchor: RenderAnchor, viewer: Faction): void {
     for (const st of world.structures) {
@@ -207,7 +333,69 @@ export class EntityRenderer {
         continue;
       }
 
-      this.drawMech(u.kind as MechClass, u, world, anchor, ground, time, s, z, yaw, aimYaw);
+      this.drawMech(
+        u.kind as MechClass,
+        u,
+        world,
+        anchor,
+        ground,
+        time,
+        s,
+        z,
+        yaw,
+        aimYaw,
+        u.cloaked && u.faction === viewer,
+      );
+      this.drawUnitState(u, anchor, ground, time, s, z, yaw);
+    }
+  }
+
+  private drawUnitState(
+    u: World['units'][number],
+    anchor: RenderAnchor,
+    ground: number,
+    time: number,
+    s: number,
+    z: number,
+    yaw: number,
+  ): void {
+    const def = UNITS[u.kind];
+    anchor.toVector(s, ground, z, this._v);
+    anchor.orientation(s, yaw, this._q);
+    this._basis.compose(this._v, this._q, ONE);
+
+    const place = (mesh: THREE.InstancedMesh | undefined, local: THREE.Matrix4): void => {
+      if (!mesh || mesh.count >= mesh.instanceMatrix.count) return;
+      _tmp.multiplyMatrices(this._basis, local);
+      mesh.setMatrixAt(mesh.count++, _tmp);
+    };
+
+    if (u.ability?.id === 'shieldWall' && u.ability.active) {
+      const pulse = 1 + Math.sin(time * 4 + u.id) * 0.035;
+      _local.makeScale(pulse, pulse, pulse);
+      _local.setPosition(0, def.height * 0.48, def.radius * 1.7);
+      place(this.abilityMeshes.get(`shieldWall|${u.faction}`), _local);
+    }
+    if (u.ability?.id === 'umbrella' && u.ability.active) {
+      const radius = ABILITIES.umbrella.protectionRadius;
+      _local.makeScale(radius, radius, radius);
+      _local.setPosition(0, 0.8, 0);
+      place(this.abilityMeshes.get(`umbrella|${u.faction}`), _local);
+    }
+    if (u.ability?.id === 'siegeMode' && (u.ability.active || u.ability.transitionTimer > 0)) {
+      const transition = u.ability.transitionTimer / ABILITIES.siegeMode.transitionDuration;
+      const radius = def.radius * (1.45 + transition * 0.35 + Math.sin(time * 5) * 0.04);
+      _local.makeScale(radius, radius, radius);
+      _local.setPosition(0, 0.65, 0);
+      place(this.abilityMeshes.get(`siegeMode|${u.faction}`), _local);
+    }
+
+    const damageState = u.damageState;
+    if (damageState === 1 || damageState === 2) {
+      const size = (damageState === 2 ? 1.25 : 0.9) * (1 + Math.sin(time * 7 + u.id) * 0.12);
+      _local.makeScale(size, size, size);
+      _local.setPosition(0, def.height * 1.12, 0);
+      place(this.damageMeshes.get(damageState), _local);
     }
   }
 
@@ -230,6 +418,7 @@ export class EntityRenderer {
     z: number,
     yaw: number,
     aimYaw: number,
+    cloakedForViewer: boolean,
   ): void {
     const rig = this.rigs.get(cls);
     if (!rig) return;
@@ -274,7 +463,9 @@ export class EntityRenderer {
     this._basis.compose(this._v, this._q, ONE);
 
     const push = (part: PartName, local: THREE.Matrix4): void => {
-      const mesh = this.mechMeshes.get(`${cls}|${part}|${f}`);
+      const mesh = cloakedForViewer && cls === 'wisp'
+        ? this.cloakMeshes.get(`${part}|${f}`)
+        : this.mechMeshes.get(`${cls}|${part}|${f}`);
       if (!mesh || mesh.count >= mesh.instanceMatrix.count) return;
       _tmp.multiplyMatrices(this._basis, local);
       mesh.setMatrixAt(mesh.count++, _tmp);
@@ -367,10 +558,9 @@ export class EntityRenderer {
     }
   }
 
-  /** Damage tint for a faction's whole army. Cheap stand-in until per-unit. */
-  setDamage(faction: Faction, v: number): void {
-    const m = this.mats[faction];
-    if (m) m.uniforms.uDamage.value = v;
+  resetTransientState(): void {
+    this.feet.clear();
+    for (const mesh of this.presentationMeshes) mesh.count = 0;
   }
 
   setEmissive(v: number): void {

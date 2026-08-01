@@ -1,0 +1,24 @@
+{
+  "schema": "ring-world-war/core-match-manifest",
+  "version": 1,
+  "id": "veteran-mirror",
+  "description": "Veteran versus Veteran faction-balance cohort with one unique run per seed.",
+  "pairSeeds": [501, 1709, 2903, 4217, 5653, 6841, 7907, 9151, 10301, 11719, 13007, 14321, 15643, 16901, 18211, 19531, 20807, 22123, 23447, 24767],
+  "legsPerSeed": 1,
+  "tickLimit": 81000,
+  "telemetryCadenceTicks": 900,
+  "roles": [
+    { "id": "veteran-alpha", "difficulty": "veteran" },
+    { "id": "veteran-beta", "difficulty": "veteran" }
+  ],
+  "gates": {
+    "expectedMatches": 20,
+    "meanDurationSeconds": { "minimum": 1200, "maximum": 2400 },
+    "maximumFactionWinRate": 0.7,
+    "maximumDrawRate": 0.35,
+    "roleWinRates": [
+      { "roleId": "veteran-alpha", "maximum": 0.7 },
+      { "roleId": "veteran-beta", "maximum": 0.7 }
+    ]
+  }
+}

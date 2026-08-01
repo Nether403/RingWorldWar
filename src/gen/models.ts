@@ -725,7 +725,9 @@ export type StructureKind =
   | 'mechFoundry'
   | 'rocketBattery'
   | 'pointDefense'
+  | 'laserGrid'
   | 'radarMast'
+  | 'silo'
   | 'spinalNode';
 
 export interface StructureModel {
@@ -895,6 +897,34 @@ export function buildStructure(kind: StructureKind, seed: number): StructureMode
       muzzles.push(new THREE.Vector3(0, 8, 8));
       break;
     }
+    case 'laserGrid': {
+      radius = 10;
+      height = 24;
+      plinth(radius, 3);
+      // Twin field pylons leave an unmistakable open gate silhouette. The
+      // emitter bars are emissive so powered coverage reads at RTS distance.
+      for (const side of [-1, 1]) {
+        addBlock(mb, {
+          size: [3.2, 18, 4.2],
+          pos: [side * 5.2, 3, 0],
+          bevel: 0.2,
+          taper: 0.82,
+          panels: 3,
+        });
+        addCylinder(mb, 1.25, 4, [side * 5.2, 20.5, 0], 8, MASK_METAL, 0.7);
+        addBlock(mb, {
+          size: [2.2, 1.0, 5.2],
+          pos: [side * 5.2, 18, 0],
+          bevel: 0.3,
+          mask: MASK_EMISSIVE,
+        });
+      }
+      addBlock(mb, { size: [11.5, 1.2, 2.2], pos: [0, 15, 0], bevel: 0.3, mask: MASK_METAL });
+      addBlock(mb, { size: [9.8, 0.55, 1.0], pos: [0, 16.2, 0], bevel: 0.35, mask: MASK_EMISSIVE });
+      addGreebles(mb, [13, 18, 7], [0, 3, 0], 10, rng);
+      muzzles.push(new THREE.Vector3(0, 19, 0));
+      break;
+    }
     case 'radarMast': {
       radius = 7;
       height = 28;
@@ -928,6 +958,36 @@ export function buildStructure(kind: StructureKind, seed: number): StructureMode
       addBlock(mb, { size: [9, 0.6, 5], pos: [0, 26, 0], bevel: 0.3, taper: 0.6, mask: MASK_HULL });
       addBlock(mb, { size: [8, 0.5, 4], pos: [0, 26.6, 0], bevel: 0.3, mask: MASK_EMISSIVE });
       addCylinder(mb, 0.3, 3, [0, 27.2, 0], 6, MASK_METAL);
+      break;
+    }
+    case 'silo': {
+      radius = 16;
+      height = 30;
+      plinth(radius, 4);
+      // Armoured launch well with split blast doors and an exposed central
+      // accelerator. It is deliberately tall and legible as an endgame target.
+      addCylinder(mb, 10, 19, [0, 4, 0], 14, MASK_HULL, 8.5);
+      addCylinder(mb, 5.2, 23, [0, 4, 0], 12, MASK_RECESS, 4.1);
+      addCylinder(mb, 2.4, 20, [0, 7, 0], 10, MASK_METAL, 1.6);
+      addCylinder(mb, 10.4, 1.3, [0, 13, 0], 14, MASK_EMISSIVE);
+      for (const side of [-1, 1]) {
+        addBlock(mb, {
+          size: [8.2, 1.5, 18],
+          pos: [side * 5.1, 23, 0],
+          bevel: 0.18,
+          lean: [side * 1.6, 0],
+          mask: MASK_METAL,
+          panels: 2,
+        });
+        addBlock(mb, {
+          size: [1.1, 7, 2.2],
+          pos: [side * 11.2, 8, 0],
+          bevel: 0.3,
+          mask: MASK_EMISSIVE,
+        });
+      }
+      addGreebles(mb, [20, 19, 20], [0, 4, 0], 18, rng);
+      muzzles.push(new THREE.Vector3(0, 29, 0));
       break;
     }
     case 'spinalNode': {

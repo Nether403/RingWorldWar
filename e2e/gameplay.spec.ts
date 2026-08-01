@@ -55,19 +55,22 @@ test('boots and supports the Gate 1 command loop', async ({ page }) => {
     .not.toBe(directStart);
   await page.keyboard.press('Escape');
   await expect.poll(() => page.evaluate(() => window.RWW!.game.directControlActive)).toBe(false);
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
+  await page.keyboard.press('Escape');
 
   const artillery = await page.evaluate(() => {
     const game = window.RWW!.game;
     const battery = game.world.spawnStructure(0, 'rocketBattery', 120, 0, 1);
-    game.world.spawnStructure(0, 'radarMast', 260, 0, 1);
-    const target = game.world.spawnUnit(1, 'vanguard', 340, 0);
+    game.world.spawnStructure(0, 'fusionCore', 180, 300, 1);
+    game.world.spawnStructure(0, 'radarMast', 1_000, 0, 1);
+    const target = game.world.spawnUnit(1, 'vanguard', 1_000, 0);
     const engineer = game.world.spawnUnit(0, 'engineer', 90, 60);
     game.selection.clear();
     window.RWW!.rig.setFocus(battery.s, battery.z);
     game.selection.add(engineer.id);
     game.setControlGroup(2);
     game.selection.clear();
-    return { batteryId: battery.id, targetId: target.id };
+    return { batteryId: battery.id, targetId: target.id, targetS: target.s };
   });
   await page.waitForTimeout(500);
   const batteryPoint = await screenPoint(page, 120, 0);
@@ -83,6 +86,8 @@ test('boots and supports the Gate 1 command loop', async ({ page }) => {
   expect(await page.evaluate(() => window.RWW!.game.artilleryTargeting)).toBe(false);
   expect(await page.evaluate(() => window.RWW!.game.hud.placing)).toBe('solarArray');
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.evaluate((id) => {
     const game = window.RWW!.game;
     game.selection.clear();
@@ -90,7 +95,9 @@ test('boots and supports the Gate 1 command loop', async ({ page }) => {
   }, artillery.batteryId);
   await page.waitForTimeout(100);
   await page.getByRole('button', { name: /Target rocket/i }).click();
-  const targetPoint = await screenPoint(page, 340, 0);
+  await page.evaluate((targetS) => window.RWW!.rig.setFocus(targetS, 0), artillery.targetS);
+  await page.waitForTimeout(200);
+  const targetPoint = await screenPoint(page, artillery.targetS, 0);
   await page.mouse.move(targetPoint.x, targetPoint.y);
   await page.waitForTimeout(150);
   await page.mouse.click(targetPoint.x, targetPoint.y);

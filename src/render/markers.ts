@@ -294,7 +294,7 @@ export class Markers {
       if (!world.isEntityVisible(player, u.id)) continue;
       if (Math.abs(deltaS(anchor.s, u.s)) > 900) continue;
       const def = UNITS[u.kind];
-      const frac = u.hp / def.hp;
+      const frac = u.hp / u.maxHp;
       if (frac > 0.985 && !selection.has(u.id)) continue;
       const col: [number, number, number] =
         u.faction === player
@@ -312,7 +312,7 @@ export class Markers {
       if (!world.isEntityVisible(player, st.id)) continue;
       if (Math.abs(deltaS(anchor.s, st.s)) > 900) continue;
       const def = STRUCTURES[st.kind];
-      const frac = st.hp / def.hp;
+      const frac = st.hp / st.maxHp;
       if (frac > 0.985 && st.progress >= 1 && !selection.has(st.id)) continue;
       const col: [number, number, number] =
         st.progress < 1 ? [0.95, 0.7, 0.25] : frac > 0.5 ? [0.35, 0.92, 0.5] : [1.0, 0.32, 0.22];

@@ -9,14 +9,17 @@ import { RING_CIRCUMFERENCE, RING_PERIOD, RING_RADIUS } from '@core/constants';
 import type { CameraRig } from '@render/cameraRig';
 import type { Environment } from '@render/environment';
 import type { Renderer } from '@render/renderer';
+import type { Game } from '../game';
 
 export class DebugOverlay {
   private el: HTMLDivElement;
   private toast: HTMLDivElement;
-  private visible = true;
+  private visible = false;
   private frames = 0;
   private elapsed = 0;
   private fps = 0;
+  private frameMsTotal = 0;
+  private simStepMsTotal = 0;
   private worstMs = 0;
   private toastTimer = 0;
 
@@ -29,7 +32,20 @@ export class DebugOverlay {
       border: 1px solid rgba(150, 180, 210, 0.14); border-left: 2px solid #f0821e;
       padding: 8px 12px; white-space: pre; pointer-events: none;
       backdrop-filter: blur(6px); letter-spacing: 0.02em;
+      display: none;
     `;
+    this.el.setAttribute('data-rww-debug-overlay', '');
+    this.el.textContent = [
+      'RING WORLD WAR                    F3 to hide',
+      '',
+      'Frame      n/a',
+      'FPS        n/a',
+      'Render     n/a',
+      'Draw calls n/a',
+      'Active entities n/a',
+      'Sim step   n/a',
+      'Memory     n/a',
+    ].join('\n');
     document.body.appendChild(this.el);
 
     this.toast = document.createElement('div');
@@ -55,7 +71,7 @@ export class DebugOverlay {
     this.toastTimer = 1.6;
   }
 
-  update(dt: number, renderer: Renderer, rig: CameraRig, env: Environment): void {
+  update(dt: number, renderer: Renderer, game: Game, rig: CameraRig, env: Environment): void {
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toast.style.opacity = '0';
@@ -63,12 +79,23 @@ export class DebugOverlay {
 
     this.frames++;
     this.elapsed += dt;
-    this.worstMs = Math.max(this.worstMs, dt * 1000);
+    const frameMs = dt * 1000;
+    this.frameMsTotal += frameMs;
+    this.simStepMsTotal += game.simStepMs;
+    this.worstMs = Math.max(this.worstMs, frameMs);
+    let activeEntities = 0;
+    for (const unit of game.world.units) if (unit.alive) activeEntities++;
+    for (const structure of game.world.structures) if (structure.alive) activeEntities++;
+    const memory = readMemory();
     if (this.elapsed < 0.4) return;
     this.fps = this.frames / this.elapsed;
+    const averageFrameMs = this.frameMsTotal / this.frames;
+    const averageSimStepMs = this.simStepMsTotal / this.frames;
     const worst = this.worstMs;
     this.frames = 0;
     this.elapsed = 0;
+    this.frameMsTotal = 0;
+    this.simStepMsTotal = 0;
     this.worstMs = 0;
 
     if (!this.visible) return;
@@ -80,9 +107,13 @@ export class DebugOverlay {
     this.el.textContent = [
       `RING WORLD WAR                    F3 to hide`,
       ``,
-      `fps        ${this.fps.toFixed(0).padStart(4)}   worst ${worst.toFixed(1)}ms`,
-      `render     ${renderer.frameMs.toFixed(2)}ms`,
-      `draws      ${String(renderer.drawCalls).padStart(4)}   tris ${(tris / 1000).toFixed(0)}k`,
+      `Frame      ${averageFrameMs.toFixed(2)} ms   worst ${worst.toFixed(1)} ms`,
+      `FPS        ${this.fps.toFixed(0).padStart(4)}`,
+      `Render     ${renderer.frameMs.toFixed(2)} ms`,
+      `Draw calls ${String(renderer.drawCalls).padStart(4)}   tris ${(tris / 1000).toFixed(0)}k`,
+      `Active entities ${String(activeEntities).padStart(4)}`,
+      `Sim step   ${averageSimStepMs.toFixed(2)} ms`,
+      `Memory     ${memory}`,
       `programs   ${info.programs?.length ?? 0}   textures ${info.memory.textures}`,
       `quality    ${renderer.quality}   (shift+1..4)`,
       ``,
@@ -96,4 +127,13 @@ export class DebugOverlay {
       `           spin ${RING_PERIOD.toFixed(0)}s  far side ${(2 * RING_RADIUS) / 1000}km up`,
     ].join('\n');
   }
+}
+
+function readMemory(): string {
+  const memory = (performance as Performance & {
+    memory?: { usedJSHeapSize?: number };
+  }).memory;
+  const bytes = memory?.usedJSHeapSize;
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes)) return 'n/a';
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
