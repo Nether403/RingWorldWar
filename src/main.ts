@@ -44,6 +44,7 @@ const boot = {
 async function start(): Promise<void> {
   const container = document.getElementById('app')!;
   const params = new URLSearchParams(location.search);
+  const scenarioDriverEnabled = params.get('scenarioDriver') === '1';
   const seed = Number(params.get('seed') ?? '20260731') || 20260731;
   const settings = new Settings({ search: params });
 
@@ -60,7 +61,7 @@ async function start(): Promise<void> {
   const game = new Game(seed, anchor, rig);
 
   await boot.step(0.62, 'tessellating the floor');
-  const ringMesh = new RingMesh(game.terrain);
+  const ringMesh = new RingMesh(game.terrain, renderer.quality);
   renderer.scene.add(ringMesh.object);
 
   await boot.step(0.86, 'igniting the solar filament');
@@ -80,7 +81,10 @@ async function start(): Promise<void> {
       environment.keyLight.shadow.map = null;
     }
     ringMesh.uniforms.uDetailFade.value = quality.detailFade;
+    ringMesh.setQuality(renderer.quality);
     game.effects.setParticleCap(quality.particleCap);
+    game.effects.setLightCap(quality.effectLightCap);
+    game.entities.setLowQuality(renderer.quality === 'low');
   };
   renderer.onQualityChange = applyRenderQuality;
   applyRenderQuality();
@@ -94,11 +98,15 @@ async function start(): Promise<void> {
 
   const input = new InputController(renderer.gl.domElement, rig);
   const overlay = new DebugOverlay();
-  const menu = new SettingsMenu(settings, renderer, (open) => input.setEnabled(!open));
+  let cancelCommands = (): void => {};
+  const menu = new SettingsMenu(settings, renderer, (open) => {
+    input.setEnabled(!open);
+    if (open) cancelCommands();
+  });
   menu.onSave = () => game.saveGame();
   menu.onLoad = () => game.loadGame();
 
-  wireCommands(renderer.gl.domElement, game, rig, () => !menu.isOpen);
+  cancelCommands = wireCommands(renderer.gl.domElement, game, rig, () => !menu.isOpen);
   wireKeys(game, renderer, overlay, input, settings, menu);
 
   await boot.step(1.0, 'ready');
@@ -108,14 +116,11 @@ async function start(): Promise<void> {
   // ---------------------------------------------------------------- loop ----
   let last = performance.now();
   let time = 0;
+  let animationFrame = 0;
+  // Scenario initialization must own tick zero, even if its module import is delayed.
+  let loopStopped = scenarioDriverEnabled;
 
-  function frame(): void {
-    requestAnimationFrame(frame);
-    const now = performance.now();
-    const dt = Math.min((now - last) / 1000, 0.1);
-    last = now;
-    time += dt;
-
+  function renderFrame(dt: number, visualTime: number, fixedVisualClock = false): void {
     input.setDirectMode(game.directControlActive);
     input.update(dt);
     game.updateDirectControl(input.moveForward, input.moveRight);
@@ -131,10 +136,10 @@ async function start(): Promise<void> {
     }
 
     game.effects.viewportHeight = renderer.gl.getContext().drawingBufferHeight;
-    game.update(dt, time);
-    environment.update(game.world.time, anchor, rig.camera.position);
+    game.update(dt, visualTime);
+    environment.update(fixedVisualClock ? visualTime : game.world.time, anchor, rig.camera.position);
 
-    ringMesh.uniforms.uTime.value = time;
+    ringMesh.uniforms.uTime.value = visualTime;
     ringMesh.uniforms.uPanelPhase.value = environment.cycle.filamentAngle;
     ringMesh.uniforms.uAmbientTint.value.copy(environment.cycle.hazeColor);
     ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
@@ -147,8 +152,18 @@ async function start(): Promise<void> {
     if (game.hud.restartRequested) location.reload();
   }
 
+  function frame(): void {
+    if (loopStopped) return;
+    animationFrame = requestAnimationFrame(frame);
+    const now = performance.now();
+    const dt = Math.min((now - last) / 1000, 0.1);
+    last = now;
+    time += dt;
+    renderFrame(dt, time);
+  }
+
   // Exposed for debugging and for the screenshot tool to interrogate.
-  (window as unknown as { RWW: unknown }).RWW = {
+  const exposed: Record<string, unknown> = {
     game,
     rig,
     anchor,
@@ -173,6 +188,49 @@ async function start(): Promise<void> {
       structures: game.world.structures.length,
     }),
   };
+  // Browser validation gets a deliberately narrow control surface. It only
+  // exists for an explicit query flag and is never consulted by gameplay.
+  if (scenarioDriverEnabled) {
+    exposed.testDriver = {
+      stopLoop: (): void => {
+        if (loopStopped) return;
+        loopStopped = true;
+        cancelAnimationFrame(animationFrame);
+      },
+      resumeLoop: (): void => {
+        if (!loopStopped) return;
+        loopStopped = false;
+        last = performance.now();
+        animationFrame = requestAnimationFrame(frame);
+      },
+      setAiEnabled: (enabled: boolean): void => game.setAiEnabled(enabled),
+      stepWorldTo: (targetTick: number): void => {
+        if (!Number.isSafeInteger(targetTick) || targetTick < game.world.tick) {
+          throw new Error(`Invalid target tick ${targetTick}`);
+        }
+        while (game.world.tick < targetTick) {
+          const previousTick = game.world.tick;
+          game.stepSimulationExactlyOnce();
+          if (game.world.tick === previousTick) throw new Error(`World stopped before target tick ${targetTick}`);
+        }
+      },
+      setCamera: (focusS: number, focusZ: number, yaw: number, zoom: number): void => {
+        rig.setFocus(focusS, focusZ);
+        rig.yaw = yaw;
+        rig.distance = zoom;
+        const exactRig = rig as unknown as {
+          targetDistance: number; smoothS: number; smoothZ: number; smoothYaw: number; focusHeight: number;
+        };
+        exactRig.targetDistance = zoom;
+        exactRig.smoothS = rig.s;
+        exactRig.smoothZ = rig.z;
+        exactRig.smoothYaw = yaw;
+        exactRig.focusHeight = game.terrain.heightAt(rig.s, rig.z);
+      },
+      renderFrame: (dt: number, visualTime: number): void => renderFrame(dt, visualTime, true),
+    };
+  }
+  (window as unknown as { RWW: unknown }).RWW = exposed;
 
   ringMesh.syncToAnchor(anchor);
   frame();
@@ -186,18 +244,30 @@ async function start(): Promise<void> {
  * Mouse commands. Left selects (click or drag box), right issues orders, and
  * while a structure is held the left button places it instead.
  */
-function wireCommands(
+export function wireCommands(
   canvas: HTMLElement,
   game: Game,
   rig: CameraRig,
   gameplayInputEnabled: () => boolean,
-): void {
+): () => void {
   let dragging = false;
   let dragStart: { s: number; z: number } | null = null;
   let downX = 0;
   let downY = 0;
   let activePointer = -1;
   let suppressCommand = false;
+  let selectionRectangleVisible = false;
+
+  const clearDrag = (): void => {
+    const pointer = activePointer;
+    activePointer = -1;
+    dragging = false;
+    dragStart = null;
+    suppressCommand = false;
+    selectionRectangleVisible = false;
+    game.hud.hideSelectionRectangle();
+    if (pointer >= 0 && canvas.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
+  };
 
   const ndc = (e: PointerEvent): { x: number; y: number } => {
     const r = canvas.getBoundingClientRect();
@@ -208,13 +278,23 @@ function wireCommands(
   };
 
   canvas.addEventListener('pointermove', (e) => {
-    if (!gameplayInputEnabled()) return;
+    if (!gameplayInputEnabled()) {
+      clearDrag();
+      return;
+    }
     const p = ndc(e);
     const hit = game.pickGround(p.x, p.y, rig.camera);
     if (hit) {
       game.updateCursor(hit.s, hit.z);
     } else {
-      game.cursor.valid = false;
+      game.invalidateCursor();
+    }
+    if (dragging && dragStart) {
+      const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
+      if (moved > 6) {
+        selectionRectangleVisible = true;
+        game.hud.showSelectionRectangle(downX, downY, e.clientX, e.clientY);
+      }
     }
   });
 
@@ -229,7 +309,7 @@ function wireCommands(
       const p = ndc(e);
       const hit = game.pickGround(p.x, p.y, rig.camera);
       if (hit) {
-        dragging = true;
+        dragging = !game.directControlActive && !game.artilleryTargeting && !game.hud.placing;
         dragStart = hit;
       }
     }
@@ -237,16 +317,15 @@ function wireCommands(
 
   window.addEventListener('pointerup', (e) => {
     if (!gameplayInputEnabled()) {
-      activePointer = -1;
-      dragging = false;
-      dragStart = null;
-      suppressCommand = false;
+      clearDrag();
       return;
     }
     if (e.pointerId !== activePointer) return;
     activePointer = -1;
+    if (selectionRectangleVisible) game.hud.hideSelectionRectangle();
+    selectionRectangleVisible = false;
     if (suppressCommand) {
-      suppressCommand = false;
+      clearDrag();
       return;
     }
     if (e.button === 2) {
@@ -258,9 +337,14 @@ function wireCommands(
         else if (game.artilleryTargeting) game.cancelArtilleryTarget();
         else game.issueOrder(hit.s, hit.z, e.ctrlKey);
       }
+      clearDrag();
       return;
     }
-    if (e.button !== 0 || !dragging || !dragStart) return;
+    if (e.button !== 0 || !dragStart) {
+      clearDrag();
+      return;
+    }
+    const selectionDrag = dragging;
     dragging = false;
 
     const p = ndc(e);
@@ -273,13 +357,22 @@ function wireCommands(
       game.fireArtilleryTarget(hit.s, hit.z);
     } else if (game.hud.placing && hit) {
       game.tryBuild(hit.s, hit.z);
-    } else if (hit && moved > 6) {
+    } else if (selectionDrag && hit && moved > 6) {
       game.selectBox(dragStart.s, dragStart.z, hit.s, hit.z, e.shiftKey);
     } else if (hit) {
       game.selectAt(hit.s, hit.z, e.shiftKey);
     }
-    dragStart = null;
+    clearDrag();
   });
+
+  window.addEventListener('pointercancel', clearDrag);
+  window.addEventListener('blur', clearDrag);
+  canvas.addEventListener('lostpointercapture', clearDrag);
+  canvas.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    clearDrag();
+  });
+  return clearDrag;
 }
 
 function wireKeys(

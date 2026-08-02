@@ -1,0 +1,53 @@
+{
+  "schema": "rww.full-suite-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-02T12:53:39Z",
+  "status": "pass",
+  "commands": [
+    {
+      "command": "npm run check",
+      "exitCode": 0,
+      "results": {
+        "lint": "pass",
+        "typecheck": "pass",
+        "unitTestFilesPassed": 26,
+        "unitTestFilesSkipped": 1,
+        "unitTestsPassed": 235,
+        "unitTestsSkipped": 1,
+        "build": "pass",
+        "buildModulesTransformed": 39
+      }
+    },
+    {
+      "command": "npm run test:e2e",
+      "exitCode": 0,
+      "results": {
+        "browser": "Chromium",
+        "workers": 1,
+        "testsPassed": 21,
+        "testsFailed": 0,
+        "duration": "3.6m"
+      }
+    }
+  ],
+  "buildArtifacts": [
+    {
+      "path": "dist/index.html",
+      "sha256": "29956f20a9289545afe416fe273ba62e1558fef222ec8e8cf519273d567a3214"
+    },
+    {
+      "path": "dist/assets/index-BcLvIVbm.js",
+      "sha256": "81b624bf9382a4dda073c24f72a8289ee6d5983dbf891a2525d8e3d4bf864bbe"
+    }
+  ],
+  "code": {
+    "sourceBaseSha": "c3af807e4f31c69a312ec710a5b080497e30ea0f",
+    "branch": "master",
+    "dirty": true,
+    "trackedPatchSha256": "33e50452fd7a0ac435d65217cc80428ff2c1186a0780edd04baac43ae1902e8d",
+    "untrackedSourceManifestSha256": "8d95daa28ab94f49161d2185c957881583a3df51ea46e86acc5aa2ec9742e1ec",
+    "untrackedSourceCount": 35,
+    "untrackedSourceExclusions": ["validation/evidence/**"],
+    "caveat": "Dirty source is content-addressed by the tracked patch and untracked-source manifest digests; validation/evidence is excluded to avoid self-reference."
+  }
+}

@@ -1,5 +1,7 @@
 # Ring World War — Task List
 
+> **Historical planning source.** This list preserves the original Phase 0–1 breakdown and does not report current project status. See `docs/roadmap.md` for the authoritative status, open evidence, and immediate sequence.
+
 Tasks are ordered by dependency. Only Phase 0 and Phase 1 are broken down; later phases are decomposed at their gate, when we know more.
 
 ---
@@ -26,7 +28,7 @@ Tasks are ordered by dependency. Only Phase 0 and Phase 1 are broken down; later
   - Files: `src/render/renderAnchor.ts`, `src/render/ringGeometry.ts`, `src/dev/spikePrecision.ts`
 
 - [x] **Task: Spike B — rotating-frame ballistics**
-  - Acceptance: projectiles integrate with centrifugal + Coriolis terms; a debug scene fires identical shots spinward and antispinward and the range difference is obvious on screen; the aim solver hits a designated target within 5 m.
+  - Acceptance: projectiles integrate with centrifugal + Coriolis terms; a debug scene shows the authoritative antispinward long-range advantage over spinward fire and the range difference is obvious on screen; the aim solver hits a designated target within 5 m.
   - Verify: `npm run test tests/sim/ballistics.test.ts` — golden-value trajectories; plus manual inspection of the debug scene.
   - Files: `src/sim/systems/projectileSystem.ts`, `src/sim/ballistics/aimSolver.ts`, `src/dev/spikeBallistics.ts`, `tests/sim/ballistics.test.ts`
 

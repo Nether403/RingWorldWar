@@ -1,0 +1,48 @@
+{
+  "schema": "rww.hardware-target",
+  "version": 1,
+  "id": "t480s-low-candidate",
+  "description": "Candidate Lenovo ThinkPad T480s baseline. Doctor validates only directly measurable capabilities; frame budgets require a representative benchmark scenario.",
+  "system": {
+    "minimumLogicalCpus": 4,
+    "minimumRamGiB": 8
+  },
+  "browser": {
+    "requireWebgl2": true,
+    "disallowSoftwareRenderer": true,
+    "minimumDrawingBuffer": {
+      "width": 960,
+      "height": 540
+    },
+    "minimumLimits": {
+      "maxTextureSize": 4096,
+      "maxRenderbufferSize": 4096,
+      "maxCombinedTextureImageUnits": 16
+    }
+  },
+  "privateGpu": {
+    "minimumDedicatedMemoryGiB": 1,
+    "note": "Candidate requirement only. Dedicated/private GPU memory is not reliably exposed to Node or browser probes and is advisory in doctor."
+  },
+  "frameBudgets": [
+    {
+      "id": "720p-low-hard-candidate",
+      "resolution": [1280, 720],
+      "quality": "low",
+      "targetFps": 30,
+      "maximumP95FrameMilliseconds": 34,
+      "maximumP99FrameMilliseconds": 50,
+      "classification": "candidate-hard",
+      "measuredBy": "future representative visual benchmark"
+    },
+    {
+      "id": "1080p-low-advisory",
+      "resolution": [1920, 1080],
+      "quality": "low",
+      "targetFps": 30,
+      "maximumP95FrameMilliseconds": 33.3,
+      "classification": "advisory",
+      "measuredBy": "future representative visual benchmark"
+    }
+  ]
+}

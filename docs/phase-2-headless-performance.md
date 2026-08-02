@@ -224,3 +224,151 @@ assertion and no claim that the requirement is closed. The suite instead guards
 deterministic continuation and result checks, canonical terrain/nav equivalence,
 navigation field build count, and existing cache/solver behavior; CI should add its own
 72,000-tick timing gate only after establishing a stable hardware baseline.
+
+## 2026-08-02 T480s Measured Follow-up
+
+This pass used the required command on the i7-8650U T480s:
+
+```text
+npm run rww -- perf headless-40m --terrain standard --runs 3 --ticks 72000
+```
+
+The representative seed ended by early victory at tick 63,311. The baseline
+receipt is `output/runs/20260802T000427.549Z-956-0e111617/receipt.json`; it is a
+failed infrastructure receipt because the old opt-in test timeout expired after
+all three samples had completed. The final successful receipt is
+`output/runs/20260802T004222.966Z-6060-af87a8dc/receipt.json`.
+
+| Receipt metric | Baseline | Final |
+| --- | ---: | ---: |
+| Standard terrain generation | 8,906 ms | 3,019 ms |
+| Simulation wall runs | 66,801 / 61,153 / 63,883 ms | 35,563 / 48,307 / 60,273 ms |
+| Median simulation wall | 63,883 ms | 48,307 ms |
+| Simulation CPU runs | 62,142 / 52,062 / 51,235 ms | 35,390 / 36,891 / 38,797 ms |
+| Median simulation CPU | 52,062 ms | 36,891 ms |
+
+The host was not pinned or idle: an observed system sample reported 68% CPU load
+with several other development processes active. Wall time varied substantially,
+including within each three-run receipt, so these results are evidence of partial
+progress rather than a stable performance qualification.
+
+### Phase and detail profiles
+
+The same 12,000-tick warmup and 63,311-tick early-victory endpoint were used
+before and after. Instrumentation is inclusive, and the absolute profiles were
+taken under different shared-host load, so phase percentages and deterministic
+work counts are more useful than treating elapsed deltas as a benchmark.
+
+| Top-level phase | Before | Final |
+| --- | ---: | ---: |
+| Late measured loop | 136,486 ms | 28,817 ms |
+| `World.stepUnits` | 84,101 ms (61.62%) | 11,729 ms (40.70%) |
+| Choir `AiOpponent.update` | 23,250 ms (17.03%) | 7,781 ms (27.00%) |
+| Compact `AiOpponent.update` | 12,100 ms (8.87%) | 3,409 ms (11.83%) |
+| `World.stepStructures` | 4,344 ms (3.18%) | 1,541 ms (5.35%) |
+| `World.stepEconomy` | 3,102 ms (2.27%) | 1,035 ms (3.59%) |
+| `World.stepProjectiles` | 2,589 ms (1.90%) | 852 ms (2.96%) |
+
+| Detailed operation | Before | Final |
+| --- | ---: | ---: |
+| Late measured loop | 190,658 ms | 39,855 ms |
+| `fireWeapons` | 68,755 ms (36.06%) | 2,604 ms (6.53%) |
+| `fireBallisticAt` | 23,094 ms (12.11%) | 6,726 ms (16.88%) |
+| Unit movement | 19,837 ms (10.40%) | 6,113 ms (15.34%) |
+| Entity visibility | 14,113 ms (7.40%) | 4,697 ms (11.79%) |
+| Target acquisition | 13,665 ms (7.17%) | 4,174 ms (10.47%) |
+| Navigation direction | 12,491 ms (6.55%) | 3,814 ms (9.57%) |
+| Unit separation | 9,029 ms (4.74%) | 2,790 ms (7.00%) |
+
+The retained changes are intentionally narrow:
+
+- Chord refinement uses the canonical impact-only integrator until the final
+  trajectory, avoiding full path allocation for intermediate corrections.
+- Drag solving retains its final canonical path for commit instead of integrating
+  and allocating that path again.
+- Exact failed non-chord geometry is cached by source, weapon, source position,
+  target position, and target terrain height. Identical retries preserve the same
+  false decision and cooldown without rerunning the solver. The cache is derived,
+  bounded to 2,048 entries, and cleared on restore.
+- Indexed target validation reads faction and surface position directly rather
+  than resolving an unused height-bearing position.
+
+Deterministic work accounting changed from 425,919 to 53,693 trajectory
+evaluations, 30,850,503 to 9,303,571 integration steps, 566 to 135 full paths,
+and 173,941 to 148,943 stored samples. There were 831 exact failed-plan cache
+hits. Target validation reduced `positionOf` calls from 147,627 to 74,458.
+
+The final periodic World hashes at ticks 9,000 through 63,311 were
+`60e2a995`, `c97d4334`, `94d0af29`, `ffc507ce`, `b6d334f9`, `44de89ac`,
+`f4cd99a4`, and `51e4cfb8`. Final controller hashes were `012d8801` and
+`8d0533d5`; all matched repeated phase/detail runs. Winner, duration, end reason,
+economy, production, losses, and destruction telemetry also matched the baseline.
+
+A bounded four-seed accepted Veteran mirror subset (501, 1709, 2903, 4217)
+completed with no draws and a 2,116.775-second mean duration. Its receipt is
+`output/runs/20260802T004739.734Z-21264-11153377/receipt.json`. This subset is a
+regression sample, not a replacement for any 20-match cohort gate.
+
+Requirement 17.5 remains **open**. The final median is above 10 seconds and no
+wall-clock assertion was added to the default suite. A pinned CI qualification
+and further measured work on movement/navigation, visibility/acquisition, and
+the remaining successful ballistic solves are still required.
+
+## 2026-08-02 Second T480s Headless Pass
+
+This pass started from the clean T480s receipt median supplied for the current
+tree: 14.63 seconds for seed 501, ending at tick 63,311. Fresh low-background
+phase/detail profiles reproduced the accepted representative hashes before any
+edit.
+
+| Profile metric | Before | Retained final |
+| --- | ---: | ---: |
+| Late phase loop | 16,034.84 ms | 14,925.94 ms |
+| Detailed late loop | 23,861.62 ms | 22,737.28 ms |
+| `World.stepUnits` (phase) | 6,453.90 ms | 5,691.80 ms |
+| Successful/attempted `fireBallisticAt` | 4,130.55 ms | 4,155.74 ms |
+| Unit movement | 3,746.23 ms | 3,749.61 ms |
+| Target acquisition | 2,544.66 ms | 2,004.60 ms |
+| Entity visibility API | 2,838.58 ms | 2,435.19 ms |
+| Unit separation | 1,765.08 ms | 1,707.52 ms |
+| Ballistic reach envelope | 934.26 ms | 576.47 ms |
+
+The retained change is deliberately small. Target range rejection now precedes
+visibility work, and a cooling non-burst weapon decrements its cooldown before
+skipping range and ballistic-envelope evaluation. Burst timers retain their
+original range/envelope gates. A work-count test proves that a cooling Longbow
+performs zero reach-envelope checks while preserving the exact cooldown value.
+
+Detailed deterministic work counts explain the reduction: reach-envelope calls
+fell from 77,545 to 44,286, point-visibility scans from 396,406 to 363,764, and
+line-of-sight scans from 86,421 to 66,110. The canonical ballistic workload was
+unchanged at 53,693 trajectory evaluations, 9,303,571 integration steps, 135
+full paths, and 148,943 stored samples. The envelope reduction also avoids at
+least 33,259 short-lived velocity-object allocations in the necessary-condition
+scan. A 32 KiB sampling heap profile observed about 18.4 MiB of sampled
+allocation, but Vitest runs the simulation in a worker and the parent profile was
+dominated by transform/module compilation; it was not used to claim a precise
+simulation-byte reduction.
+
+Experiments with successful-plan caching produced zero representative hits.
+Replacing canonical `Math.hypot` operations changed hashes at tick 27,000.
+Faction-filtered spatial views and separation/nav shortcuts were also removed
+rather than carried speculatively. The historical four-seed receipt is stale for
+the current dirty tree: after reverting every experiment, seed 1709 ended at
+tick 62,277 rather than its old 79,827. Against that current-tree baseline, the
+retained gate ordering kept the accepted subset outcomes at ticks 63,311,
+62,277, 61,605, and 49,270, with the same 1 Compact / 3 Choir winners and end
+reasons. The subset gates passed.
+
+The final required receipt is
+`output/runs/20260802T020302.514Z-4824-49e63899/receipt.json`. Standard simulation
+runs were 15,548.28 / 13,679.98 / 13,884.20 ms, for a 13,884.20 ms median.
+Terrain generation was 1,412.40 ms and remains reported separately.
+
+The target therefore **fails**. Removing the entire measured 4.16-second
+canonical ballistic solve cost would only put this host near 9.7 seconds before
+accounting for interactions and variance. The successful geometries had no exact
+cache reuse, and the faster numeric integrator changed deterministic hashes.
+Reaching less than 10 seconds with margin now requires a semantics-approved
+solver/cadence change or a larger canonical solver redesign, not another safe
+lookup micro-optimization. No default wall-clock assertion was added.

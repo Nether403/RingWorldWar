@@ -290,6 +290,7 @@ export interface HullUniforms {
   uEmissive: { value: number };
   uDamage: { value: number };
   uTime: { value: number };
+  uLowQuality: { value: number };
 }
 
 /**
@@ -309,6 +310,7 @@ export function makeHullMaterial(factionColor: number): {
     uEmissive: { value: 1 },
     uDamage: { value: 0 },
     uTime: { value: 0 },
+    uLowQuality: { value: 0 },
   };
 
   const material = new THREE.MeshStandardMaterial({
@@ -346,6 +348,7 @@ export function makeHullMaterial(factionColor: number): {
          uniform vec3 uFaction;
          uniform float uEmissive;
          uniform float uDamage;
+         uniform float uLowQuality;
          varying float vMask;
          varying vec3 vObjPos;
          float hs_hash(vec3 p) {
@@ -374,29 +377,29 @@ export function makeHullMaterial(factionColor: number): {
         vec3 metal = vec3(0.330, 0.322, 0.305);
         vec3 recess = vec3(0.075, 0.080, 0.090);
 
-        // Fine cast-metal grain, plus larger blotches of discoloration.
-        float grain = hs_noise(vObjPos * 26.0);
-        float blotch = hs_noise(vObjPos * 2.4);
-
         vec3 base = hull;
         base = mix(base, metal, step(2.5, m));
         base = mix(base, recess, step(1.5, m) * step(m, 2.5));
-        base *= 0.82 + 0.36 * grain;
+        if (uLowQuality > 0.5) {
+          base *= 0.92 + clamp(vNormal.y, 0.0, 1.0) * 0.08;
+          base = mix(base, base * vec3(0.42, 0.38, 0.36), uDamage * 0.75);
+        } else {
+          // Fine cast-metal grain, plus larger blotches of discoloration.
+          float grain = hs_noise(vObjPos * 26.0);
+          float blotch = hs_noise(vObjPos * 2.4);
+          base *= 0.82 + 0.36 * grain;
 
-        // Grime collects on upward faces and streaks down vertical ones. This
-        // and the edge wear below are what stop clean geometry looking like
-        // untextured CAD.
-        float up = clamp(vNormal.y, 0.0, 1.0);
-        base = mix(base, base * vec3(0.72, 0.70, 0.66), up * 0.35 * (0.4 + blotch));
-        float streak = hs_noise(vec3(vObjPos.x * 30.0, vObjPos.y * 2.5, vObjPos.z * 30.0));
-        base *= 1.0 - (1.0 - up) * streak * 0.22;
+          // Grime collects on upward faces and streaks down vertical ones.
+          float up = clamp(vNormal.y, 0.0, 1.0);
+          base = mix(base, base * vec3(0.72, 0.70, 0.66), up * 0.35 * (0.4 + blotch));
+          float streak = hs_noise(vec3(vObjPos.x * 30.0, vObjPos.y * 2.5, vObjPos.z * 30.0));
+          base *= 1.0 - (1.0 - up) * streak * 0.22;
 
-        // Edge wear: bright bare metal where the chamfers face the light.
-        float wear = smoothstep(0.55, 1.0, grain) * 0.35;
-        base = mix(base, vec3(0.52, 0.50, 0.47), wear);
-
-        // Battle damage darkens and sooties the whole hull.
-        base = mix(base, base * vec3(0.42, 0.38, 0.36), uDamage * (0.5 + 0.5 * blotch));
+          // Edge wear: bright bare metal where the chamfers face the light.
+          float wear = smoothstep(0.55, 1.0, grain) * 0.35;
+          base = mix(base, vec3(0.52, 0.50, 0.47), wear);
+          base = mix(base, base * vec3(0.42, 0.38, 0.36), uDamage * (0.5 + 0.5 * blotch));
+        }
 
         diffuseColor.rgb *= base;
         `,
@@ -405,8 +408,11 @@ export function makeHullMaterial(factionColor: number): {
         '#include <roughnessmap_fragment>',
         `float roughnessFactor = roughness;
          {
-           float g = hs_noise(vObjPos * 18.0);
-           roughnessFactor = clamp(roughness - g * 0.22 + uDamage * 0.25, 0.16, 1.0);
+           if (uLowQuality > 0.5) roughnessFactor = 0.68 + uDamage * 0.2;
+           else {
+             float g = hs_noise(vObjPos * 18.0);
+             roughnessFactor = clamp(roughness - g * 0.22 + uDamage * 0.25, 0.16, 1.0);
+           }
            if (vMask > 1.5 && vMask < 2.5) roughnessFactor = 0.9;
          }`,
       )
@@ -417,11 +423,13 @@ export function makeHullMaterial(factionColor: number): {
            // Faction strips. Pushed well above 1.0 so bloom picks them up --
            // this is the cheapest way to make a unit read as powered.
            float isEm = step(0.5, vMask) * step(vMask, 1.5);
-           float flicker = 1.0 - uDamage * 0.5 * step(0.5, hs_noise(vObjPos * 9.0));
-           totalEmissiveRadiance += uFaction * isEm * uEmissive * 5.0 * flicker;
-           // Exposed internals glow hot as damage rises.
-           totalEmissiveRadiance += vec3(1.0, 0.28, 0.06) * uDamage * uDamage * 0.5
-             * step(0.6, hs_noise(vObjPos * 7.0));
+            float flicker = uLowQuality > 0.5
+              ? 1.0 - uDamage * 0.25
+              : 1.0 - uDamage * 0.5 * step(0.5, hs_noise(vObjPos * 9.0));
+            totalEmissiveRadiance += uFaction * isEm * uEmissive * 5.0 * flicker;
+            // Exposed internals glow hot as damage rises.
+            float internalGlow = uLowQuality > 0.5 ? 0.35 : step(0.6, hs_noise(vObjPos * 7.0));
+            totalEmissiveRadiance += vec3(1.0, 0.28, 0.06) * uDamage * uDamage * 0.5 * internalGlow;
          }`,
       );
   };

@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { RING_CIRCUMFERENCE } from '@core/constants';
 import { deltaS } from '@core/ringMath';
 import { FACTION_COLOR, Faction, STRUCTURES, UNITS, type StructureKind } from '@sim/data';
-import type { World } from '@sim/world';
+import type { BallisticFireResult, World } from '@sim/world';
 import type { TrajectorySample } from '@sim/ballistics';
 import type { RenderAnchor } from './anchor';
 
@@ -95,6 +95,7 @@ export class Markers {
     player: Faction,
     trajectory: readonly TrajectorySample[] | null,
     artilleryTargeting: boolean,
+    artilleryResult: BallisticFireResult | null,
     camera: THREE.Camera,
   ): void {
     let rv = 0;
@@ -127,7 +128,11 @@ export class Markers {
       rv += 6;
     };
 
-    const pushAirSeg = (a: TrajectorySample, b: TrajectorySample): void => {
+    const pushAirSeg = (
+      a: TrajectorySample,
+      b: TrajectorySample,
+      color: [number, number, number],
+    ): void => {
       if (rv + 6 > this.ringPos.length) return;
       if (
         Math.abs(deltaS(anchor.s, a.s)) > MARKER_RANGE &&
@@ -142,9 +147,9 @@ export class Markers {
       this.ringPos[rv + 4] = this._v.y;
       this.ringPos[rv + 5] = this._v.z;
       for (let i = 0; i < 2; i++) {
-        this.ringCol[rv + i * 3] = 0.35;
-        this.ringCol[rv + i * 3 + 1] = 1;
-        this.ringCol[rv + i * 3 + 2] = 0.65;
+        this.ringCol[rv + i * 3] = color[0];
+        this.ringCol[rv + i * 3 + 1] = color[1];
+        this.ringCol[rv + i * 3 + 2] = color[2];
       }
       rv += 6;
     };
@@ -191,6 +196,19 @@ export class Markers {
       if (st) circle(st.s, st.z, STRUCTURES[st.kind].radius * 1.25, [0.35, 1.0, 0.55]);
     }
 
+    if (selection.size === 1) {
+      const selectedId = selection.values().next().value as number | undefined;
+      if (selectedId) {
+        const unit = world.unitById(selectedId);
+        const structure = unit ? undefined : world.structureById(selectedId);
+        const sensor = unit ?? structure;
+        const range = world.effectiveSensorRange(selectedId, player);
+        if (sensor && range > 0 && Math.abs(deltaS(anchor.s, sensor.s)) <= MARKER_RANGE) {
+          circle(sensor.s, sensor.z, range, [0.45, 0.82, 1], true);
+        }
+      }
+    }
+
     // --- Neutral capture points -----------------------------------------------
     // Culled by arc distance: without this, a node on the far side of the ring
     // draws its capture circle across the sky, because the far side really is
@@ -225,13 +243,28 @@ export class Markers {
 
     // --- Player artillery trajectory -----------------------------------------
     if (artilleryTargeting && cursor.valid) {
-      const valid = trajectory && trajectory.length > 1;
-      circle(cursor.s, cursor.z, 24, valid ? [0.35, 1, 0.65] : [1, 0.25, 0.18], true);
-      if (valid) {
-        for (let i = 3; i < trajectory.length; i += 3) pushAirSeg(trajectory[i - 3]!, trajectory[i]!);
+      const hasPreview = Boolean(trajectory && trajectory.length > 1);
+      const resultMatchesCursor = artilleryResult?.targetS !== undefined &&
+        artilleryResult.targetZ !== undefined &&
+        Math.abs(deltaS(cursor.s, artilleryResult.targetS)) < 1e-6 &&
+        Math.abs(cursor.z - artilleryResult.targetZ) < 1e-6;
+      const canFire = artilleryResult?.ok === true && resultMatchesCursor;
+      circle(cursor.s, cursor.z, 24, canFire ? [0.35, 1, 0.65] : [1, 0.56, 0.18], true);
+      // Target-side orientation cue: the arrow always points toward the
+      // favorable antispinward side, independent of trajectory validity.
+      pushRingSeg(cursor.s + 34, cursor.z, cursor.s - 76, cursor.z, 2.2, 1, 0.72, 0.3);
+      pushRingSeg(cursor.s - 76, cursor.z, cursor.s - 55, cursor.z - 14, 2.2, 1, 0.72, 0.3);
+      pushRingSeg(cursor.s - 76, cursor.z, cursor.s - 55, cursor.z + 14, 2.2, 1, 0.72, 0.3);
+      if (hasPreview && trajectory) {
+        const previewColor: [number, number, number] = canFire ? [0.35, 1, 0.65] : [1, 0.62, 0.22];
+        for (let i = 3; i < trajectory.length; i += 3) {
+          pushAirSeg(trajectory[i - 3]!, trajectory[i]!, previewColor);
+        }
         const last = trajectory.length - 1;
         const previous = last - (last % 3 || 3);
-        if (previous >= 0 && previous !== last) pushAirSeg(trajectory[previous]!, trajectory[last]!);
+        if (previous >= 0 && previous !== last) {
+          pushAirSeg(trajectory[previous]!, trajectory[last]!, previewColor);
+        }
       }
     }
 

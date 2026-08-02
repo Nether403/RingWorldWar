@@ -86,10 +86,10 @@ Diegetic-adjacent, not fantasy-ornate. Thin strokes, high contrast, faction-tint
 - Cinematic camera mode for screenshots/trailers: DoF, longer lens, letterbox.
 
 ## 11. Asset Pipeline
-- Author in Blender → glTF 2.0 export → `gltf-transform` optimize (dedupe, weld, meshopt, Draco off if meshopt on) → textures to KTX2/Basis via `toktx`.
-- Naming: `mech_vanguard_LOD0.glb`, `mat_faction_compact.ktx2`. Enforced by a lint script.
-- Budget guardrails, enforced in CI: total initial download ≤ 40 MB, per-asset ≤ 4 MB, streamed by zone thereafter.
-- Every asset checked in the calibration scene before merge.
+
+The current product has no external asset pipeline: meshes, materials, textures, animation, and audio remain generated in code under the procedural-only rule.
+
+A Blender → glTF 2.0 → `gltf-transform` → KTX2/Basis workflow is a **proposed future option**, not an active roadmap commitment. Adopting it would require an explicit product decision to relax `docs/spec.md`'s zero-binary-asset constraint, followed by naming, download-budget, calibration-scene, and CI rules. Until that decision is recorded, `.blend`, `.glb`, and authored texture files must not be added.
 
 ## 12. Audio Direction (brief)
 Mix is 40% of perceived polish. Layered mech foley (servo + hydraulic + footfall + armor rattle), distance-attenuated and delayed rocket booms (sound arrives late from far impacts — free realism), and an adaptive score that swells on engagement. Positional audio via WebAudio panner nodes; a hard voice/SFX/music bus structure with ducking.

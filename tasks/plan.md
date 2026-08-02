@@ -1,5 +1,7 @@
 # Ring World War — Development Plan
 
+> **Historical planning source.** This document preserves the original phase plan and is not the current status tracker. See `docs/roadmap.md` for delivered work, open evidence, and the current CLI → headless/T480s performance → directional-artillery USP → player observation → tutorial sequence.
+
 Companion documents: `docs/spec.md` (contract), `docs/game-design.md` (what), `docs/art-direction.md` (how it looks), `docs/architecture.md` (how it's built).
 
 ## Sequencing Principle
@@ -103,7 +105,7 @@ Each phase ends at a **gate**: a demonstrable artifact plus a go/no-go decision.
 ---
 
 ## Phase 6 — Expansion (post-launch, optional)
-Multiplayer via deterministic lockstep (the architecture is already paid for), additional maps, faction asymmetry, campaign missions, replays, mod support, WebGPU renderer path.
+Multiplayer via deterministic lockstep (the architecture is already paid for), additional maps, deeper faction differentiation (mechanical asymmetry shipped in Phase 2), campaign missions, replays, mod support, WebGPU renderer path.
 
 ---
 

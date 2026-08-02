@@ -1,0 +1,33 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "signature-lance",
+  "revision": 1,
+  "worldSeed": 20260731,
+  "quality": "high",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 24, "visualTimeSeconds": 66, "settlingFrames": 3 },
+  "camera": { "focusS": 1900, "focusZ": 0, "yawRadians": 0.18, "zoom": 330 },
+  "setup": {
+    "units": [
+      { "id": "compact-vanguard", "faction": "compact", "kind": "vanguard", "s": 1870, "z": -20, "yawRadians": 0, "target": "choir-vanguard" },
+      { "id": "compact-aegis", "faction": "compact", "kind": "aegis", "s": 1860, "z": 28, "yawRadians": 0, "target": "choir-vanguard" },
+      { "id": "choir-vanguard", "faction": "choir", "kind": "vanguard", "s": 1990, "z": 12, "yawRadians": 3.141592653589793, "target": "compact-vanguard" },
+      { "id": "choir-wisp", "faction": "choir", "kind": "wisp", "s": 2010, "z": -34, "yawRadians": 3.141592653589793, "target": "compact-aegis" }
+    ],
+    "structures": [
+      { "id": "compact-silo", "faction": "compact", "kind": "silo", "s": 1810, "z": -82, "progress": 1, "yawRadians": 0 },
+      { "id": "compact-grid", "faction": "compact", "kind": "laserGrid", "s": 1835, "z": 78, "progress": 1, "yawRadians": 0 },
+      { "id": "choir-grid", "faction": "choir", "kind": "laserGrid", "s": 2050, "z": -70, "progress": 1, "yawRadians": 3.141592653589793 },
+      { "id": "node", "faction": "neutral", "kind": "spinalNode", "s": 1940, "z": 105, "progress": 1, "yawRadians": 0 }
+    ]
+  },
+  "observationRegions": [
+    { "id": "sky", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.38 },
+    { "id": "ground", "kind": "ground", "x": 0, "y": 0.38, "width": 1, "height": 0.62 },
+    { "id": "units", "kind": "unit", "x": 0.25, "y": 0.42, "width": 0.5, "height": 0.4 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.82, "width": 1, "height": 0.18 }
+  ],
+  "benchmark": { "warmupSeconds": 2, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 10, "minimumStructures": 8, "maximumContextLosses": 0 }
+}

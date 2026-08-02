@@ -78,6 +78,7 @@ it.skipIf(PROFILE_MODE === undefined)('profiles a representative 40-minute headl
     new AiOpponent(Faction.Choir, 'veteran', controllerSeed(PROFILE_SEED, Faction.Choir, 1)),
   ] as const;
   const timings = new Map<string, Timing>();
+  const periodicHashes: Array<{ tick: number; world: string; controllers: string[] }> = [];
   const phaseMethods = [
     'rebuildBuckets',
     'stepEconomy',
@@ -139,10 +140,24 @@ it.skipIf(PROFILE_MODE === undefined)('profiles a representative 40-minute headl
     }
     const drainStarted = measured ? performance.now() : 0;
     world.drainEvents();
+    if (world.tick % 9_000 === 0) {
+      periodicHashes.push({
+        tick: world.tick,
+        world: world.stateHash(),
+        controllers: controllers.map((controller) => hashJson(controller.exportPersistenceState())),
+      });
+    }
     if (measured) {
       recordTiming(timings, 'events', performance.now() - drainStarted);
       lateLoopMilliseconds += performance.now() - loopStarted;
     }
+  }
+  if (periodicHashes.at(-1)?.tick !== world.tick) {
+    periodicHashes.push({
+      tick: world.tick,
+      world: world.stateHash(),
+      controllers: controllers.map((controller) => hashJson(controller.exportPersistenceState())),
+    });
   }
 
   const rows = [...timings.entries()]
@@ -159,9 +174,15 @@ it.skipIf(PROFILE_MODE === undefined)('profiles a representative 40-minute headl
     terrain: env.RWW_TERRAIN ?? 'flat',
     terrainMilliseconds,
     lateLoopMilliseconds,
-    measuredTicks: world.tick - PROFILE_WARMUP_TICKS,
+    measuredTicks: Math.max(0, world.tick - PROFILE_WARMUP_TICKS),
     totalTicks: world.tick,
+    status: world.status,
+    winner: world.winner,
+    endReason: world.endReason,
     finalHash: world.stateHash(),
+    controllerHashes: controllers.map((controller) => hashJson(controller.exportPersistenceState())),
+    periodicHashes,
+    ballisticWork: world.ballisticWork,
     navFieldBuilds: world.nav.fieldBuildCount,
     navCachedFields: world.nav.cachedFieldCount,
     rows,
@@ -169,7 +190,7 @@ it.skipIf(PROFILE_MODE === undefined)('profiles a representative 40-minute headl
 
   expect(world.tick).toBeGreaterThan(0);
   expect(world.tick).toBeLessThanOrEqual(PROFILE_TICKS);
-}, 180_000);
+}, 900_000);
 
 function timeMethod(
   target: object,
@@ -233,4 +254,14 @@ function recordTiming(timings: Map<string, Timing>, label: string, milliseconds:
 
 function controllerSeed(seed: number, faction: Faction, index: number): number {
   return (seed ^ Math.imul(faction + 1, 0x9e3779b9) ^ Math.imul(index + 1, 0x85ebca6b)) >>> 0;
+}
+
+function hashJson(value: unknown): string {
+  const state = JSON.stringify(value);
+  let hash = 2166136261 >>> 0;
+  for (let index = 0; index < state.length; index++) {
+    hash ^= state.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
 }

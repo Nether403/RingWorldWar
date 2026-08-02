@@ -54,6 +54,7 @@ export class EntityRenderer {
   private rigs = new Map<MechClass, MechRig>();
   private structureModels = new Map<StructureKind, StructureModel>();
   private mats: FactionMaterials[] = [];
+  private cloakMats: FactionMaterials[] = [];
   /** key: `${cls}|${part}|${faction}` */
   private mechMeshes = new Map<string, THREE.InstancedMesh>();
   /** key: `${kind}|${faction}` */
@@ -123,6 +124,7 @@ export class EntityRenderer {
     // per instance on the shared hull material without another shader channel.
     for (const f of [Faction.Compact, Faction.Choir]) {
       const cloak = makeHullMaterial(FACTION_COLOR[f]);
+      this.cloakMats[f] = cloak;
       cloak.material.transparent = true;
       cloak.material.opacity = 0.28;
       cloak.material.depthWrite = false;
@@ -565,6 +567,12 @@ export class EntityRenderer {
 
   setEmissive(v: number): void {
     for (const m of this.mats) if (m) m.uniforms.uEmissive.value = v;
+  }
+
+  setLowQuality(enabled: boolean): void {
+    for (const materials of [this.mats, this.cloakMats]) {
+      for (const m of materials) if (m) m.uniforms.uLowQuality.value = enabled ? 1 : 0;
+    }
   }
 }
 

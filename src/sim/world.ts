@@ -45,14 +45,19 @@ import {
 } from './data';
 import { ABILITIES, createAbilityState, type AbilityState } from './abilities';
 import {
+  directionalReachProfile,
   inertialToRing,
   isWithinDragAimEnvelope,
   launchToInertial,
   sampleTrajectory,
   solveAim,
   stepWithDrag,
+  trajectoryImpact,
   type BallisticState,
+  type DirectionalReachProfile,
   type RingPoint,
+  type RingVelocity,
+  type TrajectoryWork,
   type TrajectorySample,
 } from './ballistics';
 import { SurfaceNav, type NavDirection } from './nav';
@@ -62,6 +67,7 @@ const WEAPON_POWER_PULSE_TICKS = Math.round(1 / SIM_DT);
 const WRECK_COVER_MAX_DISTANCE = 260;
 const WRECK_COVER_RADIUS_MULTIPLIER = 1.1;
 const WRECK_COVER_HEIGHT_MULTIPLIER = 0.5;
+const BALLISTIC_FAILURE_CACHE_LIMIT = 2_048;
 
 // ---------------------------------------------------------------------------
 // Entities
@@ -297,6 +303,45 @@ interface BallisticPlan {
   flightMode: 'ballistic' | 'cruise' | 'chord';
 }
 
+export type BallisticFireReason =
+  | 'match-ended'
+  | 'invalid-source'
+  | 'longbow-not-deployed'
+  | 'longbow-transitioning'
+  | 'reloading'
+  | 'insufficient-power'
+  | 'outside-sensor-range'
+  | 'sensor-los-blocked'
+  | 'no-ballistic-solution'
+  | 'success';
+
+interface BallisticFireDetails {
+  remainingSeconds?: number;
+  requiredPower?: number;
+  availablePower?: number;
+  sensorCoverage?: boolean;
+  exactLineOfSight?: boolean;
+  /** Normalized coordinates inspected by the authoritative command boundary. */
+  targetS?: number;
+  targetZ?: number;
+}
+
+export type BallisticFireResult = BallisticFireDetails & (
+  | { ok: true; reason: 'success' }
+  | { ok: false; reason: Exclude<BallisticFireReason, 'success'> }
+);
+
+export interface BallisticFireInspection {
+  result: BallisticFireResult;
+  trajectory: readonly TrajectorySample[] | null;
+}
+
+interface BallisticAssessment {
+  result: BallisticFireResult;
+  source: BallisticSource | null;
+  plan: BallisticPlan | null;
+}
+
 type IndexedEntity = Unit | Structure | Wreck;
 
 // ---------------------------------------------------------------------------
@@ -349,6 +394,15 @@ export class World {
   /** Derived O(1) lookup index. Stable arrays remain authoritative and serialized. */
   private entitiesById: Array<IndexedEntity | undefined> = [];
   private readonly navDirection: NavDirection = { ds: 0, dz: 0, reachable: false };
+  private readonly ballisticPlanningWork: TrajectoryWork = {
+    trajectoryEvaluations: 0,
+    integrationSteps: 0,
+    fullTrajectoryBuilds: 0,
+    storedTrajectorySamples: 0,
+    failedPlanCacheHits: 0,
+  };
+  private readonly failedBallisticGeometry = new Map<string, true>();
+  private readonly directionalReachProfiles = new Map<string, DirectionalReachProfile>();
   private visibilityTick = -1;
   private readonly visibleEntities: Record<Faction, Map<number, boolean>> = {
     [Faction.Compact]: new Map(),
@@ -520,6 +574,10 @@ export class World {
   unitById(id: number): Unit | undefined {
     const entity = this.entitiesById[id];
     return entity?.alive && 'order' in entity ? entity : undefined;
+  }
+
+  get ballisticWork(): Readonly<TrajectoryWork> {
+    return this.ballisticPlanningWork;
   }
 
   structureById(id: number): Structure | undefined {
@@ -805,6 +863,14 @@ export class World {
     if (cost <= 0) return true;
     const { produced, drawn } = this.instantaneousEnergy(faction);
     return drawn + cost <= produced + 1e-9;
+  }
+
+  private weaponPowerStatus(faction: Faction, weapon: WeaponDef): { required: number; available: number } {
+    const { produced, drawn } = this.instantaneousEnergy(faction);
+    return {
+      required: weapon.energyPerShot ?? 0,
+      available: Math.max(0, produced - drawn),
+    };
   }
 
   private consumeWeaponPower(faction: Faction, weapon: WeaponDef): boolean {
@@ -1215,14 +1281,9 @@ export class World {
   // ---- Targeting ----------------------------------------------------------
 
   private isValidTarget(f: Faction, id: number, s: number, z: number, range: number): boolean {
-    const p = this.positionOf(id);
-    if (!p) return false;
-    const u = this.unitById(id);
-    const st = this.structureById(id);
-    const wreck = u || st ? undefined : this.wreckById(id);
-    const of = u ? u.faction : st ? st.faction : wreck ? wreck.faction : -1;
-    if (of === f || of < 0) return false;
-    return this.isEntityVisible(f, id) && surfaceDistSq(s, z, p.s, p.z) <= range * range;
+    const target = this.entitiesById[id];
+    if (!target?.alive || target.faction === f || target.faction < 0) return false;
+    return surfaceDistSq(s, z, target.s, target.z) <= range * range && this.isEntityVisible(f, id);
   }
 
   /** Nearest enemy in range. Prefers units over buildings. */
@@ -1233,9 +1294,8 @@ export class World {
     for (const id of near) {
       const entity = this.entitiesById[id];
       if (!entity?.alive || entity.faction === f || entity.faction < 0) continue;
-      if (!this.isEntityVisible(f, id)) continue;
       const d = surfaceDist(s, z, entity.s, entity.z);
-      if (d > range) continue;
+      if (d > range || !this.isEntityVisible(f, id)) continue;
       // Buildings are shot only once nothing living is in reach.
       const score = d + ('order' in entity ? 0 : 'progress' in entity ? range * 0.9 : range * 1.2);
       if (score < bestScore) {
@@ -1255,11 +1315,106 @@ export class World {
     faction: Faction,
     weaponId?: string,
   ): TrajectorySample[] | null {
+    ({ targetS, targetZ } = normalizeBallisticTarget(targetS, targetZ));
     if (this.status === 'completed') return null;
     const source = this.ballisticSource(sourceId, faction, weaponId);
     if (!source) return null;
-    if (source.weapon.flightMode !== 'chord' && !this.isVisible(faction, targetS, targetZ)) return null;
+    const sensor = this.sensorStatusAt(faction, targetS, targetZ);
+    if (source.weapon.flightMode !== 'chord' && !sensor.nominal) return null;
     return this.planBallistic(source, targetS, targetZ)?.path ?? null;
+  }
+
+  inspectBallisticCommand(
+    sourceId: number,
+    targetS: number,
+    targetZ: number,
+    faction: Faction,
+    weaponId?: string,
+  ): BallisticFireInspection {
+    ({ targetS, targetZ } = normalizeBallisticTarget(targetS, targetZ));
+    const assessment = this.assessBallisticCommand(sourceId, targetS, targetZ, faction, weaponId);
+    let plan = assessment.plan;
+    if (
+      !plan && assessment.source &&
+      assessment.result.reason !== 'outside-sensor-range' &&
+      assessment.result.reason !== 'no-ballistic-solution' &&
+      (assessment.source.weapon.flightMode === 'chord' || assessment.result.sensorCoverage === true)
+    ) {
+      plan = this.planBallistic(assessment.source, targetS, targetZ);
+    }
+    return {
+      result: withBallisticTarget(assessment.result, targetS, targetZ),
+      trajectory: plan?.path ?? null,
+    };
+  }
+
+  /** Dynamic command authority without trajectory integration. */
+  preflightBallisticCommand(
+    sourceId: number,
+    targetS: number,
+    targetZ: number,
+    faction: Faction,
+    weaponId?: string,
+  ): BallisticFireResult {
+    ({ targetS, targetZ } = normalizeBallisticTarget(targetS, targetZ));
+    const assessment = this.assessBallisticCommand(
+      sourceId,
+      targetS,
+      targetZ,
+      faction,
+      weaponId,
+      false,
+      true,
+    );
+    return withBallisticTarget(assessment.result, targetS, targetZ);
+  }
+
+  queryBallisticCommand(
+    sourceId: number,
+    targetS: number,
+    targetZ: number,
+    faction: Faction,
+    weaponId?: string,
+  ): BallisticFireResult {
+    ({ targetS, targetZ } = normalizeBallisticTarget(targetS, targetZ));
+    return withBallisticTarget(
+      this.assessBallisticCommand(sourceId, targetS, targetZ, faction, weaponId).result,
+      targetS,
+      targetZ,
+    );
+  }
+
+  /** Capability check used by player-facing ground-target commands. */
+  canCommandBallistic(sourceId: number, faction: Faction, weaponId?: string): boolean {
+    const source = this.ballisticSource(sourceId, faction, weaponId);
+    return source !== null && this.canCommandBallisticSource(source);
+  }
+
+  private canCommandBallisticSource(source: BallisticSource): boolean {
+    if (!source.isUnit) return true;
+    const unit = source.ent as Unit;
+    return unit.kind === 'longbow' &&
+      unit.ability?.id === 'siegeMode' && unit.ability.active && unit.ability.transitionTimer === 0;
+  }
+
+  /** Cached level-ground envelope for UI only; live targeting remains authoritative. */
+  directionalBallisticReach(
+    sourceId: number,
+    faction: Faction,
+    weaponId?: string,
+  ): DirectionalReachProfile | null {
+    const source = this.ballisticSource(sourceId, faction, weaponId);
+    if (!source || source.weapon.flightMode === 'cruise' || source.weapon.flightMode === 'chord') return null;
+    const muzzleHeight = source.isUnit
+      ? UNITS[(source.ent as Unit).kind].height * 0.62
+      : STRUCTURES[(source.ent as Structure).kind].height * 0.7;
+    const speed = source.weapon.launchSpeed ?? 120;
+    const key = `${source.weapon.id}:${speed}:${muzzleHeight}`;
+    const cached = this.directionalReachProfiles.get(key);
+    if (cached) return cached;
+    const profile = directionalReachProfile({ s: 0, h: muzzleHeight, z: 0 }, speed);
+    this.directionalReachProfiles.set(key, profile);
+    return profile;
   }
 
   private isSiegeImmobilized(unit: Unit): boolean {
@@ -1310,6 +1465,69 @@ export class World {
     this.clearVisibilityCache();
   }
 
+  fireBallisticCommand(
+    sourceId: number,
+    targetS: number,
+    targetZ: number,
+    faction: Faction,
+    weaponId?: string,
+  ): BallisticFireResult {
+    ({ targetS, targetZ } = normalizeBallisticTarget(targetS, targetZ));
+    return this.fireBallisticCommandNormalized(sourceId, targetS, targetZ, faction, weaponId);
+  }
+
+  private fireBallisticCommandNormalized(
+    sourceId: number,
+    targetS: number,
+    targetZ: number,
+    faction: Faction,
+    weaponId?: string,
+  ): BallisticFireResult {
+    const assessment = this.assessBallisticCommand(sourceId, targetS, targetZ, faction, weaponId, true);
+    if (!assessment.result.ok || !assessment.source) {
+      return withBallisticTarget(assessment.result, targetS, targetZ);
+    }
+    const source = assessment.source;
+    let plan = assessment.plan;
+    const blindChord = source.weapon.flightMode === 'chord' && !assessment.result.exactLineOfSight;
+    const spread = blindChord ? 80 : 0;
+    const rngState = spread > 0 ? this.rng.snapshot() : null;
+    const actualS = spread > 0 ? wrapS(targetS + this.rng.gaussian() * spread) : targetS;
+    const actualZ = spread > 0 ? clampAxial(targetZ + this.rng.gaussian() * spread) : targetZ;
+    if (spread > 0) {
+      plan = this.planBallistic(source, actualS, actualZ);
+      if (!plan) {
+        this.rng.restore(rngState!);
+        return withBallisticTarget({
+          ok: false,
+          reason: 'no-ballistic-solution',
+          sensorCoverage: assessment.result.sensorCoverage,
+          exactLineOfSight: assessment.result.exactLineOfSight,
+        }, targetS, targetZ);
+      }
+    }
+    if (!plan) {
+      return withBallisticTarget({ ok: false, reason: 'no-ballistic-solution' }, targetS, targetZ);
+    }
+    if (!this.consumeWeaponPower(faction, source.weapon)) {
+      if (rngState !== null) this.rng.restore(rngState);
+      const power = this.weaponPowerStatus(faction, source.weapon);
+      return withBallisticTarget({
+        ok: false,
+        reason: 'insufficient-power',
+        requiredPower: power.required,
+        availablePower: power.available,
+        sensorCoverage: assessment.result.sensorCoverage,
+        exactLineOfSight: assessment.result.exactLineOfSight,
+      }, targetS, targetZ);
+    }
+
+    source.ent.cd[source.weaponIndex] =
+      this.weaponCooldown(source.ent, source.weapon) / Math.max(0.35, this.powerRatio(faction));
+    this.commitBallistic(source, plan);
+    return withBallisticTarget(assessment.result, targetS, targetZ);
+  }
+
   fireBallisticAt(
     sourceId: number,
     targetS: number,
@@ -1317,23 +1535,118 @@ export class World {
     faction: Faction,
     weaponId?: string,
   ): boolean {
-    if (this.status === 'completed') return false;
-    const source = this.ballisticSource(sourceId, faction, weaponId);
-    if (!source || source.ent.cd[source.weaponIndex]! > 0) return false;
-    if (!this.hasWeaponPower(faction, source.weapon)) return false;
-    const visible = this.isVisible(faction, targetS, targetZ);
-    if (source.weapon.flightMode !== 'chord' && !visible) return false;
-    const spread = source.weapon.flightMode === 'chord' && !visible ? 80 : 0;
-    const actualS = spread > 0 ? wrapS(targetS + this.rng.gaussian() * spread) : wrapS(targetS);
-    const actualZ = spread > 0 ? clampAxial(targetZ + this.rng.gaussian() * spread) : clampAxial(targetZ);
-    const plan = this.planBallistic(source, actualS, actualZ);
-    if (!plan) return false;
-    if (!this.consumeWeaponPower(faction, source.weapon)) return false;
+    ({ targetS, targetZ } = normalizeBallisticTarget(targetS, targetZ));
+    return this.fireBallisticCommandNormalized(sourceId, targetS, targetZ, faction, weaponId).ok;
+  }
 
-    source.ent.cd[source.weaponIndex] =
-      this.weaponCooldown(source.ent, source.weapon) / Math.max(0.35, this.powerRatio(faction));
-    this.commitBallistic(source, plan);
-    return true;
+  private assessBallisticCommand(
+    sourceId: number,
+    targetS: number,
+    targetZ: number,
+    faction: Faction,
+    weaponId?: string,
+    deferBlindChordPlan = false,
+    skipPlan = false,
+  ): BallisticAssessment {
+    if (this.status === 'completed') {
+      return { result: { ok: false, reason: 'match-ended' }, source: null, plan: null };
+    }
+    const source = this.ballisticSource(sourceId, faction, weaponId);
+    if (!source) {
+      return { result: { ok: false, reason: 'invalid-source' }, source: null, plan: null };
+    }
+    const sensor = this.sensorStatusAt(faction, targetS, targetZ);
+    const sensorDetails = {
+      sensorCoverage: sensor.nominal,
+      exactLineOfSight: sensor.exactLineOfSight,
+    };
+    if (source.isUnit && (source.ent as Unit).kind === 'longbow') {
+      const ability = (source.ent as Unit).ability;
+      if ((ability?.transitionTimer ?? 0) > 0) {
+        return {
+          result: {
+            ok: false,
+            reason: 'longbow-transitioning',
+            remainingSeconds: ability!.transitionTimer,
+            ...sensorDetails,
+          },
+          source,
+          plan: null,
+        };
+      }
+      if (!ability?.active) {
+        return {
+          result: { ok: false, reason: 'longbow-not-deployed', ...sensorDetails },
+          source,
+          plan: null,
+        };
+      }
+    }
+    const cooldown = source.ent.cd[source.weaponIndex] ?? 0;
+    if (cooldown > 0) {
+      return {
+        result: { ok: false, reason: 'reloading', remainingSeconds: cooldown, ...sensorDetails },
+        source,
+        plan: null,
+      };
+    }
+    const power = this.weaponPowerStatus(faction, source.weapon);
+    if (power.available + 1e-9 < power.required) {
+      return {
+        result: {
+          ok: false,
+          reason: 'insufficient-power',
+          requiredPower: power.required,
+          availablePower: power.available,
+          ...sensorDetails,
+        },
+        source,
+        plan: null,
+      };
+    }
+    if (source.weapon.flightMode !== 'chord') {
+      if (!sensor.nominal) {
+        return {
+          result: { ok: false, reason: 'outside-sensor-range', ...sensorDetails },
+          source,
+          plan: null,
+        };
+      }
+      if (!sensor.exactLineOfSight) {
+        return {
+          result: { ok: false, reason: 'sensor-los-blocked', ...sensorDetails },
+          source,
+          plan: null,
+        };
+      }
+    }
+    if (deferBlindChordPlan && source.weapon.flightMode === 'chord' && !sensor.exactLineOfSight) {
+      return {
+        result: { ok: true, reason: 'success', ...sensorDetails },
+        source,
+        plan: null,
+      };
+    }
+    if (skipPlan) {
+      return {
+        result: { ok: true, reason: 'success', ...sensorDetails },
+        source,
+        plan: null,
+      };
+    }
+    const plan = this.planBallistic(source, targetS, targetZ);
+    if (!plan) {
+      return {
+        result: { ok: false, reason: 'no-ballistic-solution', ...sensorDetails },
+        source,
+        plan: null,
+      };
+    }
+    return {
+      result: { ok: true, reason: 'success', ...sensorDetails },
+      source,
+      plan,
+    };
   }
 
   isBallisticTargetWithinReachEnvelope(
@@ -1343,6 +1656,7 @@ export class World {
     faction: Faction,
     weaponId?: string,
   ): boolean {
+    ({ targetS, targetZ } = normalizeBallisticTarget(targetS, targetZ));
     const source = this.ballisticSource(sourceId, faction, weaponId);
     if (!source || source.weapon.flightMode === 'cruise' || source.weapon.flightMode === 'chord') {
       return source !== null;
@@ -1356,9 +1670,7 @@ export class World {
       h: groundH + sourceHeight * (source.isUnit ? 0.62 : 0.7),
       z: source.z,
     };
-    const toS = wrapS(targetS);
-    const toZ = clampAxial(targetZ);
-    const to: RingPoint = { s: toS, h: this.terrain.heightAt(toS, toZ), z: toZ };
+    const to: RingPoint = { s: targetS, h: this.terrain.heightAt(targetS, targetZ), z: targetZ };
     return isWithinDragAimEnvelope(
       from,
       to,
@@ -1408,24 +1720,38 @@ export class World {
       return this.planChord(source.weapon, from, targetS, targetZ);
     }
     const to: RingPoint = {
-      s: wrapS(targetS),
+      s: targetS,
       h: this.terrain.heightAt(targetS, targetZ),
-      z: clampAxial(targetZ),
+      z: targetZ,
     };
+    const failureKey = this.ballisticFailureKey(source, to);
+    if (this.failedBallisticGeometry.has(failureKey)) {
+      this.ballisticPlanningWork.failedPlanCacheHits++;
+      return null;
+    }
     const solution = solveAim(from, to, this.time, {
       speed: source.weapon.launchSpeed ?? 120,
       lofted: true,
       maxFlightTime: 60,
       groundAt: (s, z) => this.terrain.heightAt(s, z),
       ballisticCoefficient: BALLISTIC_COEFFICIENT,
+      work: this.ballisticPlanningWork,
     });
-    if (!solution) return null;
-    const path = sampleTrajectory(from, solution.velocity, this.time, {
+    if (!solution) {
+      if (this.failedBallisticGeometry.size >= BALLISTIC_FAILURE_CACHE_LIMIT) {
+        const oldest = this.failedBallisticGeometry.keys().next().value;
+        if (oldest !== undefined) this.failedBallisticGeometry.delete(oldest);
+      }
+      this.failedBallisticGeometry.set(failureKey, true);
+      return null;
+    }
+    const path = solution.path ?? sampleTrajectory(from, solution.velocity, this.time, {
       maxTime: solution.flightTime + 8,
       dt: SIM_DT,
       ballisticCoefficient: BALLISTIC_COEFFICIENT,
       groundAt: (s, z) => this.terrain.heightAt(s, z),
       stopOnImpact: true,
+      work: this.ballisticPlanningWork,
     });
     return {
       from,
@@ -1436,17 +1762,24 @@ export class World {
     };
   }
 
+  private ballisticFailureKey(source: BallisticSource, target: RingPoint): string {
+    // Rotating-frame dynamics and static terrain are time invariant for identical
+    // absolute endpoints. Exact coordinates avoid changing moving-target decisions.
+    return `${source.ent.id}:${source.weapon.id}:${source.s}:${source.z}:${target.s}:${target.h}:${target.z}`;
+  }
+
   private planChord(
     weapon: WeaponDef,
     from: RingPoint,
     targetS: number,
     targetZ: number,
   ): BallisticPlan | null {
-    const desiredS = wrapS(targetS);
-    const desiredZ = clampAxial(targetZ);
+    const desiredS = targetS;
+    const desiredZ = targetZ;
     let aimS = desiredS;
     let aimZ = desiredZ;
-    let lastPlan: BallisticPlan | null = null;
+    let finalVelocity: RingVelocity | null = null;
+    let finalImpact: TrajectorySample | null = null;
     for (let iteration = 0; iteration < 6; iteration++) {
       const solution = solveAim(
         from,
@@ -1455,28 +1788,38 @@ export class World {
         { speed: weapon.launchSpeed ?? 400, lofted: true, maxFlightTime: 120 },
       );
       if (!solution) return null;
-      const path = sampleTrajectory(from, solution.velocity, this.time, {
+      const impact = trajectoryImpact(from, solution.velocity, this.time, {
         maxTime: solution.flightTime + 8,
         dt: SIM_DT,
         ballisticCoefficient: weapon.ballisticCoefficient ?? BALLISTIC_COEFFICIENT,
         groundAt: (s, z) => this.terrain.heightAt(s, z),
         stopOnImpact: true,
+        work: this.ballisticPlanningWork,
       });
-      const impact = path[path.length - 1]!;
-      lastPlan = {
-        from,
-        velocity: solution.velocity,
-        flightTime: impact.t,
-        path,
-        flightMode: 'chord',
-      };
+      finalVelocity = solution.velocity;
+      finalImpact = impact;
       const missS = deltaS(desiredS, impact.s);
       const missZ = impact.z - desiredZ;
-      if (Math.hypot(missS, missZ) < 2) return lastPlan;
+      if (Math.hypot(missS, missZ) < 2) break;
       aimS = wrapS(aimS - missS);
       aimZ = clampAxial(aimZ - missZ);
     }
-    return lastPlan;
+    if (!finalVelocity || !finalImpact) return null;
+    const path = sampleTrajectory(from, finalVelocity, this.time, {
+      maxTime: finalImpact.t + 8,
+      dt: SIM_DT,
+      ballisticCoefficient: weapon.ballisticCoefficient ?? BALLISTIC_COEFFICIENT,
+      groundAt: (s, z) => this.terrain.heightAt(s, z),
+      stopOnImpact: true,
+      work: this.ballisticPlanningWork,
+    });
+    return {
+      from,
+      velocity: finalVelocity,
+      flightTime: finalImpact.t,
+      path,
+      flightMode: 'chord',
+    };
   }
 
   private planCruise(
@@ -1485,10 +1828,8 @@ export class World {
     targetS: number,
     targetZ: number,
   ): BallisticPlan {
-    const toS = wrapS(targetS);
-    const toZ = clampAxial(targetZ);
-    const ds = deltaS(from.s, toS);
-    const dz = toZ - from.z;
+    const ds = deltaS(from.s, targetS);
+    const dz = targetZ - from.z;
     const distance = Math.hypot(ds, dz);
     const speed = weapon.launchSpeed ?? 55;
     const altitude = weapon.cruiseAltitude ?? 50;
@@ -1568,6 +1909,10 @@ export class World {
         continue;
       }
       ent.cd[i] = Math.max(0, (ent.cd[i] ?? 0) - dt);
+
+      // A cooling weapon cannot change firing state. Bursts remain range- and
+      // envelope-gated exactly as before because their timer is independent.
+      if ((ent.burst[i] ?? 0) <= 0 && ent.cd[i]! > 0) continue;
 
       const range = this.weaponRange(ent, w);
       if (surfaceDistSq(s, z, tgt.s, tgt.z) > range * range) continue;
@@ -2321,12 +2666,17 @@ export class World {
     this.bucketGeneration++;
     this.bucketsDirty = true;
     this.clearVisibilityCache();
+    this.failedBallisticGeometry.clear();
   }
 
   private rebuildEntityIndex(): void {
     this.entitiesById = [];
-    for (const unit of this.units) this.entitiesById[unit.id] = unit;
-    for (const structure of this.structures) this.entitiesById[structure.id] = structure;
+    for (const unit of this.units) {
+      this.entitiesById[unit.id] = unit;
+    }
+    for (const structure of this.structures) {
+      this.entitiesById[structure.id] = structure;
+    }
     for (const wreck of this.wreckages) this.entitiesById[wreck.id] = wreck;
   }
 
@@ -2343,27 +2693,53 @@ export class World {
 
   // ---- Vision -------------------------------------------------------------
 
+  sensorPowerScale(faction: Faction): number {
+    return 0.55 + this.powerRatio(faction) * 0.45;
+  }
+
+  effectiveSensorRange(entityId: number, faction: Faction): number {
+    const unit = this.unitById(entityId);
+    if (unit) return unit.faction === faction ? unit.vision * this.sensorPowerScale(faction) : 0;
+    const structure = this.structureById(entityId);
+    if (!structure || structure.faction !== faction || structure.progress < 1) return 0;
+    return structure.vision * this.sensorPowerScale(faction);
+  }
+
+  sensorStatusAt(faction: Faction, s: number, z: number): {
+    nominal: boolean;
+    exactLineOfSight: boolean;
+  } {
+    const scale = this.sensorPowerScale(faction);
+    let nominal = false;
+    for (const unit of this.units) {
+      if (!unit.alive || unit.faction !== faction) continue;
+      if (surfaceDistSq(unit.s, unit.z, s, z) >= (unit.vision * scale) ** 2) continue;
+      nominal = true;
+      if (this.hasLineOfSight(unit.s, unit.z, UNITS[unit.kind].height * 0.8, s, z)) {
+        return { nominal: true, exactLineOfSight: true };
+      }
+    }
+    for (const structure of this.structures) {
+      if (!structure.alive || structure.faction !== faction || structure.progress < 1) continue;
+      if (surfaceDistSq(structure.s, structure.z, s, z) >= (structure.vision * scale) ** 2) continue;
+      nominal = true;
+      if (this.hasLineOfSight(
+        structure.s,
+        structure.z,
+        STRUCTURES[structure.kind].height * 0.8,
+        s,
+        z,
+      )) return { nominal: true, exactLineOfSight: true };
+    }
+    return { nominal, exactLineOfSight: false };
+  }
+
   /**
    * Can `faction` see this point? Artillery needs a spotter, so this gates
    * both rendering and the AI's targeting.
    */
   isVisible(faction: Faction, s: number, z: number): boolean {
-    const sensorScale = 0.55 + this.powerRatio(faction) * 0.45;
-    for (const u of this.units) {
-      if (!u.alive || u.faction !== faction) continue;
-      if (
-        surfaceDistSq(u.s, u.z, s, z) < (u.vision * sensorScale) ** 2 &&
-        this.hasLineOfSight(u.s, u.z, UNITS[u.kind].height * 0.8, s, z)
-      ) return true;
-    }
-    for (const st of this.structures) {
-      if (!st.alive || st.faction !== faction || st.progress < 1) continue;
-      if (
-        surfaceDistSq(st.s, st.z, s, z) < (st.vision * sensorScale) ** 2 &&
-        this.hasLineOfSight(st.s, st.z, STRUCTURES[st.kind].height * 0.8, s, z)
-      ) return true;
-    }
-    return false;
+    return this.sensorStatusAt(faction, s, z).exactLineOfSight;
   }
 
   isEntityVisible(faction: Faction, id: number): boolean {
@@ -2375,9 +2751,9 @@ export class World {
       const visible =
         unit.faction === faction ||
         unit.revealed > 0 ||
-        (unit.cloaked
-          ? this.hasCloakProximityReveal(faction, unit)
-          : this.isVisible(faction, unit.s, unit.z));
+         (unit.cloaked
+           ? this.hasCloakProximityReveal(faction, unit)
+           : this.isVisible(faction, unit.s, unit.z));
       this.visibleEntities[faction].set(id, visible);
       return visible;
     }
@@ -2509,6 +2885,14 @@ function restorePlayer(state: WorldPlayerPersistenceState): PlayerState {
 function clampAxial(z: number): number {
   const lim = RING_HALF_WIDTH - 40;
   return z < -lim ? -lim : z > lim ? lim : z;
+}
+
+function withBallisticTarget(result: BallisticFireResult, targetS: number, targetZ: number): BallisticFireResult {
+  return { ...result, targetS, targetZ };
+}
+
+function normalizeBallisticTarget(targetS: number, targetZ: number): { targetS: number; targetZ: number } {
+  return { targetS: wrapS(targetS), targetZ: clampAxial(targetZ) };
 }
 
 export function resolveTerrainSeed(terrain: Terrain, worldSeed: number): number {

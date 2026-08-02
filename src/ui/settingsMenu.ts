@@ -61,6 +61,8 @@ const KEYBINDINGS: ReadonlyArray<readonly [string, string]> = [
   ['Zoom', 'Wheel or R / F'],
   ['Rotate camera', 'Q / E or Shift + right drag'],
   ['Select / command', 'Left / right click'],
+  ['Minimap focus / primary', 'Arrows / Enter'],
+  ['Minimap move / attack-move', 'M / A'],
   ['Pilot selected mech', 'V'],
   ['Toggle selected ability', 'X'],
   ['Control groups', 'Ctrl or Alt + 1-9'],

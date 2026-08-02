@@ -40,6 +40,25 @@ describe('chord shots', () => {
     expect(a.isProjectileVisible(Faction.Choir, projectileA)).toBe(true);
   });
 
+  it('allocates one full path while refining chord shots by impact only', () => {
+    const world = emptyWorld(205);
+    const silo = world.spawnStructure(Faction.Compact, 'silo', 0, 0, 1);
+
+    expect(world.fireBallisticAt(
+      silo.id,
+      RING_CIRCUMFERENCE * 0.5,
+      0,
+      Faction.Compact,
+      'chordShot',
+    )).toBe(true);
+
+    expect(world.ballisticWork.fullTrajectoryBuilds).toBe(1);
+    expect(world.ballisticWork.trajectoryEvaluations).toBeGreaterThan(1);
+    expect(world.ballisticWork.storedTrajectorySamples).toBeLessThan(
+      world.ballisticWork.integrationSteps,
+    );
+  });
+
   it('re-enters and applies terminal splash damage at a spotted target', () => {
     const world = emptyWorld(203);
     const silo = world.spawnStructure(Faction.Compact, 'silo', 0, 0, 1);

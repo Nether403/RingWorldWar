@@ -31,7 +31,8 @@ import {
   type UnitKind,
 } from '@sim/data';
 import type { AbilityId } from '@sim/abilities';
-import type { Structure, Unit, World } from '@sim/world';
+import type { DirectionalReachProfile } from '@sim/ballistics';
+import type { BallisticFireResult, Structure, Unit, World } from '@sim/world';
 
 const CSS = `
 .rww-root { position: fixed; inset: 0; pointer-events: none; z-index: 30;
@@ -56,6 +57,10 @@ const CSS = `
 .rww-sel { flex: 0 0 auto; min-width: 250px; padding: 10px 14px; }
 .rww-sel h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; letter-spacing: 0.1em; }
 .rww-sel p { margin: 0; font-size: 11px; opacity: 0.6; line-height: 1.45; max-width: 34ch; }
+.rww-sel .rww-directional-range { margin-top: 6px; opacity: 0.88; font-variant-numeric: tabular-nums; }
+.rww-directional-range strong { color: #f0b26e; font-size: 10px; letter-spacing: 0.12em; }
+.rww-sel .rww-sensor-range { margin-top: 5px; color: #9fd8ff; opacity: 0.88;
+  font-variant-numeric: tabular-nums; text-transform: uppercase; letter-spacing: 0.1em; }
 .rww-sel .rww-hp { margin-top: 7px; height: 3px; background: rgba(255,255,255,0.1); }
 .rww-sel .rww-hp i { display: block; height: 100%; background: #6ee7a0; }
 
@@ -78,6 +83,17 @@ const CSS = `
 .rww-map canvas { display: block; width: 100%; height: 100%; pointer-events: auto; cursor: crosshair; }
 .rww-maplbl { position: absolute; top: -15px; left: 6px; font-size: 8.5px;
   letter-spacing: 0.26em; text-transform: uppercase; opacity: 0.42; }
+.rww-sensor-lbl { position: absolute; top: -15px; right: 6px; font-size: 8.5px;
+  letter-spacing: 0.2em; color: #9fd8ff; text-transform: uppercase; }
+.rww-target-status { position: absolute; right: 6px; bottom: calc(100% + 5px); max-width: 440px;
+  padding: 4px 7px; background: rgba(6,10,15,0.9); border-left: 2px solid #f0b26e;
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; text-align: right; }
+.rww-target-status.ready { border-left-color: #6ee7a0; }
+.rww-target-status.blocked { border-left-color: #ff8b73; }
+.rww-selection-box { position: fixed; display: none; pointer-events: none; z-index: 80;
+  box-sizing: border-box; border: 1px solid rgba(186,226,255,0.95);
+  background: repeating-linear-gradient(135deg, rgba(125,194,238,0.09) 0 2px, transparent 2px 7px);
+  box-shadow: inset 0 0 0 1px rgba(4,10,16,0.9); }
 
 /* Alerts + end card */
 .rww-alert { position: absolute; top: 74px; left: 50%; transform: translateX(-50%);
@@ -120,6 +136,7 @@ export type BuildRequest = { kind: StructureKind } | null;
 
 const ARTILLERY_LABEL: Record<string, string> = {
   batteryGun: 'Standard Rocket',
+  siegeMortar: 'Siege Mortar',
   cruiseMissile: 'Cruise Missile',
   chordShot: 'Chord Shot',
 };
@@ -145,13 +162,22 @@ export class Hud {
   private endEl: HTMLDivElement | null = null;
   private map: HTMLCanvasElement;
   private mapCtx: CanvasRenderingContext2D;
+  private targetStatusEl: HTMLDivElement;
+  private selectionBoxEl: HTMLDivElement;
   private alertTimer = 0;
   private selectionSignature = '';
   private cameraS = 0;
   private cameraZ = 0;
+  private lastTargetStatusText = '';
+  private lastTargetStatusClass = '';
+  private lastTargetStatusHidden = true;
 
-  /** Callback wired by main: jump the camera to a surface position. */
-  onMinimapClick: ((s: number, z: number) => void) | null = null;
+  onMinimapPointer: ((s: number, z: number) => void) | null = null;
+  onMinimapPrimary: ((s: number, z: number) => void) | null = null;
+  onMinimapSecondary: ((s: number, z: number, attackMove: boolean) => void) | null = null;
+  onMinimapMove: ((s: number, z: number, attackMove: boolean) => void) | null = null;
+  onMinimapCancel: (() => boolean) | null = null;
+  onMinimapCamera: ((s: number, z: number) => void) | null = null;
   /** Begin a ground-targeted artillery command for a selected launcher. */
   onArtilleryTarget: ((sourceId: number, weaponId: string) => void) | null = null;
   /** Toggle the active ability on a single selected mech. */
@@ -182,22 +208,48 @@ export class Hud {
     const lbl = el('div', 'rww-maplbl');
     lbl.textContent = 'ring — antispinward ◀ · ▶ spinward · edges join';
     mapWrap.appendChild(lbl);
+    const sensorLabel = el('div', 'rww-sensor-lbl');
+    sensorLabel.textContent = 'SENSOR COVERAGE';
+    mapWrap.appendChild(sensorLabel);
+    this.targetStatusEl = el('div', 'rww-target-status');
+    this.targetStatusEl.hidden = true;
+    this.targetStatusEl.setAttribute('role', 'status');
+    mapWrap.appendChild(this.targetStatusEl);
     this.map = document.createElement('canvas');
     this.map.width = 900;
     this.map.height = 160;
     this.map.tabIndex = 0;
     this.map.setAttribute('role', 'application');
-    this.map.setAttribute('aria-label', 'Ring minimap. Use arrow keys to move the camera.');
+    this.map.setAttribute('aria-label', minimapAriaLabel('Ring minimap with nominal sensor coverage.'));
     mapWrap.appendChild(this.map);
     this.mapCtx = this.map.getContext('2d')!;
     this.root.appendChild(mapWrap);
 
-    this.map.addEventListener('pointerdown', (e) => {
+    this.selectionBoxEl = el('div', 'rww-selection-box');
+    this.selectionBoxEl.dataset.selectionRectangle = '';
+    this.root.appendChild(this.selectionBoxEl);
+
+    const mapPoint = (e: PointerEvent): { s: number; z: number } => {
       const r = this.map.getBoundingClientRect();
       const fx = (e.clientX - r.left) / r.width;
       const fy = (e.clientY - r.top) / r.height;
-      this.onMinimapClick?.(fx * RING_CIRCUMFERENCE, (fy - 0.5) * 2 * RING_HALF_WIDTH);
+      return {
+        s: Math.max(0, Math.min(1, fx)) * RING_CIRCUMFERENCE,
+        z: (Math.max(0, Math.min(1, fy)) - 0.5) * 2 * RING_HALF_WIDTH,
+      };
+    };
+    this.map.addEventListener('pointermove', (e) => {
+      const point = mapPoint(e);
+      this.onMinimapPointer?.(point.s, point.z);
     });
+    this.map.addEventListener('pointerdown', (e) => {
+      const point = mapPoint(e);
+      e.preventDefault();
+      this.onMinimapPointer?.(point.s, point.z);
+      if (e.button === 2) this.onMinimapSecondary?.(point.s, point.z, e.ctrlKey);
+      else if (e.button === 0) this.onMinimapPrimary?.(point.s, point.z);
+    });
+    this.map.addEventListener('contextmenu', (e) => e.preventDefault());
     this.map.addEventListener('keydown', (e) => {
       const stepS = e.shiftKey ? 1_500 : 500;
       const stepZ = e.shiftKey ? 500 : 200;
@@ -205,12 +257,21 @@ export class Hud {
       else if (e.key === 'ArrowRight') this.cameraS += stepS;
       else if (e.key === 'ArrowUp') this.cameraZ -= stepZ;
       else if (e.key === 'ArrowDown') this.cameraZ += stepZ;
-      else return;
+      else if (e.key === 'Enter') this.onMinimapPrimary?.(this.cameraS, this.cameraZ);
+      else if (e.code === 'KeyM' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        this.onMinimapMove?.(this.cameraS, this.cameraZ, false);
+      } else if (e.code === 'KeyA' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        this.onMinimapMove?.(this.cameraS, this.cameraZ, true);
+      } else if (e.key === 'Escape') {
+        if (!this.onMinimapCancel?.()) return;
+      } else return;
       e.preventDefault();
-      this.onMinimapClick?.(
-        ((this.cameraS % RING_CIRCUMFERENCE) + RING_CIRCUMFERENCE) % RING_CIRCUMFERENCE,
-        Math.max(-RING_HALF_WIDTH, Math.min(RING_HALF_WIDTH, this.cameraZ)),
-      );
+      e.stopPropagation();
+      if (e.key.startsWith('Arrow')) {
+        this.cameraS = ((this.cameraS % RING_CIRCUMFERENCE) + RING_CIRCUMFERENCE) % RING_CIRCUMFERENCE;
+        this.cameraZ = Math.max(-RING_HALF_WIDTH, Math.min(RING_HALF_WIDTH, this.cameraZ));
+        this.onMinimapCamera?.(this.cameraS, this.cameraZ);
+      }
     });
 
     this.alertEl = el('div', 'rww-alert rww-panel');
@@ -222,6 +283,7 @@ export class Hud {
     hint.innerHTML =
       'WASD / edge — pan &nbsp;·&nbsp; wheel — zoom &nbsp;·&nbsp; Q E — rotate<br>' +
       'left click — select &nbsp;·&nbsp; drag — box select &nbsp;·&nbsp; right click — move / attack<br>' +
+      'minimap: arrows — focus &nbsp;·&nbsp; Enter — center / fire &nbsp;·&nbsp; M / A — move / attack-move<br>' +
       'V — pilot mech &nbsp;·&nbsp; X — ability &nbsp;·&nbsp; Alt/Ctrl+1..9 — group &nbsp;·&nbsp; esc — cancel / tactical &nbsp;·&nbsp; F3 — stats';
     this.root.appendChild(hint);
 
@@ -238,6 +300,22 @@ export class Hud {
     this.selectionSignature = '';
   }
 
+  showSelectionRectangle(x0: number, y0: number, x1: number, y1: number): void {
+    const left = Math.max(0, Math.min(innerWidth, Math.min(x0, x1)));
+    const top = Math.max(0, Math.min(innerHeight, Math.min(y0, y1)));
+    const right = Math.max(0, Math.min(innerWidth, Math.max(x0, x1)));
+    const bottom = Math.max(0, Math.min(innerHeight, Math.max(y0, y1)));
+    this.selectionBoxEl.style.display = 'block';
+    this.selectionBoxEl.style.left = `${left}px`;
+    this.selectionBoxEl.style.top = `${top}px`;
+    this.selectionBoxEl.style.width = `${right - left}px`;
+    this.selectionBoxEl.style.height = `${bottom - top}px`;
+  }
+
+  hideSelectionRectangle(): void {
+    this.selectionBoxEl.style.display = 'none';
+  }
+
   // -------------------------------------------------------------------------
 
   update(
@@ -247,6 +325,8 @@ export class Hud {
     selection: Set<number>,
     cameraS: number,
     cameraZ: number,
+    artilleryTargeting: boolean,
+    artilleryResult: BallisticFireResult | null,
   ): void {
     this.cameraS = cameraS;
     this.cameraZ = cameraZ;
@@ -257,7 +337,7 @@ export class Hud {
 
     this.drawResources(world, player);
     this.drawSelection(world, player, selection);
-    this.drawMinimap(world, player, cameraS, cameraZ);
+    this.drawMinimap(world, player, selection, cameraS, cameraZ, artilleryTargeting, artilleryResult);
     this.drawEnd(world, player);
   }
 
@@ -308,6 +388,7 @@ export class Hud {
       playerState.commandCap,
       [...playerState.unlocked].sort().join(','),
       this.placing ?? '',
+      Math.round(world.sensorPowerScale(player) * 1_000),
       units
         .map((unit) =>
           `${unit.id}:${Math.ceil(unit.hp / 25)}:${unit.order.kind}:` +
@@ -327,6 +408,18 @@ export class Hud {
     this.selectionSignature = signature;
 
     this.cmdEl.innerHTML = '';
+    const directional = this.selectedDirectionalArtillery(world, player, selection);
+    const rangeCopy = directional
+      ? `<p class="rww-directional-range" data-spinward-range="${directional.profile.spinward.toFixed(0)}" ` +
+        `data-antispinward-range="${directional.profile.antispinward.toFixed(0)}">` +
+        `◀ ANTISPINWARD ${formatRange(directional.profile.antispinward)} · ` +
+        `SPINWARD ${formatRange(directional.profile.spinward)} ▶<br>` +
+        `<strong>ANTISPINWARD = LONG SHOT</strong></p>`
+      : '';
+    const sensorSource = units.length + structs.length === 1 ? units[0] ?? structs[0] : undefined;
+    const sensorCopy = sensorSource
+      ? this.sensorRangeCopy(world, player, sensorSource)
+      : '';
 
     if (units.length === 0 && structs.length === 0) {
       this.selEl.innerHTML =
@@ -340,7 +433,7 @@ export class Hud {
       const def = STRUCTURES[st.kind];
       const pct = Math.round((st.hp / st.maxHp) * 100);
       this.selEl.innerHTML =
-        `<h3>${def.name}</h3><p>${def.role}</p>` +
+        `<h3>${def.name}</h3><p>${def.role}</p>${sensorCopy}${rangeCopy}` +
         (st.progress < 1
           ? `<p style="opacity:.8;color:#f0b26e">Under construction — ${Math.round(st.progress * 100)}%</p>`
           : '') +
@@ -371,7 +464,7 @@ export class Hud {
       if (units.length === 1) {
         const pct = Math.round((first.hp / first.maxHp) * 100);
         this.selEl.innerHTML =
-          `<h3>${def.name}</h3><p>${def.role}</p>` +
+          `<h3>${def.name}</h3><p>${def.role}</p>${sensorCopy}${rangeCopy}` +
           `<div class="rww-hp"><i style="width:${pct}%;background:${pct > 50 ? '#6ee7a0' : pct > 25 ? '#f0c26e' : '#ff7a5e'}"></i></div>`;
       } else {
         const counts = new Map<UnitKind, number>();
@@ -387,23 +480,38 @@ export class Hud {
       if (units.length === 1 && first.faction === player && first.ability && first.ability.id !== 'cloak') {
         this.addAbilityButton(first);
       }
+      if (units.length === 1 && first.faction === player && first.ability?.id === 'siegeMode' &&
+          first.ability.active) {
+        this.addArtilleryButton(first, 'siegeMortar');
+      }
     }
   }
 
-  private addArtilleryButton(st: Structure, weaponId: string): void {
-    const weaponIndex = STRUCTURES[st.kind].weapons.indexOf(weaponId);
+  private sensorRangeCopy(world: World, player: Faction, source: Unit | Structure): string {
+    const effective = world.effectiveSensorRange(source.id, player);
+    if (effective <= 0) return '';
+    const reduction = Math.round((1 - world.sensorPowerScale(player)) * 100);
+    return `<p class="rww-sensor-range" data-effective-sensor-range="${effective.toFixed(0)}">` +
+      `SENSOR ${formatRange(effective)} EFFECTIVE · POWER REDUCTION ${reduction}%<br>` +
+        `NOMINAL RADIUS · EXACT LOS CHECKED SEPARATELY</p>`;
+  }
+
+  private addArtilleryButton(source: Structure | Unit, weaponId: string): void {
+    const weapons = 'progress' in source ? STRUCTURES[source.kind].weapons : UNITS[source.kind].weapons;
+    const weaponIndex = weapons.indexOf(weaponId);
     if (weaponIndex < 0) return;
-    const cooldown = st.cd[weaponIndex] ?? 0;
+    const cooldown = source.cd[weaponIndex] ?? 0;
     const ready = cooldown <= 0;
     const label = ARTILLERY_LABEL[weaponId] ?? WEAPONS[weaponId]!.id;
     const target = button('rww-btn' + (ready ? '' : ' off'));
+    target.dataset.artilleryWeapon = weaponId;
     target.setAttribute('aria-label', weaponId === 'batteryGun' ? `${label} - Target rocket` : label);
     target.setAttribute('aria-disabled', String(!ready));
     const targetKind = WEAPONS[weaponId]?.flightMode === 'chord' ? 'blind-fire ground target' : 'ground target';
     target.innerHTML = `<u>${label}</u><s>${ready ? targetKind : `${cooldown.toFixed(1)}s reload`}</s>`;
     target.title = 'Preview the ring-physics trajectory, then click to fire';
     target.onclick = (): void => {
-      if (ready) this.onArtilleryTarget?.(st.id, weaponId);
+      if (ready) this.onArtilleryTarget?.(source.id, weaponId);
       else this.alert(`${label} is reloading`);
     };
     this.cmdEl.appendChild(target);
@@ -497,7 +605,15 @@ export class Hud {
    * that makes flanking work here, so the map is drawn to make that obvious
    * rather than hiding it behind a conventional square.
    */
-  private drawMinimap(world: World, player: Faction, camS: number, camZ: number): void {
+  private drawMinimap(
+    world: World,
+    player: Faction,
+    selection: Set<number>,
+    camS: number,
+    camZ: number,
+    artilleryTargeting: boolean,
+    artilleryResult: BallisticFireResult | null,
+  ): void {
     const g = this.mapCtx;
     const W = this.map.width;
     const H = this.map.height;
@@ -517,6 +633,28 @@ export class Hud {
         g.fillRect(x, 0, 4, H);
       }
     }
+
+    this.drawSensorCoverage(g, world, player, X, Y, W, H);
+
+    const directional = this.selectedDirectionalArtillery(world, player, selection);
+    if (directional) {
+      this.drawDirectionalRangeOverlay(
+        g,
+        X(directional.source.s),
+        Y(directional.source.z),
+        directional.profile,
+        W,
+        H,
+      );
+    } else {
+      delete this.map.dataset.artilleryOverlay;
+      delete this.map.dataset.spinwardRange;
+      delete this.map.dataset.antispinwardRange;
+      delete this.map.dataset.wrapCopies;
+      this.map.setAttribute('aria-label', minimapAriaLabel('Ring minimap with nominal sensor coverage.'));
+    }
+
+    this.drawTargetStatus(artilleryTargeting, artilleryResult);
 
     // Rim edges.
     g.strokeStyle = 'rgba(150,180,210,0.16)';
@@ -571,7 +709,180 @@ export class Hud {
     g.lineWidth = 1.5;
     const cw = 26;
     const ch = 20;
-    g.strokeRect(X(camS) - cw / 2, Y(camZ) - ch / 2, cw, ch);
+    let cameraCopies = 0;
+    for (const offset of [-W, 0, W]) {
+      const left = X(camS) + offset - cw / 2;
+      if (left + cw < 0 || left > W) continue;
+      g.strokeRect(left, Y(camZ) - ch / 2, cw, ch);
+      cameraCopies++;
+    }
+    this.map.dataset.cameraWrapCopies = String(cameraCopies);
+  }
+
+  private drawSensorCoverage(
+    g: CanvasRenderingContext2D,
+    world: World,
+    player: Faction,
+    X: (s: number) => number,
+    Y: (z: number) => number,
+    width: number,
+    height: number,
+  ): void {
+    const sensors: Array<Unit | Structure> = [];
+    for (const unit of world.units) {
+      if (unit.alive && unit.faction === player && unit.vision > 0) sensors.push(unit);
+    }
+    for (const structure of world.structures) {
+      if (structure.alive && structure.faction === player && structure.progress >= 1 && structure.vision > 0) {
+        sensors.push(structure);
+      }
+    }
+    g.fillStyle = 'rgba(1,4,8,0.72)';
+    g.fillRect(0, 0, width, height);
+    g.save();
+    g.globalCompositeOperation = 'destination-out';
+    g.fillStyle = 'rgba(0,0,0,0.52)';
+    for (const sensor of sensors) {
+      const range = world.effectiveSensorRange(sensor.id, player);
+      const rx = (range / RING_CIRCUMFERENCE) * width;
+      const ry = (range / (RING_HALF_WIDTH * 2)) * height;
+      for (const offset of [-width, 0, width]) {
+        g.beginPath();
+        g.ellipse(X(sensor.s) + offset, Y(sensor.z), rx, ry, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    g.restore();
+    g.strokeStyle = 'rgba(158,216,255,0.58)';
+    g.lineWidth = 1;
+    g.setLineDash([5, 4]);
+    for (const sensor of sensors) {
+      const range = world.effectiveSensorRange(sensor.id, player);
+      const rx = (range / RING_CIRCUMFERENCE) * width;
+      const ry = (range / (RING_HALF_WIDTH * 2)) * height;
+      for (const offset of [-width, 0, width]) {
+        g.beginPath();
+        g.ellipse(X(sensor.s) + offset, Y(sensor.z), rx, ry, 0, 0, Math.PI * 2);
+        g.stroke();
+      }
+    }
+    g.setLineDash([]);
+    this.map.dataset.sensorCoverage = 'nominal';
+    this.map.dataset.sensorCount = String(sensors.length);
+  }
+
+  private drawTargetStatus(targeting: boolean, result: BallisticFireResult | null): void {
+    let text = '';
+    let className = 'rww-target-status';
+    if (!targeting) {
+      delete this.map.dataset.targetSensorCoverage;
+      delete this.map.dataset.targetExactLos;
+    } else if (!result) {
+      text = 'PREVIEW ONLY · CHECKING TARGET COORDINATES';
+      className += ' pending';
+      delete this.map.dataset.targetSensorCoverage;
+      delete this.map.dataset.targetExactLos;
+    } else {
+      const nominal = result.sensorCoverage ? 'YES' : 'NO';
+      const exact = result.exactLineOfSight ? 'YES' : 'NO';
+      this.map.dataset.targetSensorCoverage = String(Boolean(result.sensorCoverage));
+      this.map.dataset.targetExactLos = String(Boolean(result.exactLineOfSight));
+      text = `${result.ok ? 'READY TO FIRE' : 'PREVIEW ONLY'} · SENSOR COVERAGE: ${nominal} · ` +
+        `EXACT LOS: ${exact}${result.ok ? '' : ` · ${ballisticFireMessage(result)}`}`;
+      className += result.ok ? ' ready' : ' blocked';
+    }
+    const hidden = !targeting;
+    if (text === this.lastTargetStatusText && className === this.lastTargetStatusClass &&
+        hidden === this.lastTargetStatusHidden) return;
+    this.lastTargetStatusText = text;
+    this.lastTargetStatusClass = className;
+    this.lastTargetStatusHidden = hidden;
+    this.targetStatusEl.textContent = text;
+    this.targetStatusEl.className = className;
+    this.targetStatusEl.hidden = hidden;
+  }
+
+  private selectedDirectionalArtillery(
+    world: World,
+    player: Faction,
+    selection: Set<number>,
+  ): { source: Unit | Structure; weaponId: string; profile: DirectionalReachProfile } | null {
+    if (selection.size !== 1) return null;
+    const id = selection.values().next().value as number | undefined;
+    if (!id) return null;
+    const unit = world.unitById(id);
+    const structure = unit ? undefined : world.structureById(id);
+    const source = unit ?? structure;
+    if (!source || source.faction !== player) return null;
+    if (unit && !world.canCommandBallistic(unit.id, player, 'siegeMortar')) return null;
+    const weapons = unit ? UNITS[unit.kind].weapons : STRUCTURES[structure!.kind].weapons;
+    const weaponId = weapons.find((id) => WEAPONS[id]?.kind === 'ballistic' && !WEAPONS[id]?.flightMode);
+    if (!weaponId) return null;
+    const profile = world.directionalBallisticReach(source.id, player, weaponId);
+    return profile ? { source, weaponId, profile } : null;
+  }
+
+  private drawDirectionalRangeOverlay(
+    g: CanvasRenderingContext2D,
+    sourceX: number,
+    sourceY: number,
+    profile: DirectionalReachProfile,
+    width: number,
+    height: number,
+  ): void {
+    const anti = (profile.antispinward / RING_CIRCUMFERENCE) * width;
+    const spin = (profile.spinward / RING_CIRCUMFERENCE) * width;
+    const half = Math.min(28, Math.max(14, height * 0.16));
+    let copies = 0;
+    for (const offset of [-width, 0, width]) {
+      const x = sourceX + offset;
+      if (x + spin < 0 || x - anti > width) continue;
+      copies++;
+      g.beginPath();
+      g.moveTo(x - anti, sourceY);
+      g.lineTo(x - anti * 0.72, sourceY - half * 0.55);
+      g.lineTo(x, sourceY - half);
+      g.lineTo(x + spin * 0.72, sourceY - half * 0.55);
+      g.lineTo(x + spin, sourceY);
+      g.lineTo(x + spin * 0.72, sourceY + half * 0.55);
+      g.lineTo(x, sourceY + half);
+      g.lineTo(x - anti * 0.72, sourceY + half * 0.55);
+      g.closePath();
+      g.fillStyle = 'rgba(240,130,30,0.16)';
+      g.fill();
+      g.strokeStyle = 'rgba(255,190,105,0.9)';
+      g.lineWidth = 2;
+      g.setLineDash([8, 4]);
+      g.stroke();
+      g.setLineDash([]);
+      g.strokeStyle = '#fff0cc';
+      g.beginPath();
+      g.moveTo(x - 7, sourceY);
+      g.lineTo(x + 7, sourceY);
+      g.moveTo(x, sourceY - 7);
+      g.lineTo(x, sourceY + 7);
+      g.stroke();
+    }
+
+    g.font = '600 14px Rajdhani, sans-serif';
+    g.fillStyle = '#ffd9a3';
+    g.textBaseline = 'top';
+    g.fillText(`◀ ANTI LONG ${formatRange(profile.antispinward)}`, wrapCanvasX(sourceX - anti + 8, width), 6);
+    g.textAlign = 'right';
+    g.fillText(`SPIN ${formatRange(profile.spinward)} ▶`, wrapCanvasX(sourceX + spin - 8, width), 6);
+    g.textAlign = 'left';
+
+    this.map.dataset.artilleryOverlay = 'directional';
+    this.map.dataset.spinwardRange = profile.spinward.toFixed(0);
+    this.map.dataset.antispinwardRange = profile.antispinward.toFixed(0);
+    this.map.dataset.wrapCopies = String(copies);
+    this.map.setAttribute(
+      'aria-label',
+      minimapAriaLabel(
+        `Ring minimap. Directional artillery range: antispinward ${formatRange(profile.antispinward)}, ` +
+        `spinward ${formatRange(profile.spinward)}. Antispinward equals long shot.`,
+      ),
+    );
   }
 
   private drawEnd(world: World, player: Faction): void {
@@ -623,4 +934,38 @@ function button(cls: string): HTMLButtonElement {
 /** Shortest signed screen-space delta, used for minimap camera boxes. */
 export function mapDelta(a: number, b: number): number {
   return deltaS(a, b);
+}
+
+function formatRange(metres: number): string {
+  return `${(metres / 1000).toFixed(1)} km`;
+}
+
+function wrapCanvasX(x: number, width: number): number {
+  return ((x % width) + width) % width;
+}
+
+export function ballisticFireMessage(result: BallisticFireResult): string {
+  switch (result.reason) {
+    case 'match-ended': return 'MATCH ENDED';
+    case 'invalid-source': return 'INVALID ARTILLERY SOURCE';
+    case 'longbow-not-deployed': return 'LONG BOW MUST DEPLOY';
+    case 'longbow-transitioning': return 'LONG BOW MUST FINISH DEPLOYING';
+    case 'reloading': return `RELOADING — ${(result.remainingSeconds ?? 0).toFixed(1)}s`;
+    case 'insufficient-power':
+      return `NEED ${formatPower(result.requiredPower)} POWER — ${formatPower(result.availablePower)} AVAILABLE`;
+    case 'outside-sensor-range': return 'NO SENSOR COVERAGE';
+    case 'sensor-los-blocked': return 'SENSOR LOS BLOCKED';
+    case 'no-ballistic-solution': return 'NO VALID TRAJECTORY FROM THIS SIDE';
+    case 'success': return 'READY TO FIRE';
+  }
+}
+
+function minimapAriaLabel(description: string): string {
+  return `${description} Arrow keys move camera focus. Enter centers or fires. M moves selected units. ` +
+    'A attack-moves selected units. Escape cancels artillery targeting.';
+}
+
+function formatPower(value: number | undefined): string {
+  const safe = value ?? 0;
+  return Number.isInteger(safe) ? safe.toFixed(0) : safe.toFixed(1);
 }

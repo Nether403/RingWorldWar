@@ -9,6 +9,7 @@ import {
 } from '@core/constants';
 import { deltaS } from '@core/ringMath';
 import {
+  directionalReachProfile,
   inertialToRing,
   inertialToRingVelocity,
   isWithinDragAimEnvelope,
@@ -22,6 +23,7 @@ import {
   type RingPoint,
   type RingVelocity,
 } from '@sim/ballistics';
+import { WEAPONS } from '@sim/data';
 
 const origin: RingPoint = { s: 0, h: 2, z: 0 };
 
@@ -155,6 +157,21 @@ describe('aim solver', () => {
 
     expect(trajectoryImpact(origin, velocity, 0, options)).toEqual(path[path.length - 1]);
   });
+});
+
+describe('directional reach profile', () => {
+  for (const weaponId of ['batteryGun', 'siegeMortar'] as const) {
+    it(`reports a deterministic antispinward advantage for ${weaponId}`, () => {
+      const speed = WEAPONS[weaponId].launchSpeed!;
+      const first = directionalReachProfile(origin, speed);
+      const second = directionalReachProfile(origin, speed);
+
+      expect(second).toEqual(first);
+      expect(first.spinward).toBeGreaterThan(0);
+      expect(first.antispinward).toBeGreaterThan(first.spinward * 1.5);
+      expect(first.antispinward).toBeLessThan(RING_CIRCUMFERENCE / 2);
+    });
+  }
 });
 
 describe('world dimension sanity', () => {

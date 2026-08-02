@@ -1,0 +1,55 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "heavy-combat",
+  "revision": 1,
+  "worldSeed": 20260802,
+  "quality": "low",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 90, "visualTimeSeconds": 92, "settlingFrames": 3 },
+  "camera": { "focusS": 3200, "focusZ": 0, "yawRadians": -0.12, "zoom": 500 },
+  "setup": {
+    "units": [
+      { "id": "c01", "faction": "compact", "kind": "vanguard", "s": 3060, "z": -120, "yawRadians": 0, "target": "h01" },
+      { "id": "c02", "faction": "compact", "kind": "vanguard", "s": 3070, "z": -70, "yawRadians": 0, "target": "h02" },
+      { "id": "c03", "faction": "compact", "kind": "vanguard", "s": 3080, "z": -20, "yawRadians": 0, "target": "h03" },
+      { "id": "c04", "faction": "compact", "kind": "vanguard", "s": 3070, "z": 40, "yawRadians": 0, "target": "h04" },
+      { "id": "c05", "faction": "compact", "kind": "aegis", "s": 3020, "z": -95, "yawRadians": 0, "target": "h05" },
+      { "id": "c06", "faction": "compact", "kind": "aegis", "s": 3030, "z": -35, "yawRadians": 0, "target": "h06" },
+      { "id": "c07", "faction": "compact", "kind": "aegis", "s": 3030, "z": 25, "yawRadians": 0, "target": "h07" },
+      { "id": "c08", "faction": "compact", "kind": "longbow", "s": 2950, "z": -80, "yawRadians": 0, "target": "h08" },
+      { "id": "c09", "faction": "compact", "kind": "longbow", "s": 2960, "z": 0, "yawRadians": 0, "target": "h09" },
+      { "id": "c10", "faction": "compact", "kind": "wisp", "s": 3120, "z": 95, "yawRadians": 0, "target": "h10" },
+      { "id": "c11", "faction": "compact", "kind": "vanguard", "s": 3050, "z": 100, "yawRadians": 0, "target": "h11" },
+      { "id": "c12", "faction": "compact", "kind": "wisp", "s": 3110, "z": -150, "yawRadians": 0, "target": "h12" },
+      { "id": "h01", "faction": "choir", "kind": "vanguard", "s": 3340, "z": -120, "yawRadians": 3.141592653589793, "target": "c01" },
+      { "id": "h02", "faction": "choir", "kind": "vanguard", "s": 3330, "z": -70, "yawRadians": 3.141592653589793, "target": "c02" },
+      { "id": "h03", "faction": "choir", "kind": "vanguard", "s": 3320, "z": -20, "yawRadians": 3.141592653589793, "target": "c03" },
+      { "id": "h04", "faction": "choir", "kind": "vanguard", "s": 3330, "z": 40, "yawRadians": 3.141592653589793, "target": "c04" },
+      { "id": "h05", "faction": "choir", "kind": "aegis", "s": 3380, "z": -95, "yawRadians": 3.141592653589793, "target": "c05" },
+      { "id": "h06", "faction": "choir", "kind": "aegis", "s": 3370, "z": -35, "yawRadians": 3.141592653589793, "target": "c06" },
+      { "id": "h07", "faction": "choir", "kind": "aegis", "s": 3370, "z": 25, "yawRadians": 3.141592653589793, "target": "c07" },
+      { "id": "h08", "faction": "choir", "kind": "longbow", "s": 3450, "z": -80, "yawRadians": 3.141592653589793, "target": "c08" },
+      { "id": "h09", "faction": "choir", "kind": "longbow", "s": 3440, "z": 0, "yawRadians": 3.141592653589793, "target": "c09" },
+      { "id": "h10", "faction": "choir", "kind": "wisp", "s": 3280, "z": 95, "yawRadians": 3.141592653589793, "target": "c10" },
+      { "id": "h11", "faction": "choir", "kind": "vanguard", "s": 3350, "z": 100, "yawRadians": 3.141592653589793, "target": "c11" },
+      { "id": "h12", "faction": "choir", "kind": "wisp", "s": 3290, "z": -150, "yawRadians": 3.141592653589793, "target": "c12" }
+    ],
+    "structures": [
+      { "id": "c-battery", "faction": "compact", "kind": "rocketBattery", "s": 2870, "z": -130, "progress": 1, "yawRadians": 0 },
+      { "id": "c-grid", "faction": "compact", "kind": "laserGrid", "s": 2910, "z": 130, "progress": 1, "yawRadians": 0 },
+      { "id": "c-pd", "faction": "compact", "kind": "pointDefense", "s": 2990, "z": 155, "progress": 1, "yawRadians": 0 },
+      { "id": "h-battery", "faction": "choir", "kind": "rocketBattery", "s": 3530, "z": 130, "progress": 1, "yawRadians": 3.141592653589793 },
+      { "id": "h-grid", "faction": "choir", "kind": "laserGrid", "s": 3490, "z": -130, "progress": 1, "yawRadians": 3.141592653589793 },
+      { "id": "h-pd", "faction": "choir", "kind": "pointDefense", "s": 3410, "z": -155, "progress": 1, "yawRadians": 3.141592653589793 }
+    ]
+  },
+  "observationRegions": [
+    { "id": "sky", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.35 },
+    { "id": "ground", "kind": "ground", "x": 0, "y": 0.35, "width": 1, "height": 0.65 },
+    { "id": "units", "kind": "unit", "x": 0.18, "y": 0.38, "width": 0.64, "height": 0.44 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.82, "width": 1, "height": 0.18 }
+  ],
+  "benchmark": { "warmupSeconds": 3, "sampleSeconds": 30 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 28, "minimumStructures": 10, "maximumContextLosses": 0 }
+}

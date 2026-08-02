@@ -10,10 +10,11 @@ A real-time strategy game on the inner surface of a rotating ring megastructure.
 - **Shadow squares:** an inner ring of panels casts moving day/night bands across the surface. Night matters: solar power drops, sensor ranges shrink, rocket launches are easier to spot (visible plumes).
 - **Terrain:** ruined megastructure districts, scrith plains, breach scars (holes to space, impassable), overgrown arcologies. Terrain provides cover, chokepoints, and salvage.
 
-## 3. Factions (vertical slice: 2, mechanically symmetric)
-- **The Meridian Compact** — militarized ring-born successors. Visual identity: amber/orange, angular plating, banners, kinetic brutality.
-- **The Axiom Choir** — machine-cult ascendants. Visual identity: cyan/white, smooth composite shells, holographics, drone swarms (cosmetic).
-Post-slice, factions diverge mechanically (Compact: cheaper artillery, tougher mechs; Choir: better sensors/interception, faster deployment).
+## 3. Factions (2, mechanically asymmetric)
+- **The Meridian Compact** — a coalition of permanent arc-cities and civil, industrial, and military institutions. Visual identity: amber/orange, angular plating, banners, kinetic brutality. Implemented doctrine: tougher mechs and cheaper ballistic structures.
+- **The Axiom Choir** — a mobile society descended from maintenance, sensor, and machine-integrated communities. Visual identity: cyan/white, smooth composite shells, holographics, drone swarms. Implemented doctrine: stronger vision and faster construction or production.
+
+Both factions include biological and machine people. Further roster, silhouette, and ring-system differentiation remains future work.
 
 ## 4. Core Loop
 ```
@@ -98,5 +99,5 @@ Difficulty tiers adjust reaction time, intel usage, and doctrine variety — nev
 - RTS standard: edge/MMB pan, wheel zoom (zoom out far enough and the camera tilts to reveal the ring arc — the "strategy postcard" shot), ctrl-groups, tab subselect.
 - `V` — takeover selected mech · `Esc` — back to tactical · `Space` — jump to last alert.
 
-## 12. Out of Scope (vertical slice)
-Multiplayer netcode, campaign/story missions, >1 map, faction asymmetry, replays, mod support, mobile/touch. All are architected-for (determinism, data-driven unit defs) but not built.
+## 12. Out of Scope (current skirmish)
+Multiplayer netcode, campaign/story missions, >1 map, faction-exclusive rosters, replays, mod support, and mobile/touch. All are architected-for where applicable, but not built.

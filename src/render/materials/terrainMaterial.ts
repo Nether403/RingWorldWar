@@ -32,6 +32,88 @@ export interface TerrainUniforms {
   uDetailFade: { value: number };
 }
 
+export function makeLowTerrainMaterial(uniforms: TerrainUniforms): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+      ...uniforms,
+      uHalfWidth: { value: RING_HALF_WIDTH },
+      uPanelSpacing: { value: (Math.PI * 2) / SHADOW_SQUARE_COUNT },
+    },
+    fog: true,
+    dithering: true,
+    vertexShader: /* glsl */ `
+      attribute vec2 aSurface;
+      varying vec2 vSurface;
+      varying float vSlope;
+      varying float vTheta;
+      varying float vLight;
+      #include <fog_pars_vertex>
+      void main() {
+        vSurface = aSurface;
+        vec2 fromAxis = vec2(position.x, position.y - ${RING_RADIUS.toFixed(1)});
+        vec3 localUp = normalize(vec3(-fromAxis, 0.0));
+        vec3 objectNormal = normalize(normal);
+        vSlope = 1.0 - clamp(dot(objectNormal, localUp), 0.0, 1.0);
+        vTheta = atan(position.x, ${RING_RADIUS.toFixed(1)} - position.y);
+        vLight = 0.68 + 0.32 * max(dot(objectNormal, normalize(vec3(0.24, 0.94, 0.18))), 0.0);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uPanelPhase;
+      uniform float uPanelSpan;
+      uniform float uPanelSpacing;
+      uniform float uHalfWidth;
+      uniform vec3 uAmbientTint;
+      varying vec2 vSurface;
+      varying float vSlope;
+      varying float vTheta;
+      varying float vLight;
+      #include <common>
+      #include <fog_pars_fragment>
+      #include <dithering_pars_fragment>
+
+      float lowHash(vec2 p) {
+        p = fract(p * vec2(123.34, 456.21));
+        p += dot(p, p + 45.32);
+        return fract(p.x * p.y);
+      }
+      float lowNoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(lowHash(i), lowHash(i + vec2(1.0, 0.0)), u.x),
+          mix(lowHash(i + vec2(0.0, 1.0)), lowHash(i + 1.0), u.x), u.y);
+      }
+      float lowGrid(vec2 p, float width) {
+        vec2 g = abs(fract(p) - 0.5);
+        return 1.0 - smoothstep(0.0, width, 0.5 - max(g.x, g.y));
+      }
+      void main() {
+        float region = lowNoise(vSurface * 0.00055 + 17.0);
+        float district = 0.5 + 0.5 * sin(vSurface.x * 0.0017 + sin(vSurface.y * 0.006));
+        vec3 dust = mix(vec3(0.145, 0.142, 0.132), vec3(0.275, 0.242, 0.184), region);
+        vec3 albedo = mix(dust, vec3(0.105, 0.112, 0.125), clamp(vSlope * 2.3, 0.0, 0.78));
+        albedo *= mix(0.68, 1.42, smoothstep(0.24, 0.76, district));
+        float rim = smoothstep(0.80, 0.97, abs(vSurface.y) / uHalfWidth);
+        albedo = mix(albedo, vec3(0.184, 0.177, 0.165), rim);
+        albedo *= 1.0 - lowGrid(vSurface / 420.0, 0.008) * 0.25;
+        float rel = mod(vTheta - uPanelPhase, uPanelSpacing);
+        float d = min(rel, uPanelSpacing - rel);
+        float band = 1.0 - (1.0 - smoothstep(uPanelSpan * 0.55, uPanelSpan, d)) * 0.72;
+        vec3 outgoingLight = albedo * vLight * band + uAmbientTint * (1.0 - band) * 0.035;
+        gl_FragColor = vec4(outgoingLight, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        #include <fog_fragment>
+        #include <dithering_fragment>
+      }
+    `,
+  });
+}
+
 /** Shared GLSL: cheap value noise. Simplex is nicer but this is 3x faster and
  *  at these frequencies the difference is invisible under a PBR response. */
 const NOISE_GLSL = /* glsl */ `
@@ -94,11 +176,11 @@ const NOISE_GLSL = /* glsl */ `
   }
 `;
 
-export function makeTerrainMaterial(): {
+export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
   material: THREE.MeshStandardMaterial;
   uniforms: TerrainUniforms;
 } {
-  const uniforms: TerrainUniforms = {
+  const uniforms: TerrainUniforms = sharedUniforms ?? {
     uTime: { value: 0 },
     uPanelPhase: { value: 0 },
     uPanelSpan: { value: 0.19 },
@@ -187,7 +269,7 @@ export function makeTerrainMaterial(): {
         float slope = 1.0 - clamp(dot(normalize(vNormal), normalize(vLocalUp)), 0.0, 1.0);
         float rimT = smoothstep(0.80, 0.97, abs(su.y) / uHalfWidth);
 
-        // --- Per-layer detail heights -------------------------------------
+         // --- Per-layer detail heights -------------------------------------
         float nBig    = rww_fbm(su * 0.0026, 4);
         float nMid    = rww_fbm(su * 0.021, 4);
         float nFine   = rww_fbm(su * 0.15, 3);

@@ -1,0 +1,75 @@
+{
+  "schema": "rww.tracked-performance-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-02T10:46:40.081Z",
+  "status": "pass",
+  "scenario": {
+    "id": "heavy-combat",
+    "revision": 1,
+    "schema": "rww.browser-scenario",
+    "version": 1,
+    "path": "validation/scenarios/heavy-combat.json",
+    "sha256": "fc28d6ea84b4c4c6a5c435514d517d4aedc542e54bb97e882221a58ff2a86025"
+  },
+  "target": {
+    "id": "t480s-low-candidate",
+    "path": "validation/hardware/t480s-low.json",
+    "sha256": "1578c7fad49766717878aae90950c6e4080b8329b3703f61b36e2af9c9866512",
+    "budget": "720p-low-hard-candidate",
+    "classification": "candidate-hard",
+    "verdict": "pass",
+    "failures": []
+  },
+  "environment": {
+    "os": "Windows 10.0.26220 x64",
+    "cpu": "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz",
+    "logicalCpus": 8,
+    "ramBytes": 25600958464,
+    "browser": "Chromium 151.0.7922.34",
+    "renderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "softwareRenderer": false,
+    "webgl2": true,
+    "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+    "quality": "low",
+    "adaptiveQuality": false
+  },
+  "measurement": {
+    "warmupSeconds": 3,
+    "sampleSeconds": 5,
+    "samples": 301,
+    "frameMilliseconds": { "median": 16.7, "p95": 16.8, "p99": 16.8 },
+    "renderMilliseconds": { "median": 1.7, "p95": 3.3, "p99": 4.6 },
+    "simulationMilliseconds": { "median": 0.4, "p95": 0.6, "p99": 1.3 },
+    "fullFrameMilliseconds": { "median": 3, "p95": 5.3, "p99": 8 },
+    "over100MillisecondsCount": 0,
+    "over100MillisecondsPerMinute": 0,
+    "drawCalls": 63,
+    "triangles": 114736,
+    "geometries": 47,
+    "textures": 2,
+    "programs": 15,
+    "contextLosses": 0,
+    "blackFrame": false,
+    "liveUnits": 30,
+    "liveStructures": 15,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  "artifacts": {
+    "reportSha256": "b7094ca057077a37be2f56e7fa8bc8d706195b6a7e60b950f638a9d6d5dfaf0c",
+    "sourceArtifact": "output/runs/20260802T104640.081Z-5792-e4c78fa6/artifacts/browser-heavy.json",
+    "sourceReceipt": "output/runs/20260802T104640.081Z-5792-e4c78fa6/receipt.json",
+    "sourceReceiptSha256": "f4f9188f77e66cf280c7bd01c907bd75923249edc41828a6edb3ceb2ca618dc9"
+  },
+  "code": {
+    "sha": "c3af807e4f31c69a312ec710a5b080497e30ea0f",
+    "sourceBaseSha": "c3af807e4f31c69a312ec710a5b080497e30ea0f",
+    "branch": "master",
+    "dirty": true,
+    "trackedPatchSha256": "33e50452fd7a0ac435d65217cc80428ff2c1186a0780edd04baac43ae1902e8d",
+    "untrackedSourceManifestSha256": "8d95daa28ab94f49161d2185c957881583a3df51ea46e86acc5aa2ec9742e1ec",
+    "untrackedSourceCount": 35,
+    "untrackedSourceExclusions": ["validation/evidence/**"],
+    "caveat": "Dirty source is content-addressed by the tracked patch and untracked-source manifest digests; validation/evidence is excluded to avoid self-reference."
+  }
+}

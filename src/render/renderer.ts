@@ -22,6 +22,8 @@ export interface QualitySettings {
   drawDistance: number;
   /** Maximum live effect particles. */
   particleCap: number;
+  /** Maximum pooled explosion lights participating in PBR shading. */
+  effectLightCap: number;
   /** The stable direct renderer deliberately has no post-processing path. */
   postProcessingLevel: 'none';
 }
@@ -34,6 +36,7 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     detailFade: 0.4,
     drawDistance: 8_000,
     particleCap: 225,
+    effectLightCap: 2,
     postProcessingLevel: 'none',
   },
   medium: {
@@ -43,6 +46,7 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     detailFade: 0.8,
     drawDistance: 12_000,
     particleCap: 450,
+    effectLightCap: 8,
     postProcessingLevel: 'none',
   },
   high: {
@@ -52,6 +56,7 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     detailFade: 1,
     drawDistance: 18_000,
     particleCap: 675,
+    effectLightCap: 14,
     postProcessingLevel: 'none',
   },
   ultra: {
@@ -61,6 +66,7 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     detailFade: 1,
     drawDistance: 26_000,
     particleCap: 900,
+    effectLightCap: 14,
     postProcessingLevel: 'none',
   },
 };

@@ -1,5 +1,7 @@
 # Spec: Ring World War
 
+> **Current status and sequencing:** See `docs/roadmap.md`. This specification defines the product contract; it is not the authoritative progress tracker.
+
 ## Objective
 A browser-based 3D real-time strategy game set on the inner surface of a ring-shaped megastructure. Two factions wage war across the curve of the ring: players build bases, extract resources, fire rockets whose trajectories bend with the ring's spin physics, and deploy battle mechs they can optionally pilot directly. Single-player vs AI first, architected for future multiplayer.
 
@@ -10,7 +12,7 @@ A browser-based 3D real-time strategy game set on the inner surface of a ring-sh
 **Signature differentiators:**
 1. The enemy is visible *in the sky* — the ring curves up, so distant territory hangs overhead.
 2. Rocket trajectories obey ring physics: Coriolis drift makes spinward and antispinward shots behave differently.
-3. The map wraps — there is no map edge in the ring direction; flanking goes all the way around.
+3. The map wraps — there is no map edge in the ring direction; flanking goes all the way around. Antispinward is the authoritative long-range artillery direction.
 
 ## Tech Stack
 - **Language:** TypeScript (strict mode)
@@ -40,7 +42,7 @@ Typecheck: npm run typecheck       # tsc --noEmit
 ```
 docs/              → Design docs (this spec, GDD, art direction, architecture)
 tasks/             → plan.md and todo.md (development plan + task list)
-public/            → Static assets served as-is (compressed textures, models, audio)
+public/            → Static web files only; no binary art, model, texture, or audio assets
 src/
   core/            → Engine-agnostic utilities: math (ring-space), events, RNG
   sim/             → Deterministic game simulation (world, navigation, ballistics; no Three.js imports)
@@ -88,7 +90,7 @@ Conventions:
 - **Never:** commit secrets or API keys; **add any binary art/audio/model asset to the repo**; import Three.js inside `src/sim/`; delete or skip the determinism test to make CI green.
 
 ## Success Criteria (vertical slice)
-- [x] One complete 22.6 km ring map, 2 factions, and a playable skirmish vs AI with a 45-minute hard cap.
+- [x] One complete 22.6 km ring map, 2 mechanically asymmetric factions, and a playable skirmish vs AI with a 45-minute hard cap.
 - [x] Full core loop works: extract salvage and generate power → build structures → produce units → fire rockets → deploy mechs → destroy enemy Bastion → win/lose screen.
 - [x] Rockets visibly arc with ring curvature; spinward vs antispinward shots land differently; targeting guidance explains the long-range direction.
 - [x] Player can take direct control of any mech (WASD + mouse aim) and return to tactical camera seamlessly.
@@ -97,7 +99,7 @@ Conventions:
 - [x] Determinism test passes: identical seeds → identical outcomes.
 
 ## Open Questions
-- Faction identity: symmetric factions with cosmetic differences (cheaper to balance) vs asymmetric mechanics (more interesting)? Vertical slice assumes **symmetric with distinct visual identity**.
-- Audio direction: licensed music vs generative/ambient? Deferred to Phase 4.
+- Further faction differentiation: mechanical asymmetry is implemented; distinct silhouettes, faction-specific rosters, and deeper doctrine differences remain open.
+- Audio direction within the procedural-only rule: synthesized score vs generative ambience? Deferred to Phase 4.
 - WebGPU renderer adoption timing — revisit when Three.js WebGPU path is stable for our post stack.
 - Multiplayer model when it comes: deterministic lockstep (cheap bandwidth, needs perfect determinism) vs state sync. Architecture bets on lockstep.

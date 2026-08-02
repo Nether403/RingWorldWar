@@ -1,0 +1,41 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "directional-artillery",
+  "revision": 1,
+  "worldSeed": 20260802,
+  "quality": "low",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 24, "visualTimeSeconds": 18, "settlingFrames": 3 },
+  "camera": { "focusS": 180, "focusZ": 0, "yawRadians": 0.08, "zoom": 360 },
+  "setup": {
+    "disableAi": true,
+    "units": [
+      {
+        "id": "compact-longbow",
+        "faction": "compact",
+        "kind": "longbow",
+        "s": 180,
+        "z": 0,
+        "yawRadians": 3.141592653589793,
+        "selected": true,
+        "abilityActive": true,
+        "abilityTransitionTimer": 0,
+        "weaponCooldowns": [0]
+      },
+      { "id": "compact-spotter", "faction": "compact", "kind": "wisp", "s": 20940, "z": 40, "yawRadians": 3.141592653589793 },
+      { "id": "choir-target", "faction": "choir", "kind": "vanguard", "s": 20880, "z": 0, "yawRadians": 0 }
+    ],
+    "structures": [
+      { "id": "compact-forward-radar", "faction": "compact", "kind": "radarMast", "s": 20940, "z": 120, "progress": 1 },
+      { "id": "compact-fire-support-power", "faction": "compact", "kind": "fusionCore", "s": 480, "z": 300, "progress": 1 }
+    ]
+  },
+  "observationRegions": [
+    { "id": "sky", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.38 },
+    { "id": "ground", "kind": "ground", "x": 0, "y": 0.38, "width": 1, "height": 0.44 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.82, "width": 1, "height": 0.18 }
+  ],
+  "benchmark": { "warmupSeconds": 2, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 8, "minimumStructures": 7, "maximumContextLosses": 0 }
+}

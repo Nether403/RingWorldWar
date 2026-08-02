@@ -19,13 +19,13 @@ import {
   WEAPONS,
   type StructureKind,
 } from '@sim/data';
-import { World } from '@sim/world';
+import { World, type BallisticFireResult } from '@sim/world';
 import type { TrajectorySample } from '@sim/ballistics';
 import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
 import { EntityRenderer } from '@render/entityRenderer';
 import { Effects } from '@render/effects';
-import { Hud } from '@ui/hud';
+import { ballisticFireMessage, Hud } from '@ui/hud';
 import { Markers } from '@render/markers';
 
 export const PLAYER: Faction = Faction.Compact;
@@ -44,17 +44,27 @@ export class Game {
   readonly markers: Markers;
   readonly hud: Hud;
   private ai: AiOpponent;
+  private aiEnabled = true;
 
   selection = new Set<number>();
   /** Ground point under the cursor, in surface coordinates. */
   cursor = { s: 0, z: 0, valid: false };
   trajectoryPreview: TrajectorySample[] | null = null;
+  artilleryResult: BallisticFireResult | null = null;
   private artillerySourceId = 0;
   private artilleryWeaponId = '';
   private directUnitId = 0;
   private readonly controlGroups = new Map<number, number[]>();
   private previewDirty = false;
   private previewCooldown = 0;
+  private artilleryInspection: {
+    targetS: number;
+    targetZ: number;
+    sourceS: number;
+    sourceZ: number;
+    geometryChecked: boolean;
+    geometryValid: boolean;
+  } | null = null;
   /** Duration of the most recent fixed simulation step, excluding AI work. */
   simStepMs = 0;
 
@@ -80,8 +90,21 @@ export class Game {
     this.markers = new Markers();
     this.hud = new Hud();
 
-    this.hud.onMinimapClick = (s, z) => {
-      this.rig.setFocus(s, z);
+    this.hud.onMinimapPointer = (s, z) => this.updateCursor(s, z);
+    this.hud.onMinimapCamera = (s, z) => this.rig.setFocus(s, z);
+    this.hud.onMinimapPrimary = (s, z) => {
+      if (this.artilleryTargeting) this.fireArtilleryTarget(s, z);
+      else this.rig.setFocus(s, z);
+    };
+    this.hud.onMinimapSecondary = (s, z, attackMove) => {
+      if (this.artilleryTargeting) this.cancelArtilleryTarget();
+      else this.issueOrder(s, z, attackMove);
+    };
+    this.hud.onMinimapMove = (s, z, attackMove) => this.issueOrder(s, z, attackMove);
+    this.hud.onMinimapCancel = () => {
+      if (!this.artilleryTargeting) return false;
+      this.cancelArtilleryTarget();
+      return true;
     };
     this.hud.onArtilleryTarget = (sourceId, weaponId) => this.beginArtilleryTarget(sourceId, weaponId);
     this.hud.onAbilityToggle = (unitId) => this.toggleAbility(unitId);
@@ -96,32 +119,20 @@ export class Game {
 
   update(dt: number, time: number): void {
     this.previewCooldown = Math.max(0, this.previewCooldown - dt);
-    if (this.artillerySourceId && this.cursor.valid && this.previewDirty && this.previewCooldown === 0) {
-      this.trajectoryPreview = this.world.previewBallistic(
-        this.artillerySourceId,
-        this.cursor.s,
-        this.cursor.z,
-        PLAYER,
-        this.artilleryWeaponId,
-      );
-      this.previewDirty = false;
-      this.previewCooldown = 0.1;
-    }
     // Fixed-timestep simulation. Capped so that a long stall (an alt-tab, a
     // shader compile) cannot trigger a death spiral of catch-up ticks.
     this.acc += dt;
     let steps = 0;
     let simStepTotal = 0;
     while (this.acc >= SIM_DT && steps < 6) {
-      const stepStart = performance.now();
-      this.world.step();
-      simStepTotal += performance.now() - stepStart;
-      this.ai.update(this.world, SIM_DT);
+      simStepTotal += this.fixedSimulationStep();
       this.acc -= SIM_DT;
       steps++;
     }
     if (steps > 0) this.simStepMs = simStepTotal / steps;
     if (steps === 6) this.acc = 0;
+
+    this.refreshArtilleryInspection();
 
     const events = this.world.drainEvents();
     this.effects.consume(events, this.world, this.anchor, PLAYER);
@@ -138,17 +149,45 @@ export class Game {
       PLAYER,
       this.trajectoryPreview,
       this.artilleryTargeting,
+      this.artilleryResult,
       this.rig.camera,
     );
-    this.hud.update(dt, this.world, PLAYER, this.selection, this.rig.s, this.rig.z);
+    this.hud.update(
+      dt,
+      this.world,
+      PLAYER,
+      this.selection,
+      this.rig.s,
+      this.rig.z,
+      this.artilleryTargeting,
+      this.artilleryResult,
+    );
 
     // Drop dead entities from the selection so the panel does not show ghosts.
     for (const id of [...this.selection]) {
       if (!this.world.unitById(id) && !this.world.structureById(id)) this.selection.delete(id);
     }
-    if (this.artillerySourceId && !this.world.structureById(this.artillerySourceId)) {
-      this.cancelArtilleryTarget();
-    }
+  }
+
+  /** Advances the same fixed simulation/controller step used by update(). */
+  stepSimulationExactlyOnce(): void {
+    this.fixedSimulationStep();
+  }
+
+  private fixedSimulationStep(): number {
+    const stepStart = performance.now();
+    this.world.step();
+    const elapsed = performance.now() - stepStart;
+    if (this.aiEnabled) this.ai.update(this.world, SIM_DT);
+    return elapsed;
+  }
+
+  setAiEnabled(enabled: boolean): void {
+    this.aiEnabled = enabled;
+  }
+
+  get isAiEnabled(): boolean {
+    return this.aiEnabled;
   }
 
   /** Called after the anchor re-bases, so render-space effects follow it. */
@@ -339,52 +378,175 @@ export class Game {
 
   beginArtilleryTarget(sourceId: number, weaponId?: string): void {
     if (this.world.status === 'completed') return;
-    const source = this.world.structureById(sourceId);
+    const unit = this.world.unitById(sourceId);
+    const structure = unit ? undefined : this.world.structureById(sourceId);
+    const source = unit ?? structure;
     if (!source || source.faction !== PLAYER) return;
-    const selectedWeapon = weaponId ?? STRUCTURES[source.kind].weapons.find((id) => WEAPONS[id]?.kind === 'ballistic');
-    if (!selectedWeapon || !STRUCTURES[source.kind].weapons.includes(selectedWeapon)) return;
+    const weapons = unit ? UNITS[unit.kind].weapons : STRUCTURES[structure!.kind].weapons;
+    const selectedWeapon = weaponId ?? weapons.find((id) => WEAPONS[id]?.kind === 'ballistic');
+    if (!selectedWeapon || !weapons.includes(selectedWeapon)) return;
     if (WEAPONS[selectedWeapon]?.kind !== 'ballistic') return;
     this.hud.placing = null;
     this.artillerySourceId = sourceId;
     this.artilleryWeaponId = selectedWeapon;
     this.trajectoryPreview = null;
+    this.artilleryResult = null;
+    this.artilleryInspection = null;
     this.previewDirty = true;
+    this.previewCooldown = 0;
     this.hud.alert(
       WEAPONS[selectedWeapon]?.flightMode === 'chord'
         ? 'Choose a target - Chord Shot can blind-fire anywhere on the ring'
-        : 'Choose a spotted target - antispinward carries farther; click to fire',
+        : 'Choose a target - trajectory is a preview; sensor and firing checks remain authoritative',
     );
     if (this.cursor.valid) this.updateCursor(this.cursor.s, this.cursor.z);
   }
 
   updateCursor(s: number, z: number): void {
-    this.cursor.s = s;
-    this.cursor.z = z;
+    const nextS = wrapS(s);
+    const nextZ = clamp(z, -RING_HALF_WIDTH + 40, RING_HALF_WIDTH - 40);
+    const moved = !this.cursor.valid || this.cursor.s !== nextS || this.cursor.z !== nextZ;
+    this.cursor.s = nextS;
+    this.cursor.z = nextZ;
     this.cursor.valid = true;
-    if (this.artillerySourceId) this.previewDirty = true;
+    if (this.artillerySourceId && moved) {
+      this.trajectoryPreview = null;
+      this.artilleryResult = null;
+      this.artilleryInspection = null;
+      this.previewDirty = true;
+    }
+  }
+
+  invalidateCursor(): void {
+    if (!this.cursor.valid) return;
+    this.cursor.valid = false;
+    if (!this.artillerySourceId) return;
+    this.trajectoryPreview = null;
+    this.artilleryResult = null;
+    this.artilleryInspection = null;
+    this.previewDirty = true;
   }
 
   fireArtilleryTarget(s: number, z: number): boolean {
     if (!this.artillerySourceId) return false;
+    this.updateCursor(s, z);
     const weaponId = this.artilleryWeaponId;
-    const fired = this.world.fireBallisticAt(this.artillerySourceId, s, z, PLAYER, weaponId);
+    const preflight = this.world.preflightBallisticCommand(
+      this.artillerySourceId,
+      this.cursor.s,
+      this.cursor.z,
+      PLAYER,
+      weaponId,
+    );
+    if (!preflight.ok) {
+      this.artilleryResult = preflight;
+      this.previewDirty = true;
+      this.hud.alert(ballisticFireMessage(preflight));
+      return false;
+    }
+    const result = this.world.fireBallisticCommand(
+      this.artillerySourceId,
+      this.cursor.s,
+      this.cursor.z,
+      PLAYER,
+      weaponId,
+    );
+    this.artilleryResult = result;
     const blindFire = WEAPONS[weaponId]?.flightMode === 'chord';
     this.hud.alert(
-      fired
+      result.ok
         ? blindFire ? 'Chord Shot away' : 'Rocket away'
-        : blindFire
-          ? 'Target unreachable or launcher reloading'
-          : 'Target unreachable, unspotted, or launcher reloading',
+        : ballisticFireMessage(result),
     );
-    if (fired) this.cancelArtilleryTarget();
-    return fired;
+    if (result.ok) this.cancelArtilleryTarget();
+    else this.previewDirty = true;
+    return result.ok;
   }
 
   cancelArtilleryTarget(): void {
     this.artillerySourceId = 0;
     this.artilleryWeaponId = '';
     this.trajectoryPreview = null;
+    this.artilleryResult = null;
+    this.artilleryInspection = null;
     this.previewDirty = false;
+  }
+
+  private refreshArtilleryInspection(): void {
+    if (!this.artillerySourceId) return;
+    const source = this.world.positionOf(this.artillerySourceId);
+    if (this.world.status === 'completed' || !source) {
+      this.cancelArtilleryTarget();
+      return;
+    }
+    if (!this.cursor.valid) return;
+
+    const cached = this.artilleryInspection;
+    const sameCoordinates = cached !== null &&
+      cached.targetS === this.cursor.s && cached.targetZ === this.cursor.z &&
+      cached.sourceS === source.s && cached.sourceZ === source.z;
+    if (!sameCoordinates && cached) {
+      this.trajectoryPreview = null;
+      this.artilleryResult = null;
+      this.artilleryInspection = null;
+      this.previewDirty = true;
+    }
+
+    const preflight = this.world.preflightBallisticCommand(
+      this.artillerySourceId,
+      this.cursor.s,
+      this.cursor.z,
+      PLAYER,
+      this.artilleryWeaponId,
+    );
+    if (sameCoordinates) {
+      if (preflight.sensorCoverage === false) {
+        this.trajectoryPreview = null;
+        this.artilleryInspection = null;
+        this.artilleryResult = preflight;
+        this.previewDirty = true;
+        return;
+      } else if (!preflight.ok) {
+        this.artilleryResult = preflight;
+      } else if (cached.geometryValid) {
+        this.artilleryResult = preflight;
+      } else if (cached.geometryChecked) {
+        this.artilleryResult = {
+          ...preflight,
+          ok: false,
+          reason: 'no-ballistic-solution',
+        };
+      } else {
+        this.artilleryResult = null;
+        this.previewDirty = true;
+      }
+    }
+
+    if (!this.previewDirty || this.previewCooldown > 0) return;
+    const inspection = this.world.inspectBallisticCommand(
+      this.artillerySourceId,
+      this.cursor.s,
+      this.cursor.z,
+      PLAYER,
+      this.artilleryWeaponId,
+    );
+    const trajectory = inspection.trajectory as TrajectorySample[] | null;
+    const geometryChecked = trajectory !== null ||
+      inspection.result.reason === 'no-ballistic-solution' ||
+      (inspection.result.reason !== 'outside-sensor-range' &&
+        (WEAPONS[this.artilleryWeaponId]?.flightMode === 'chord' || inspection.result.sensorCoverage === true));
+    this.trajectoryPreview = trajectory;
+    this.artilleryResult = inspection.result;
+    this.artilleryInspection = {
+      targetS: this.cursor.s,
+      targetZ: this.cursor.z,
+      sourceS: source.s,
+      sourceZ: source.z,
+      geometryChecked,
+      geometryValid: trajectory !== null,
+    };
+    this.previewDirty = false;
+    this.previewCooldown = 0.1;
   }
 
   toggleSelectedAbility(): boolean {
@@ -402,6 +564,7 @@ export class Game {
     if (changed) {
       this.hud.alert(`${abilityName(ability.id)} ${next ? 'activated' : 'deactivated'}`);
       this.hud.invalidate();
+      if (this.artillerySourceId === unit.id && this.cursor.valid) this.previewDirty = true;
     } else if (ability.cooldown > 0) {
       this.hud.alert(`${abilityName(ability.id)} cooldown: ${ability.cooldown.toFixed(1)}s`);
     } else {
@@ -586,6 +749,7 @@ export class Game {
     this.cancelArtilleryTarget();
     this.hud.placing = null;
     this.selection.clear();
+    this.hud.hideSelectionRectangle();
     this.hud.invalidate();
   }
 

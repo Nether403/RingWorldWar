@@ -125,24 +125,42 @@ test('keeps the ring surface visible in an ultrawide viewport', async ({ page })
   expect(Math.min(...Object.values(qualityVariances))).toBeGreaterThan(50);
 });
 
-test('releases render resources when the viewport is rebuilt', async ({ page }) => {
+test('keeps quality switching resource-bounded and restores the full-detail ring', async ({ page }) => {
   await page.evaluate(() => {
     window.requestAnimationFrame = () => 0;
   });
   await page.waitForTimeout(100);
-  const textureCounts = await page.evaluate(() => {
+  const samples = await page.evaluate(() => {
     const renderer = window.RWW!.renderer;
-    const counts = [renderer.gl.info.memory.textures];
-    const qualities = ['low', 'medium', 'high', 'ultra', 'medium', 'low'] as const;
+    let contextLosses = 0;
+    renderer.gl.domElement.addEventListener('webglcontextlost', () => { contextLosses++; });
+    const counts: Array<{ quality: string; textures: number; geometries: number; programs: number; triangles: number }> = [];
+    const qualities = ['low', 'high', 'ultra', 'medium', 'low', 'high', 'low'] as const;
     for (let i = 0; i < qualities.length; i++) {
       renderer.setQuality(qualities[i]!);
       renderer.resize(1100 + (i % 2) * 2, 640);
       renderer.render(1 / 60);
       renderer.gl.getContext().finish();
-      counts.push(renderer.gl.info.memory.textures);
+      counts.push({
+        quality: qualities[i]!,
+        textures: renderer.gl.info.memory.textures,
+        geometries: renderer.gl.info.memory.geometries,
+        programs: renderer.gl.info.programs?.length ?? 0,
+        triangles: renderer.gl.info.render.triangles,
+      });
     }
-    return counts;
+    return { counts, contextLosses };
   });
 
-  expect(Math.max(...textureCounts) - Math.min(...textureCounts)).toBeLessThanOrEqual(2);
+  expect(samples.contextLosses).toBe(0);
+  expect(Math.max(...samples.counts.map((item) => item.textures)) - Math.min(...samples.counts.map((item) => item.textures))).toBeLessThanOrEqual(2);
+  expect(Math.max(...samples.counts.map((item) => item.geometries)) - Math.min(...samples.counts.map((item) => item.geometries))).toBeLessThanOrEqual(1);
+  // Low and shadowed qualities intentionally compile different light/material
+  // variants. Once each variant is warm, repeated switches must plateau.
+  expect(Math.max(...samples.counts.map((item) => item.programs)) - Math.min(...samples.counts.map((item) => item.programs))).toBeLessThanOrEqual(12);
+  const warmedPrograms = samples.counts.slice(-3).map((item) => item.programs);
+  expect(Math.max(...warmedPrograms) - Math.min(...warmedPrograms)).toBe(0);
+  const lowTriangles = samples.counts.filter((item) => item.quality === 'low').map((item) => item.triangles);
+  const highTriangles = samples.counts.filter((item) => item.quality === 'high').map((item) => item.triangles);
+  expect(Math.max(...lowTriangles)).toBeLessThan(Math.min(...highTriangles) - 200_000);
 });

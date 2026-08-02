@@ -26,24 +26,40 @@ import {
 import type { Terrain } from '@gen/terrain';
 import { RIM_WALL_HEIGHT } from '@gen/terrain';
 import type { RenderAnchor } from './anchor';
-import { makeTerrainMaterial, type TerrainUniforms } from './materials/terrainMaterial';
+import { makeLowTerrainMaterial, makeTerrainMaterial, type TerrainUniforms } from './materials/terrainMaterial';
+import type { QualityLevel } from './renderer';
 
 /** Vertices around the ring. 1024 gives ~22 m spacing. */
 const SEG_S = 1024;
 /** Vertices across the ring's width. */
 const SEG_Z = 160;
+const LOW_SEG_S = 512;
+const LOW_SEG_Z = 64;
 
 export class RingMesh {
   readonly object = new THREE.Group();
   readonly mesh: THREE.Mesh;
   readonly uniforms: TerrainUniforms;
+  private readonly terrain: Terrain;
+  private readonly geometries = new Map<'low' | 'full', THREE.BufferGeometry>();
+  private readonly materials = new Map<'low' | 'full', THREE.Material>();
 
-  constructor(terrain: Terrain) {
+  constructor(terrain: Terrain, quality: QualityLevel = 'high') {
     this.object.name = 'ring';
+    this.terrain = terrain;
 
-    const geometry = buildRingGeometry(terrain);
-    const { material, uniforms } = makeTerrainMaterial();
+    const detail = quality === 'low' ? 'low' : 'full';
+    const geometry = buildRingGeometry(
+      terrain,
+      detail === 'low' ? LOW_SEG_S : SEG_S,
+      detail === 'low' ? LOW_SEG_Z : SEG_Z,
+    );
+    this.geometries.set(detail, geometry);
+    const { material: fullMaterial, uniforms } = makeTerrainMaterial();
     this.uniforms = uniforms;
+    const material = detail === 'low' ? makeLowTerrainMaterial(uniforms) : fullMaterial;
+    this.materials.set(detail, material);
+    if (detail === 'low') fullMaterial.dispose();
 
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.receiveShadow = true;
@@ -51,6 +67,28 @@ export class RingMesh {
     // The mesh is the whole world; it is never off screen.
     this.mesh.frustumCulled = false;
     this.object.add(this.mesh);
+  }
+
+  setQuality(quality: QualityLevel): void {
+    const detail = quality === 'low' ? 'low' : 'full';
+    let geometry = this.geometries.get(detail);
+    if (!geometry) {
+      geometry = buildRingGeometry(
+        this.terrain,
+        detail === 'low' ? LOW_SEG_S : SEG_S,
+        detail === 'low' ? LOW_SEG_Z : SEG_Z,
+      );
+      this.geometries.set(detail, geometry);
+    }
+    let material = this.materials.get(detail);
+    if (!material) {
+      material = detail === 'low'
+        ? makeLowTerrainMaterial(this.uniforms)
+        : makeTerrainMaterial(this.uniforms).material;
+      this.materials.set(detail, material);
+    }
+    this.mesh.geometry = geometry;
+    this.mesh.material = material;
   }
 
   /**
@@ -76,9 +114,7 @@ export class RingMesh {
  * genuinely closes into a torus-section: walk far enough spinward and you
  * arrive back where you started, upside down relative to where you began.
  */
-function buildRingGeometry(terrain: Terrain): THREE.BufferGeometry {
-  const cols = SEG_S;
-  const rows = SEG_Z;
+function buildRingGeometry(terrain: Terrain, cols: number, rows: number): THREE.BufferGeometry {
   const vertCount = cols * (rows + 1);
 
   const positions = new Float32Array(vertCount * 3);

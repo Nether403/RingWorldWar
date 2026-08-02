@@ -77,6 +77,61 @@ describe('World production invariants', () => {
   });
 });
 
+describe('World targeting work', () => {
+  it('validates indexed targets without resolving an unused terrain-height position', () => {
+    let heightQueries = 0;
+    const terrain = {
+      heightAt: () => {
+        heightQueries++;
+        return 0;
+      },
+      slopeAt: () => 0,
+      isBuildable: () => true,
+    } as unknown as Terrain;
+    const world = new World(terrain, 16);
+    const target = world.spawnUnit(Faction.Choir, 'vanguard', 100, 0);
+    target.revealed = 1;
+    const isValidTarget = (world as unknown as {
+      isValidTarget: (faction: Faction, id: number, s: number, z: number, range: number) => boolean;
+    }).isValidTarget.bind(world);
+
+    expect(isValidTarget(Faction.Compact, target.id, 0, 0, 200)).toBe(true);
+    expect(heightQueries).toBe(0);
+  });
+
+  it('does not evaluate ballistic reach while a non-burst weapon is cooling down', () => {
+    const world = createWorld(17);
+    const source = world.spawnUnit(Faction.Compact, 'longbow', 0, 0);
+    const target = world.spawnUnit(Faction.Choir, 'vanguard', 100, 0);
+    source.cd[0] = 1;
+    let reachChecks = 0;
+    const record = world as unknown as {
+      isBallisticTargetWithinReachEnvelope: World['isBallisticTargetWithinReachEnvelope'];
+      fireWeapons: (
+        ent: typeof source,
+        weapons: string[],
+        target: { s: number; z: number; h: number },
+        dt: number,
+        faction: Faction,
+        s: number,
+        z: number,
+        isUnit: boolean,
+      ) => void;
+    };
+    const original = record.isBallisticTargetWithinReachEnvelope.bind(world);
+    record.isBallisticTargetWithinReachEnvelope = (...args) => {
+      reachChecks++;
+      return original(...args);
+    };
+
+    record.fireWeapons(source, UNITS.longbow.weapons, { s: target.s, z: target.z, h: 0 }, 1 / 30,
+      source.faction, source.s, source.z, true);
+
+    expect(source.cd[0]).toBeCloseTo(1 - 1 / 30);
+    expect(reachChecks).toBe(0);
+  });
+});
+
 describe('World determinism', () => {
   it('produces identical hash streams for a seeded match', () => {
     const a = createWorld(44);

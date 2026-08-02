@@ -198,11 +198,8 @@ export class Effects {
     this.object.add(this.puffs);
 
     // --- Pooled lights ---------------------------------------------------------
-    // These stay VISIBLE for the lifetime of the game with intensity 0 when
-    // idle. Three counts only visible lights, so toggling `visible` changes the
-    // light count and invalidates every shader program in the scene -- which
-    // shows up as a multi-frame stall, and a black screen, the first time
-    // anything fires. Holding the count constant costs nothing and avoids it.
+    // Quality changes may alter the visible pool size, but individual effects
+    // only change intensity. This keeps shader variants stable during combat.
     for (let i = 0; i < MAX_LIGHTS; i++) {
       const l = new THREE.PointLight(0xffaa55, 0, 400, 2);
       l.visible = true;
@@ -222,6 +219,19 @@ export class Effects {
     this.puffHead %= next;
     for (let i = next; i < MAX_PUFFS; i++) this.puffData[i * 4 + 1] = 0;
     this.puffs.geometry.attributes.aData!.needsUpdate = true;
+  }
+
+  setLightCap(cap: number): void {
+    const next = Math.max(0, Math.min(MAX_LIGHTS, Math.floor(cap)));
+    for (let i = 0; i < this.lights.length; i++) {
+      const enabled = i < next;
+      const light = this.lights[i]!;
+      light.visible = enabled;
+      if (!enabled) {
+        light.intensity = 0;
+        this.lightLife[i] = 0;
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -301,6 +311,7 @@ export class Effects {
 
   private addLight(pos: THREE.Vector3, color: number, intensity: number, life: number): void {
     for (let i = 0; i < this.lights.length; i++) {
+      if (!this.lights[i]!.visible) continue;
       if (this.lightLife[i]! > 0) continue;
       const l = this.lights[i]!;
       l.position.copy(pos);

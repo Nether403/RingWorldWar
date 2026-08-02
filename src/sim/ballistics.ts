@@ -33,6 +33,7 @@
 
 import {
   ATMOSPHERE_HEIGHT,
+  RING_CIRCUMFERENCE,
   RING_OMEGA,
   RING_RADIUS,
 } from '@core/constants';
@@ -231,6 +232,16 @@ export interface TrajectoryOptions {
   groundAt?: (s: number, z: number) => number;
   /** Stop as soon as the trajectory dips below the ground. */
   stopOnImpact?: boolean;
+  /** Optional deterministic work accounting for profiling and regression tests. */
+  work?: TrajectoryWork;
+}
+
+export interface TrajectoryWork {
+  trajectoryEvaluations: number;
+  integrationSteps: number;
+  fullTrajectoryBuilds: number;
+  storedTrajectorySamples: number;
+  failedPlanCacheHits: number;
 }
 
 /**
@@ -271,6 +282,7 @@ function integrateTrajectory(
   const bc = opts.ballisticCoefficient ?? 0;
   const groundAt = opts.groundAt;
   const stopOnImpact = opts.stopOnImpact ?? true;
+  const work = opts.work;
 
   const st = launchToInertial(from, v, t0);
   const pt: RingPoint = { s: 0, h: 0, z: 0 };
@@ -278,7 +290,9 @@ function integrateTrajectory(
   if (out) out.push(last);
 
   const steps = Math.ceil(maxTime / dt);
+  let integrationSteps = 0;
   for (let i = 0; i < steps; i++) {
+    integrationSteps++;
     if (bc > 0) stepWithDrag(st, dt, bc);
     else stepFree(st, dt);
 
@@ -299,6 +313,14 @@ function integrateTrajectory(
     // A shot that reaches the far side of the ring has left the playfield.
     if (pt.h > RING_RADIUS * 1.98) break;
   }
+  if (work) {
+    work.trajectoryEvaluations++;
+    work.integrationSteps += integrationSteps;
+    if (out) {
+      work.fullTrajectoryBuilds++;
+      work.storedTrajectorySamples += out.length;
+    }
+  }
   return last;
 }
 
@@ -315,6 +337,8 @@ export interface AimSolution {
   speed: number;
   /** Elevation angle above the local horizon, radians. Diagnostic. */
   elevation: number;
+  /** Canonical path retained when drag solving already had to build it. */
+  path?: TrajectorySample[];
 }
 
 /**
@@ -380,6 +404,14 @@ export interface AimOptions {
   /** Reject solutions whose arc clips terrain. */
   groundAt?: (s: number, z: number) => number;
   ballisticCoefficient?: number;
+  work?: TrajectoryWork;
+}
+
+export interface DirectionalReachProfile {
+  /** Approximate level-ground reach in metres. */
+  spinward: number;
+  /** Approximate level-ground reach in metres. */
+  antispinward: number;
 }
 
 /**
@@ -398,8 +430,16 @@ export function isWithinDragAimEnvelope(
   speed: number,
   maxFlightTime = 60,
 ): boolean {
+  return minimumRequiredLaunchSpeed(from, to, t0, maxFlightTime) <= speed * 1.25;
+}
+
+function minimumRequiredLaunchSpeed(
+  from: RingPoint,
+  to: RingPoint,
+  t0: number,
+  maxFlightTime: number,
+): number {
   const samples = 32;
-  const margin = 1.25;
   const velocity: RingVelocity = { vt: 0, vh: 0, vz: 0 };
   let minimumRequired = Infinity;
   for (let index = 0; index <= samples; index++) {
@@ -409,7 +449,39 @@ export function isWithinDragAimEnvelope(
       requiredLaunch(from, to, t0, flightTime, velocity),
     );
   }
-  return minimumRequired <= speed * margin;
+  return minimumRequired;
+}
+
+/**
+ * Cheap, deterministic directional envelope for HUD communication.
+ *
+ * This uses the same drag-free necessary condition that guards the expensive
+ * drag solver, but only against level ground and only when a source/profile is
+ * first requested. It is deliberately approximate: preview and firing still
+ * use `solveAim` and the canonical drag trajectory.
+ */
+export function directionalReachProfile(
+  from: RingPoint,
+  speed: number,
+  maxFlightTime = 60,
+): DirectionalReachProfile {
+  const limit = RING_CIRCUMFERENCE * 0.5 - 1;
+  const range = (sign: -1 | 1): number => {
+    let lo = 0;
+    let hi = limit;
+    for (let iteration = 0; iteration < 18; iteration++) {
+      const distance = (lo + hi) * 0.5;
+      const to: RingPoint = {
+        s: wrapS(from.s + sign * distance),
+        h: 0,
+        z: from.z,
+      };
+      if (minimumRequiredLaunchSpeed(from, to, 0, maxFlightTime) <= speed * 1.25) lo = distance;
+      else hi = distance;
+    }
+    return lo;
+  };
+  return { spinward: range(1), antispinward: range(-1) };
 }
 
 /**
@@ -547,25 +619,30 @@ function refineDragSolution(
     az: number,
     el: number,
     dt: number,
-  ): { es: number; ez: number; time: number; velocity: RingVelocity } => {
+    retainPath = false,
+  ): { es: number; ez: number; time: number; velocity: RingVelocity; path?: TrajectorySample[] } => {
     const horizontal = Math.cos(el) * speed;
     const velocity = {
       vt: Math.cos(az) * horizontal,
       vh: Math.sin(el) * speed,
       vz: Math.sin(az) * horizontal,
     };
-    const impact = trajectoryImpact(from, velocity, t0, {
+    const trajectoryOptions = {
       maxTime: opts.maxFlightTime ?? 60,
       dt,
       ballisticCoefficient: coefficient,
       groundAt,
       stopOnImpact: true,
-    });
+      work: opts.work,
+    };
+    const path = retainPath ? sampleTrajectory(from, velocity, t0, trajectoryOptions) : undefined;
+    const impact = path?.[path.length - 1] ?? trajectoryImpact(from, velocity, t0, trajectoryOptions);
     return {
       es: deltaS(to.s, impact.s),
       ez: impact.z - to.z,
       time: impact.t,
       velocity,
+      path,
     };
   };
 
@@ -595,9 +672,9 @@ function refineDragSolution(
 
   if (!refine(0.2, 8, 20)) return null;
   refine(1 / 30, 6, 2);
-  const final = evaluate(azimuth, elevation, 1 / 30);
+  const final = evaluate(azimuth, elevation, 1 / 30, true);
   if (Math.hypot(final.es, final.ez) >= 4) return null;
-  return { velocity: final.velocity, flightTime: final.time, speed, elevation };
+  return { velocity: final.velocity, flightTime: final.time, speed, elevation, path: final.path };
 }
 
 function clamp(value: number, min: number, max: number): number {
