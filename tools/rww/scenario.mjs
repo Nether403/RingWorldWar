@@ -31,7 +31,7 @@ export function parseScenario(input) {
   record(input, 'scenario');
   exactKeys(input, [
     'schema', 'version', 'id', 'revision', 'worldSeed', 'quality', 'viewport', 'simulation',
-    'camera', 'setup', 'observationRegions', 'benchmark', 'invariants', 'expectedVisual',
+    'camera', 'setup', 'mission', 'observationRegions', 'benchmark', 'invariants', 'expectedVisual',
   ], 'scenario');
   if (input.schema !== SCENARIO_SCHEMA) fail('schema', `must be ${SCENARIO_SCHEMA}`);
   if (input.version !== SCENARIO_VERSION) fail('version', `must be ${SCENARIO_VERSION}`);
@@ -61,19 +61,29 @@ export function parseScenario(input) {
   boundedNumber(input.camera.zoom, 45, 1150, 'camera.zoom');
 
   record(input.setup, 'setup');
-  exactKeys(input.setup, ['units', 'structures', 'disableAi'], 'setup');
+  exactKeys(input.setup, ['units', 'structures', 'disableAi', 'player'], 'setup');
   if (input.setup.disableAi !== undefined && typeof input.setup.disableAi !== 'boolean') {
     fail('setup.disableAi', 'must be a boolean');
   }
+  if (input.setup.player !== undefined) {
+    record(input.setup.player, 'setup.player');
+    exactKeys(input.setup.player, ['salvage', 'commandCap'], 'setup.player');
+    nonNegativeNumber(input.setup.player.salvage, 'setup.player.salvage');
+    if (input.setup.player.commandCap !== undefined) {
+      nonNegativeNumber(input.setup.player.commandCap, 'setup.player.commandCap');
+    }
+  }
   array(input.setup.units, 'setup.units');
   array(input.setup.structures, 'setup.structures');
+  if (input.setup.units.length > 128) fail('setup.units', 'must contain at most 128 entries');
+  if (input.setup.structures.length > 128) fail('setup.structures', 'must contain at most 128 entries');
   const ids = new Set();
   input.setup.units.forEach((unit, index) => {
     const path = `setup.units[${index}]`;
     record(unit, path);
     exactKeys(unit, [
       'id', 'faction', 'kind', 's', 'z', 'yawRadians', 'target', 'selected',
-      'abilityActive', 'abilityTransitionTimer', 'weaponCooldowns',
+      'targetMode', 'abilityActive', 'abilityTransitionTimer', 'weaponCooldowns',
     ], path);
     uniqueId(unit.id, `${path}.id`, ids);
     member(unit.faction, FACTIONS, `${path}.faction`);
@@ -82,6 +92,10 @@ export function parseScenario(input) {
     finiteNumber(unit.z, `${path}.z`);
     optionalFinite(unit.yawRadians, `${path}.yawRadians`);
     if (unit.target !== undefined) safeId(unit.target, `${path}.target`);
+    if (unit.targetMode !== undefined) {
+      member(unit.targetMode, new Set(['attack', 'attackMove']), `${path}.targetMode`);
+      if (unit.target === undefined) fail(`${path}.targetMode`, 'requires target');
+    }
     if (unit.selected !== undefined && typeof unit.selected !== 'boolean') fail(`${path}.selected`, 'must be a boolean');
     if (unit.abilityActive !== undefined && typeof unit.abilityActive !== 'boolean') fail(`${path}.abilityActive`, 'must be a boolean');
     if (unit.abilityTransitionTimer !== undefined) nonNegativeNumber(unit.abilityTransitionTimer, `${path}.abilityTransitionTimer`);
@@ -113,6 +127,24 @@ export function parseScenario(input) {
   input.setup.units.forEach((unit, index) => {
     if (unit.target !== undefined && !ids.has(unit.target)) fail(`setup.units[${index}].target`, 'must reference a setup id');
   });
+
+  if (input.mission !== undefined) {
+    record(input.mission, 'mission');
+    exactKeys(input.mission, ['id', 'revision', 'bindings'], 'mission');
+    if (input.mission.id !== 'first-contact' && input.mission.id !== 'break-the-line' && input.mission.id !== 'counterfire') {
+      fail('mission.id', 'must be first-contact, break-the-line, or counterfire');
+    }
+    if (input.mission.revision !== 1) fail('mission.revision', 'must be 1');
+    if (input.simulation.targetTick !== 0) fail('simulation.targetTick', 'must be zero for mission scenarios');
+    record(input.mission.bindings, 'mission.bindings');
+    if (input.mission.id === 'first-contact') {
+      parseFirstContactBindings(input.mission.bindings, input.setup, ids);
+    } else if (input.mission.id === 'break-the-line') {
+      parseBreakLineBindings(input.mission.bindings, input.setup, ids);
+    } else {
+      parseCounterfireBindings(input.mission.bindings, input.setup, ids);
+    }
+  }
 
   array(input.observationRegions, 'observationRegions');
   if (input.observationRegions.length === 0) fail('observationRegions', 'must not be empty');
@@ -150,6 +182,97 @@ export function parseScenario(input) {
   const parsed = structuredClone(input);
   parsed.setup.disableAi ??= false;
   return parsed;
+}
+
+function parseFirstContactBindings(bindings, setup, ids) {
+  exactKeys(bindings, ['tutorialNode', 'artilleryTarget'], 'mission.bindings');
+  safeId(bindings.tutorialNode, 'mission.bindings.tutorialNode');
+  safeId(bindings.artilleryTarget, 'mission.bindings.artilleryTarget');
+  requireSetupIds([bindings.tutorialNode], ids, 'mission.bindings.tutorialNode');
+  requireSetupIds([bindings.artilleryTarget], ids, 'mission.bindings.artilleryTarget');
+  if (bindings.tutorialNode === bindings.artilleryTarget) fail('mission.bindings', 'must reference distinct entities');
+  const node = setup.structures.find((structure) => structure.id === bindings.tutorialNode);
+  if (node?.kind !== 'spinalNode') fail('mission.bindings.tutorialNode', 'must reference a Spinal Node');
+  if (node.faction !== 'neutral' || node.progress !== 1) {
+    fail('mission.bindings.tutorialNode', 'must reference a completed neutral Spinal Node');
+  }
+  const target = setup.structures.find((structure) => structure.id === bindings.artilleryTarget);
+  if (target?.faction !== 'choir' || target.kind !== 'fusionCore' || target.progress !== 1) {
+    fail('mission.bindings.artilleryTarget', 'must reference a completed Choir fusionCore');
+  }
+}
+
+function parseBreakLineBindings(bindings, setup, ids) {
+  exactKeys(bindings, [
+    'forwardNode', 'protectedExtractor', 'enemyArtillery', 'strongpointIds', 'raiderIds',
+  ], 'mission.bindings');
+  for (const key of ['forwardNode', 'protectedExtractor', 'enemyArtillery']) {
+    safeId(bindings[key], `mission.bindings.${key}`);
+    requireSetupIds([bindings[key]], ids, `mission.bindings.${key}`);
+  }
+  const strongpointIds = setupIdArray(bindings.strongpointIds, ids, 'mission.bindings.strongpointIds', 1, 8);
+  const raiderIds = setupIdArray(bindings.raiderIds, ids, 'mission.bindings.raiderIds', 1, 12);
+  const all = [bindings.forwardNode, bindings.protectedExtractor, bindings.enemyArtillery, ...strongpointIds, ...raiderIds];
+  if (new Set(all).size !== all.length) fail('mission.bindings', 'must reference distinct entities');
+
+  const node = setup.structures.find((structure) => structure.id === bindings.forwardNode);
+  if (node?.kind !== 'spinalNode' || node.faction !== 'neutral' || node.progress !== 1) {
+    fail('mission.bindings.forwardNode', 'must reference a completed neutral Spinal Node');
+  }
+  const extractor = setup.structures.find((structure) => structure.id === bindings.protectedExtractor);
+  if (extractor?.kind !== 'extractor' || extractor.faction !== 'compact' || extractor.progress !== 1) {
+    fail('mission.bindings.protectedExtractor', 'must reference a completed Compact Extractor');
+  }
+  const artillery = setup.structures.find((structure) => structure.id === bindings.enemyArtillery);
+  if (artillery?.kind !== 'rocketBattery' || artillery.faction !== 'choir' || artillery.progress !== 1) {
+    fail('mission.bindings.enemyArtillery', 'must reference a completed Choir Rocket Battery');
+  }
+  for (const id of strongpointIds) {
+    const structure = setup.structures.find((candidate) => candidate.id === id);
+    if (structure?.faction !== 'choir' || structure.progress !== 1) {
+      fail('mission.bindings.strongpointIds', 'must reference completed Choir structures');
+    }
+  }
+  for (const id of raiderIds) {
+    const unit = setup.units.find((candidate) => candidate.id === id);
+    if (unit?.faction !== 'choir') fail('mission.bindings.raiderIds', 'must reference Choir units');
+  }
+}
+
+function parseCounterfireBindings(bindings, setup, ids) {
+  const keys = ['protectedAsset', 'defensePower', 'aegis', 'wisp', 'playerBattery', 'enemyLauncher', 'enemyGrid'];
+  exactKeys(bindings, keys, 'mission.bindings');
+  for (const key of keys) {
+    safeId(bindings[key], `mission.bindings.${key}`);
+    requireSetupIds([bindings[key]], ids, `mission.bindings.${key}`);
+  }
+  if (new Set(keys.map((key) => bindings[key])).size !== keys.length) {
+    fail('mission.bindings', 'must reference distinct entities');
+  }
+  const structure = (id) => setup.structures.find((candidate) => candidate.id === id);
+  const unit = (id) => setup.units.find((candidate) => candidate.id === id);
+  const protectedAsset = structure(bindings.protectedAsset);
+  if (protectedAsset?.faction !== 'compact' || protectedAsset.kind !== 'fabricator' || protectedAsset.progress !== 1) fail('mission.bindings.protectedAsset', 'must reference a completed Compact Fabricator');
+  const defensePower = structure(bindings.defensePower);
+  if (defensePower?.kind !== 'fusionCore' || defensePower.faction !== 'compact') fail('mission.bindings.defensePower', 'must reference a Compact Fusion Core');
+  if (unit(bindings.aegis)?.kind !== 'aegis' || unit(bindings.aegis)?.faction !== 'compact') fail('mission.bindings.aegis', 'must reference a Compact Aegis');
+  if (unit(bindings.wisp)?.kind !== 'wisp' || unit(bindings.wisp)?.faction !== 'compact') fail('mission.bindings.wisp', 'must reference a Compact Wisp');
+  if (structure(bindings.playerBattery)?.kind !== 'rocketBattery' || structure(bindings.playerBattery)?.faction !== 'compact' || structure(bindings.playerBattery)?.progress !== 1) fail('mission.bindings.playerBattery', 'must reference a completed Compact Rocket Battery');
+  if (unit(bindings.enemyLauncher)?.kind !== 'longbow' || unit(bindings.enemyLauncher)?.faction !== 'choir') fail('mission.bindings.enemyLauncher', 'must reference a Choir Longbow');
+  if (structure(bindings.enemyGrid)?.kind !== 'laserGrid' || structure(bindings.enemyGrid)?.faction !== 'choir' || structure(bindings.enemyGrid)?.progress !== 1) fail('mission.bindings.enemyGrid', 'must reference a completed Choir Laser Grid');
+}
+
+function setupIdArray(value, ids, path, minimum, maximum) {
+  array(value, path);
+  if (value.length < minimum || value.length > maximum) fail(path, `must contain ${minimum} to ${maximum} ids`);
+  value.forEach((id, index) => safeId(id, `${path}[${index}]`));
+  if (new Set(value).size !== value.length) fail(path, 'must not contain duplicates');
+  requireSetupIds(value, ids, path);
+  return value;
+}
+
+function requireSetupIds(values, ids, path) {
+  for (const id of values) if (!ids.has(id)) fail(path, 'must reference a setup id');
 }
 
 function parseExpectedVisual(value, observationRegions) {
@@ -206,7 +329,7 @@ function exactKeys(value, allowed, path) {
     if (![
       'expectedVisual', 'yawRadians', 'target', 'maximumContextLosses', 'selected',
       'abilityActive', 'abilityTransitionTimer', 'weaponCooldowns',
-      'disableAi',
+      'targetMode', 'disableAi', 'player', 'mission', 'commandCap',
     ].includes(key) && !(key in value)) {
       fail(`${path}.${key}`, 'is required');
     }

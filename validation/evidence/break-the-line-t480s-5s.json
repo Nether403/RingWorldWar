@@ -1,0 +1,52 @@
+{
+  "schema": "rww.tracked-performance-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-02T21:52:51.690Z",
+  "status": "pass",
+  "scenario": {
+    "id": "break-the-line",
+    "revision": 1,
+    "path": "validation/scenarios/break-the-line.json",
+    "sha256": "65b824e16b2558419cb82fa148a284025e025af9037005b2e2ad7c1f574b6586"
+  },
+  "target": {
+    "id": "t480s-low-candidate",
+    "path": "validation/hardware/t480s-low.json",
+    "sha256": "1578c7fad49766717878aae90950c6e4080b8329b3703f61b36e2af9c9866512",
+    "budget": "720p-low-hard-candidate",
+    "classification": "candidate-hard",
+    "verdict": "pass",
+    "failures": []
+  },
+  "measurement": {
+    "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+    "quality": "low",
+    "warmupSeconds": 3,
+    "sampleSeconds": 5,
+    "samples": 295,
+    "frameMilliseconds": { "median": 16.7, "p95": 16.7, "p99": 33.3 },
+    "renderMilliseconds": { "median": 2.2, "p95": 5.7, "p99": 6.742 },
+    "simulationMilliseconds": { "median": 0.1, "p95": 0.4, "p99": 0.7 },
+    "fullFrameMilliseconds": { "median": 3.5, "p95": 8.9, "p99": 18.376 },
+    "over100MillisecondsCount": 0,
+    "drawCalls": 55,
+    "triangles": 95480,
+    "contextLosses": 0,
+    "blackFrame": false,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  "artifacts": {
+    "reportSha256": "a683a82fe3d65cf4e9a1e13ec4efbf020fa5965fd6e7c5b935fc67c897474ede",
+    "sourceArtifact": "output/runs/20260802T215251.690Z-7956-2c8e30bf/artifacts/browser-heavy.json",
+    "sourceReceipt": "output/runs/20260802T215251.690Z-7956-2c8e30bf/receipt.json",
+    "sourceReceiptSha256": "921864245d995ec56b657ba9299dc2d3b7d84392fdf25f0cd368f6e6e1292937"
+  },
+  "code": {
+    "sourceBaseSha": "d182bde4915afb8aa2c934b3b59dcd0e69912d48",
+    "trackedPatchSha256": "8bde21484869305b2f517a50ba094926181762ee5832222115700faf0e7975bb",
+    "untrackedSourceManifestSha256": "27eaed7166b8e08edd2c85d7c2da2ef375a9665f56817f94ab563e65a711f2a5",
+    "untrackedSourceCount": 15,
+    "untrackedSourceExclusions": ["validation/evidence/**"]
+  }
+}

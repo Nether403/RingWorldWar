@@ -10,7 +10,7 @@ import { RING_HALF_WIDTH, RING_RADIUS, SIM_DT } from '@core/constants';
 import { deltaS, surfaceDist, wrapS } from '@core/ringMath';
 import { createTerrain, type Terrain } from '@gen/terrain';
 import { AiOpponent, type Difficulty } from '@ai/opponent';
-import { deserializeMatchSession, serializeMatchSession } from '@headless/session';
+import { deserializeGameSave, serializeGameSave } from './gameSave';
 import {
   effectiveStructureStats,
   Faction,
@@ -19,7 +19,7 @@ import {
   WEAPONS,
   type StructureKind,
 } from '@sim/data';
-import { World, type BallisticFireResult } from '@sim/world';
+import { World, type BallisticFireResult, type SimEvent } from '@sim/world';
 import type { TrajectorySample } from '@sim/ballistics';
 import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
@@ -27,6 +27,16 @@ import { EntityRenderer } from '@render/entityRenderer';
 import { Effects } from '@render/effects';
 import { ballisticFireMessage, Hud } from '@ui/hud';
 import { Markers } from '@render/markers';
+import {
+  MissionController,
+  type MissionBindings,
+  type BreakLineBindings,
+  type CounterfireBindings,
+  type MissionHudModel,
+  type MissionDebriefModel,
+  type MissionId,
+  type MissionSnapshot,
+} from './tutorial/mission';
 
 export const PLAYER: Faction = Faction.Compact;
 export const SAVE_SLOT_KEY = 'ring-world-war/save-slot';
@@ -45,6 +55,8 @@ export class Game {
   readonly hud: Hud;
   private ai: AiOpponent;
   private aiEnabled = true;
+  private mission: MissionController | null = null;
+  private readonly presentationEvents: SimEvent[] = [];
 
   selection = new Set<number>();
   /** Ground point under the cursor, in surface coordinates. */
@@ -134,7 +146,7 @@ export class Game {
 
     this.refreshArtilleryInspection();
 
-    const events = this.world.drainEvents();
+    const events = this.presentationEvents.splice(0);
     this.effects.consume(events, this.world, this.anchor, PLAYER);
     this.effects.update(dt, this.world, this.anchor, PLAYER, this.rig.camera);
     if (this.effects.shake > 0) this.rig.addShake(this.effects.shake);
@@ -161,6 +173,8 @@ export class Game {
       this.rig.z,
       this.artilleryTargeting,
       this.artilleryResult,
+      this.mission?.hudModel() ?? null,
+      this.mission?.debriefModel() ?? null,
     );
 
     // Drop dead entities from the selection so the panel does not show ghosts.
@@ -179,6 +193,9 @@ export class Game {
     this.world.step();
     const elapsed = performance.now() - stepStart;
     if (this.aiEnabled) this.ai.update(this.world, SIM_DT);
+    const events = this.world.drainEvents();
+    this.mission?.advanceTick(this.world, events);
+    this.presentationEvents.push(...events);
     return elapsed;
   }
 
@@ -188,6 +205,34 @@ export class Game {
 
   get isAiEnabled(): boolean {
     return this.aiEnabled;
+  }
+
+  startMission(id: 'first-contact', bindings: MissionBindings): void;
+  startMission(id: 'break-the-line', bindings: BreakLineBindings): void;
+  startMission(id: 'counterfire', bindings: CounterfireBindings): void;
+  startMission(
+    id: MissionId,
+    bindings: MissionBindings | BreakLineBindings | CounterfireBindings,
+  ): void {
+    const started = id === 'first-contact'
+      ? MissionController.start(id, this.world.tick, bindings as MissionBindings)
+      : id === 'break-the-line'
+        ? MissionController.start(id, this.world.tick, bindings as BreakLineBindings)
+        : MissionController.start(id, this.world.tick, bindings as CounterfireBindings);
+    this.mission = MissionController.fromSnapshot(started.snapshot(), this.world);
+    this.hud.invalidate();
+  }
+
+  get missionSnapshot(): MissionSnapshot | null {
+    return this.mission?.snapshot() ?? null;
+  }
+
+  get missionHudModel(): MissionHudModel | null {
+    return this.mission?.hudModel() ?? null;
+  }
+
+  get missionDebriefModel(): MissionDebriefModel | null {
+    return this.mission?.debriefModel() ?? null;
   }
 
   /** Called after the anchor re-bases, so render-space effects follow it. */
@@ -458,7 +503,17 @@ export class Game {
         ? blindFire ? 'Chord Shot away' : 'Rocket away'
         : ballisticFireMessage(result),
     );
-    if (result.ok) this.cancelArtilleryTarget();
+    if (result.ok) {
+      this.mission?.observePlayerAction({
+        kind: 'artillery-fired',
+        sourceId: this.artillerySourceId,
+        weaponId,
+        projectileId: result.projectileId,
+        targetS: this.cursor.s,
+        targetZ: this.cursor.z,
+      }, this.world);
+      this.cancelArtilleryTarget();
+    }
     else this.previewDirty = true;
     return result.ok;
   }
@@ -584,6 +639,7 @@ export class Game {
         this.selection.add(id);
       }
     }
+    this.observeSelection();
   }
 
   selectBox(s0: number, z0: number, s1: number, z1: number, additive: boolean): void {
@@ -605,6 +661,7 @@ export class Game {
     // A box that caught nothing selects the structure under it instead, which
     // is what players expect from a small accidental drag.
     if (!found) this.selectAt(s1, z1, additive);
+    else this.observeSelection();
   }
 
   selectAllCombat(): void {
@@ -612,6 +669,7 @@ export class Game {
     for (const u of this.world.units) {
       if (u.alive && u.faction === PLAYER && UNITS[u.kind].isMech) this.selection.add(u.id);
     }
+    this.observeSelection();
   }
 
   setControlGroup(index: number): void {
@@ -633,6 +691,7 @@ export class Game {
     for (const id of ids) {
       if (this.world.unitById(id) || this.world.structureById(id)) this.selection.add(id);
     }
+    this.observeSelection();
     const first = this.selection.values().next().value as number | undefined;
     if (first) {
       const position = this.world.positionOf(first);
@@ -756,7 +815,12 @@ export class Game {
   saveGame(): SaveActionResult {
     try {
       const inactivePlayerController = new AiOpponent(PLAYER, this.difficulty, this.seed);
-      const serialized = serializeMatchSession(this.world, [inactivePlayerController, this.ai]);
+      const serialized = serializeGameSave(
+        this.world,
+        [inactivePlayerController, this.ai],
+        this.aiEnabled,
+        this.mission?.snapshot() ?? null,
+      );
       localStorage.setItem(SAVE_SLOT_KEY, serialized);
       this.hud.alert('Game saved');
       return { ok: true, message: 'Game saved to this browser' };
@@ -774,7 +838,7 @@ export class Game {
 
       // Deserialize the complete session first. Only after world and both AI
       // controllers pass validation do we replace any live authority.
-      const session = deserializeMatchSession(saved, this.terrain);
+      const session = deserializeGameSave(saved, this.terrain);
       const opponent = session.controllers.find(
         (controller) => controller.exportPersistenceState().faction === Faction.Choir,
       );
@@ -782,6 +846,8 @@ export class Game {
 
       this.world.restorePersistenceState(session.world.exportPersistenceState());
       this.ai = opponent;
+      this.aiEnabled = session.aiEnabled;
+      this.mission = session.mission;
       this.resetTransientState();
       this.hud.alert('Game loaded');
       return { ok: true, message: 'Game loaded' };
@@ -803,7 +869,15 @@ export class Game {
     this.rig.exitDirect();
     this.acc = 0;
     this.previewCooldown = 0;
+    this.presentationEvents.length = 0;
     this.entities.resetTransientState();
+  }
+
+  private observeSelection(): void {
+    this.mission?.observePlayerAction({
+      kind: 'selection-changed',
+      selectedIds: [...this.selection],
+    }, this.world);
   }
 
   dispose(): void {

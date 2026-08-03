@@ -1,0 +1,46 @@
+{
+  "schema": "rww.tracked-visual-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-02T19:27:15.925Z",
+  "status": "baseline-created",
+  "warning": "No cross-GPU exact-pixel pass is inferred until the scenario embeds an accepted expected signature.",
+  "scenario": {
+    "id": "first-contact",
+    "revision": 1,
+    "path": "validation/scenarios/first-contact.json",
+    "sha256": "87385228a29908fc14586d4fdbe744f45e2082f4eafdce1ce17edb5b37fc57da"
+  },
+  "environment": {
+    "os": "Windows 10.0.26220 x64",
+    "cpu": "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz",
+    "browser": "Chromium 151.0.7922.34",
+    "renderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "softwareRenderer": false,
+    "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 }
+  },
+  "signatureSummary": {
+    "meanLuminance": 133.071933,
+    "luminanceVariance": 2500.319906,
+    "liveUnits": 6,
+    "liveStructures": 8,
+    "drawCalls": 18,
+    "triangles": 72386,
+    "contextLosses": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  "artifacts": {
+    "signatureSha256": "33c051c3cdfcb574aa578e6daa5bb82fc6901c52c5ed7ba47b5cd2b4b080d01b",
+    "manifestSha256": "38c0cbf0671a1f97d5db2b10f7084a0715e5122761183a40425a3b4e822d1cc3",
+    "screenshotSha256": "9b494405419435cea6c31b429af612eaf52c5291c213c30b6c2c5c820dcbe78c",
+    "sourceReceipt": "output/runs/20260802T192715.925Z-19440-61792d0d/receipt.json",
+    "sourceReceiptSha256": "ef39638a053f0e0018c4d763caa407b28d1b92c8314b389486f6cb22c8452930"
+  },
+  "code": {
+    "sourceBaseSha": "d182bde4915afb8aa2c934b3b59dcd0e69912d48",
+    "trackedPatchSha256": "2d8e29b58096af7b799c69171c39877945b543623857768911a7465b39b44eed",
+    "untrackedSourceManifestSha256": "0de343fca9869a7ff81685f1d9dc4cbfa2a8e1c4240eb456d5242d7783fc7a12",
+    "untrackedSourceCount": 11,
+    "untrackedSourceExclusions": ["validation/evidence/**"]
+  }
+}

@@ -33,6 +33,8 @@ import {
 import type { AbilityId } from '@sim/abilities';
 import type { DirectionalReachProfile } from '@sim/ballistics';
 import type { BallisticFireResult, Structure, Unit, World } from '@sim/world';
+import type { MissionHudModel } from '../tutorial/mission';
+import type { MissionDebriefModel } from '../tutorial/mission';
 
 const CSS = `
 .rww-root { position: fixed; inset: 0; pointer-events: none; z-index: 30;
@@ -95,6 +97,23 @@ const CSS = `
   background: repeating-linear-gradient(135deg, rgba(125,194,238,0.09) 0 2px, transparent 2px 7px);
   box-shadow: inset 0 0 0 1px rgba(4,10,16,0.9); }
 
+/* Tutorial mission */
+.rww-mission { position: absolute; top: 74px; left: 12px; width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 86px); overflow-y: auto; box-sizing: border-box; pointer-events: auto;
+  padding: 12px 14px 13px; border-left: 2px solid #f0821e; }
+.rww-mission[hidden] { display: none; }
+.rww-mission-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+  margin-bottom: 7px; font-size: 10px; text-transform: uppercase; letter-spacing: .2em; opacity: .72; }
+.rww-mission h2 { margin: 0 0 5px; color: #f0b26e; font-size: 17px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; }
+.rww-mission p { margin: 0; max-width: 45ch; font-size: 12px; line-height: 1.45; opacity: .86; }
+.rww-mission .rww-mission-hint { margin-top: 7px; padding-top: 7px;
+  border-top: 1px solid rgba(150,180,210,.14); color: #9fd8ff; font-size: 11px; opacity: .78; }
+.rww-mission.complete { border-left-color: #6ee7a0; }
+.rww-mission.complete h2 { color: #6ee7a0; }
+.rww-mission.failed { border-left-color: #ff6f59; }
+.rww-mission.failed h2 { color: #ff8b73; }
+
 /* Alerts + end card */
 .rww-alert { position: absolute; top: 74px; left: 50%; transform: translateX(-50%);
   font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
@@ -109,6 +128,11 @@ const CSS = `
   padding: 12px 34px; background: transparent; border: 1px solid rgba(240,130,30,0.7);
   color: #f0821e; letter-spacing: 0.22em; text-transform: uppercase; font-size: 12px; }
 .rww-end button:hover { background: rgba(240,130,30,0.14); }
+.rww-debrief-rows { display: grid; grid-template-columns: auto auto; gap: 7px 28px;
+  min-width: min(420px, calc(100vw - 40px)); padding: 14px 18px;
+  border-top: 1px solid rgba(150,180,210,.16); border-bottom: 1px solid rgba(150,180,210,.16); }
+.rww-debrief-rows span { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; opacity: .62; }
+.rww-debrief-rows b { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
 
 /* Hints */
 .rww-hint { position: absolute; left: 12px; bottom: 132px; font-size: 10.5px;
@@ -129,6 +153,8 @@ const CSS = `
   .rww-btn { min-width: 78px; padding: 6px 8px; }
   .rww-map { left: 6px; right: 6px; bottom: 6px; width: auto; height: 86px; }
   .rww-hint { display: none; }
+  .rww-mission { top: 54px; left: 6px; width: min(340px, calc(100vw - 12px));
+    max-height: calc(100vh - 60px); }
 }
 `;
 
@@ -160,10 +186,12 @@ export class Hud {
   private cmdEl: HTMLDivElement;
   private alertEl: HTMLDivElement;
   private endEl: HTMLDivElement | null = null;
+  private dismissedDebriefKey = '';
   private map: HTMLCanvasElement;
   private mapCtx: CanvasRenderingContext2D;
   private targetStatusEl: HTMLDivElement;
   private selectionBoxEl: HTMLDivElement;
+  private missionEl: HTMLDivElement;
   private alertTimer = 0;
   private selectionSignature = '';
   private cameraS = 0;
@@ -171,6 +199,7 @@ export class Hud {
   private lastTargetStatusText = '';
   private lastTargetStatusClass = '';
   private lastTargetStatusHidden = true;
+  private missionSignature = '';
 
   onMinimapPointer: ((s: number, z: number) => void) | null = null;
   onMinimapPrimary: ((s: number, z: number) => void) | null = null;
@@ -228,6 +257,12 @@ export class Hud {
     this.selectionBoxEl = el('div', 'rww-selection-box');
     this.selectionBoxEl.dataset.selectionRectangle = '';
     this.root.appendChild(this.selectionBoxEl);
+
+    this.missionEl = el('section', 'rww-mission rww-panel');
+    this.missionEl.hidden = true;
+    this.missionEl.setAttribute('aria-label', 'Current mission objective');
+    this.missionEl.setAttribute('aria-live', 'polite');
+    this.root.appendChild(this.missionEl);
 
     const mapPoint = (e: PointerEvent): { s: number; z: number } => {
       const r = this.map.getBoundingClientRect();
@@ -327,6 +362,8 @@ export class Hud {
     cameraZ: number,
     artilleryTargeting: boolean,
     artilleryResult: BallisticFireResult | null,
+    mission: MissionHudModel | null = null,
+    debrief: MissionDebriefModel | null = null,
   ): void {
     this.cameraS = cameraS;
     this.cameraZ = cameraZ;
@@ -338,7 +375,41 @@ export class Hud {
     this.drawResources(world, player);
     this.drawSelection(world, player, selection);
     this.drawMinimap(world, player, selection, cameraS, cameraZ, artilleryTargeting, artilleryResult);
-    this.drawEnd(world, player);
+    this.drawMission(mission);
+    this.drawEnd(world, player, debrief);
+  }
+
+  private drawMission(mission: MissionHudModel | null): void {
+    const signature = mission ? JSON.stringify(mission) : '';
+    if (signature === this.missionSignature) return;
+    this.missionSignature = signature;
+    this.missionEl.hidden = mission === null;
+    if (!mission) return;
+
+    this.missionEl.dataset.missionId = mission.missionId;
+    this.missionEl.dataset.missionStatus = mission.status;
+    if (mission.objectiveId) this.missionEl.dataset.objectiveId = mission.objectiveId;
+    else delete this.missionEl.dataset.objectiveId;
+    this.missionEl.classList.toggle('complete', mission.status === 'completed');
+    this.missionEl.classList.toggle('failed', mission.status === 'failed');
+    this.missionEl.innerHTML = '';
+
+    const head = el('div', 'rww-mission-head');
+    const name = document.createElement('span');
+    name.textContent = mission.title;
+    const progress = document.createElement('span');
+    progress.textContent = mission.progressText;
+    head.append(name, progress);
+    const title = document.createElement('h2');
+    title.textContent = mission.objectiveTitle ?? 'Mission complete';
+    const body = document.createElement('p');
+    body.textContent = mission.objectiveBody ?? 'The forward path is open. The Last Rotation has begun.';
+    this.missionEl.append(head, title, body);
+    if (mission.hint) {
+      const hint = el('p', 'rww-mission-hint');
+      hint.textContent = mission.hint;
+      this.missionEl.appendChild(hint);
+    }
   }
 
   private drawResources(world: World, player: Faction): void {
@@ -662,11 +733,27 @@ export class Hud {
     g.strokeRect(0.5, 0.5, W - 1, H - 1);
 
     // Deposits.
+    let depositGuidanceCount = 0;
+    const placingExtractor = this.placing === 'extractor';
     for (const d of world.deposits) {
-      if (d.amount <= 0) continue;
-      g.fillStyle = 'rgba(190,170,110,0.55)';
-      g.fillRect(X(d.s) - 1.5, Y(d.z) - 1.5, 3, 3);
+      if (!world.isDepositAvailable(d)) continue;
+      if (!world.isVisible(player, d.s, d.z)) continue;
+      const x = X(d.s);
+      const y = Y(d.z);
+      if (placingExtractor) {
+        g.strokeStyle = 'rgba(255,195,72,0.98)';
+        g.lineWidth = 2;
+        g.strokeRect(x - 5, y - 5, 10, 10);
+        g.fillStyle = 'rgba(255,221,126,0.95)';
+        g.fillRect(x - 2, y - 2, 4, 4);
+        depositGuidanceCount++;
+      } else {
+        g.fillStyle = 'rgba(190,170,110,0.55)';
+        g.fillRect(x - 1.5, y - 1.5, 3, 3);
+      }
     }
+    if (placingExtractor) this.map.dataset.depositGuidance = String(depositGuidanceCount);
+    else delete this.map.dataset.depositGuidance;
 
     // Structures.
     for (const st of world.structures) {
@@ -885,34 +972,54 @@ export class Hud {
     );
   }
 
-  private drawEnd(world: World, player: Faction): void {
-    if (world.status === 'running') {
+  private drawEnd(world: World, player: Faction, debrief: MissionDebriefModel | null): void {
+    const missionDebrief = world.status === 'running' && debrief?.key !== this.dismissedDebriefKey ? debrief : null;
+    if (world.status === 'running' && !missionDebrief) {
       if (this.endEl) {
         this.endEl.remove();
         this.endEl = null;
       }
       return;
     }
-    if (this.endEl) return;
+    const key = world.status === 'running' ? missionDebrief!.key : `world:${world.status}:${world.endReason}`;
+    if (this.endEl?.dataset.debriefKey === key) return;
+    this.endEl?.remove();
 
     const draw = world.winner === null;
     const won = world.winner === player;
     this.endEl = el('div', 'rww-end');
+    this.endEl.dataset.debriefKey = key;
     this.endEl.setAttribute('role', 'dialog');
     this.endEl.setAttribute('aria-modal', 'true');
     const h = document.createElement('h1');
-    h.textContent = draw ? 'Draw' : won ? 'Victory' : 'Defeat';
-    h.style.color = draw ? '#dbe3ec' : won ? '#8ce8b0' : '#ff7a5e';
+    h.textContent = missionDebrief?.title ?? (draw ? 'Draw' : won ? 'Victory' : 'Defeat');
+    h.style.color = missionDebrief
+      ? missionDebrief.outcome === 'success' ? '#8ce8b0' : '#ff7a5e'
+      : draw ? '#dbe3ec' : won ? '#8ce8b0' : '#ff7a5e';
     const p = document.createElement('p');
-    p.textContent = draw
+    p.textContent = missionDebrief?.summary ?? (draw
       ? world.endReason
-      : `${world.endReason} — ${FACTION_NAME[world.winner!]} holds the ring`;
+      : `${world.endReason} — ${FACTION_NAME[world.winner!]} holds the ring`);
+    const rows = el('div', 'rww-debrief-rows');
+    for (const row of missionDebrief?.rows ?? []) {
+      const label = document.createElement('span');
+      label.textContent = row.label;
+      const value = document.createElement('b');
+      value.textContent = row.value;
+      rows.append(label, value);
+    }
     const b = document.createElement('button');
-    b.textContent = 'Fight again';
+    b.textContent = missionDebrief ? 'Continue' : 'Fight again';
     b.onclick = (): void => {
-      this.restartRequested = true;
+      if (missionDebrief) {
+        this.dismissedDebriefKey = missionDebrief.key;
+        this.endEl?.remove();
+        this.endEl = null;
+      } else this.restartRequested = true;
     };
-    this.endEl.append(h, p, b);
+    this.endEl.append(h, p);
+    if (missionDebrief) this.endEl.appendChild(rows);
+    this.endEl.appendChild(b);
     this.root.appendChild(this.endEl);
     b.focus();
   }

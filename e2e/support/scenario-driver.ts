@@ -10,11 +10,31 @@ interface BrowserScenario {
   quality: QualityLevel;
   simulation: { targetTick: number; visualTimeSeconds: number; settlingFrames: number };
   camera: { focusS: number; focusZ: number; yawRadians: number; zoom: number };
+  mission?:
+    | {
+      id: 'first-contact'; revision: 1;
+      bindings: { tutorialNode: string; artilleryTarget: string };
+    }
+    | {
+      id: 'break-the-line'; revision: 1;
+      bindings: {
+        forwardNode: string; protectedExtractor: string; enemyArtillery: string;
+        strongpointIds: string[]; raiderIds: string[];
+      };
+    }
+    | {
+      id: 'counterfire'; revision: 1;
+      bindings: {
+        protectedAsset: string; defensePower: string; aegis: string; wisp: string;
+        playerBattery: string; enemyLauncher: string; enemyGrid: string;
+      };
+    };
   setup: {
     disableAi?: boolean;
+    player?: { salvage: number; commandCap?: number };
     units: Array<{
       id: string; faction: 'compact' | 'choir'; kind: Parameters<Game['world']['spawnUnit']>[1];
-      s: number; z: number; yawRadians?: number; target?: string; selected?: boolean;
+      s: number; z: number; yawRadians?: number; target?: string; targetMode?: 'attack' | 'attackMove'; selected?: boolean;
       abilityActive?: boolean; abilityTransitionTimer?: number; weaponCooldowns?: number[];
     }>;
     structures: Array<{ id: string; faction: 'compact' | 'choir' | 'neutral'; kind: Parameters<Game['world']['spawnStructure']>[1]; s: number; z: number; progress: number; yawRadians?: number }>;
@@ -53,6 +73,10 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
     );
     if (structure.yawRadians !== undefined) spawned.yaw = structure.yawRadians;
     entities.set(structure.id, spawned);
+    if (structure.kind === 'extractor') {
+      const deposit = rww.game.world.depositAt(structure.s, structure.z);
+      if (deposit) deposit.claimedBy = spawned.id;
+    }
   }
   for (const unit of scenario.setup.units) {
     const spawned = rww.game.world.spawnUnit(
@@ -71,8 +95,13 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
     const target = entities.get(unit.target);
     if (!source || !target) throw new Error(`Scenario target not found: ${unit.id} -> ${unit.target}`);
     const spawned = rww.game.world.unitById(source.id)!;
-    spawned.order = { kind: 'attack', s: target.s, z: target.z, targetId: target.id };
-    spawned.targetId = target.id;
+    if (unit.targetMode === 'attackMove') {
+      spawned.order = { kind: 'attackMove', s: target.s, z: target.z, targetId: 0 };
+      spawned.targetId = 0;
+    } else {
+      spawned.order = { kind: 'attack', s: target.s, z: target.z, targetId: target.id };
+      spawned.targetId = target.id;
+    }
   }
   rww.testDriver.stepWorldTo(scenario.simulation.targetTick);
   for (const unit of scenario.setup.units) {
@@ -93,6 +122,43 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
       }
     }
     if (unit.selected) rww.game.selection.add(spawned.id);
+  }
+  if (scenario.setup.player) {
+    rww.game.world.players[0].salvage = scenario.setup.player.salvage;
+    if (scenario.setup.player.commandCap !== undefined) {
+      rww.game.world.players[0].commandCap = scenario.setup.player.commandCap;
+    }
+  }
+  if (scenario.mission) {
+    const entityId = (id: string): number => {
+      const value = entities.get(id)?.id;
+      if (!value) throw new Error(`Scenario mission binding was not spawned: ${id}`);
+      return value;
+    };
+    if (scenario.mission.id === 'first-contact') {
+      rww.game.startMission('first-contact', {
+        tutorialNode: entityId(scenario.mission.bindings.tutorialNode),
+        artilleryTarget: entityId(scenario.mission.bindings.artilleryTarget),
+      });
+    } else if (scenario.mission.id === 'break-the-line') {
+      rww.game.startMission('break-the-line', {
+        forwardNode: entityId(scenario.mission.bindings.forwardNode),
+        protectedExtractor: entityId(scenario.mission.bindings.protectedExtractor),
+        enemyArtillery: entityId(scenario.mission.bindings.enemyArtillery),
+        strongpointIds: scenario.mission.bindings.strongpointIds.map(entityId),
+        raiderIds: scenario.mission.bindings.raiderIds.map(entityId),
+      });
+    } else {
+      rww.game.startMission('counterfire', {
+        protectedAsset: entityId(scenario.mission.bindings.protectedAsset),
+        defensePower: entityId(scenario.mission.bindings.defensePower),
+        aegis: entityId(scenario.mission.bindings.aegis),
+        wisp: entityId(scenario.mission.bindings.wisp),
+        playerBattery: entityId(scenario.mission.bindings.playerBattery),
+        enemyLauncher: entityId(scenario.mission.bindings.enemyLauncher),
+        enemyGrid: entityId(scenario.mission.bindings.enemyGrid),
+      });
+    }
   }
   rww.testDriver.setCamera(scenario.camera.focusS, scenario.camera.focusZ, scenario.camera.yawRadians, scenario.camera.zoom);
   for (let index = 0; index < scenario.simulation.settlingFrames; index++) {
@@ -117,11 +183,14 @@ export function captureScenarioState(): Record<string, unknown> {
     aiEnabled: game.isAiEnabled,
     quality: renderer.quality,
     adaptiveQuality: renderer.autoQuality,
+    mission: game.missionHudModel,
+    missionProgress: game.missionSnapshot,
   };
 }
 
 export function captureScenarioStateHash(): string {
-  const state = JSON.stringify(createWorldSnapshot(requiredRww().game.world));
+  const game = requiredRww().game;
+  const state = JSON.stringify({ world: createWorldSnapshot(game.world), mission: game.missionSnapshot });
   let hash = 2166136261 >>> 0;
   for (let index = 0; index < state.length; index++) {
     hash ^= state.charCodeAt(index);

@@ -1,0 +1,38 @@
+{
+  "schema": "rww.break-line-completion",
+  "version": 1,
+  "capturedAt": "2026-08-02T21:56:15Z",
+  "status": "pass",
+  "test": "Break the Line is completable through normal orders, capture, combat, and artillery",
+  "command": "npx playwright test e2e/break-line.spec.ts --grep \"completable through normal\"",
+  "scenario": {
+    "id": "break-the-line",
+    "revision": 1,
+    "path": "validation/scenarios/break-the-line.json",
+    "sha256": "65b824e16b2558419cb82fa148a284025e025af9037005b2e2ad7c1f574b6586"
+  },
+  "completion": {
+    "durationTicks": 28354,
+    "durationSeconds": 945.1333333333333,
+    "durationClock": "15:45",
+    "intendedWindowSeconds": [900, 1500],
+    "completedObjectiveTicks": [2998, 5396, 8760, 22100, 23884, 27454, 28354],
+    "milestoneTicks": [2998, 5396, 8760, 22100, 23884, 27454, 28354],
+    "path": [
+      "normal group orders defeat the raid",
+      "Wisp movement reveals the artillery line",
+      "normal proximity capture secures the node",
+      "Longbow movement and Siege Mode establish the favorable side",
+      "explicit Siege Mortar fire destroys the battery",
+      "normal assault and artillery destroy the strongpoint",
+      "world ticks complete the uninterrupted territorial hold"
+    ]
+  },
+  "code": {
+    "sourceBaseSha": "d182bde4915afb8aa2c934b3b59dcd0e69912d48",
+    "trackedPatchSha256": "8bde21484869305b2f517a50ba094926181762ee5832222115700faf0e7975bb",
+    "untrackedSourceManifestSha256": "27eaed7166b8e08edd2c85d7c2da2ef375a9665f56817f94ab563e65a711f2a5",
+    "untrackedSourceCount": 15,
+    "untrackedSourceExclusions": ["validation/evidence/**"]
+  }
+}

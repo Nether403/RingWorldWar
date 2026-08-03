@@ -17,11 +17,14 @@ describe('authoritative vision', () => {
     expect(world.projectiles.some((projectile) => projectile.ballistic)).toBe(false);
   });
 
-  it('allows artillery to fire when a scout spots the target', () => {
+  it('allows explicitly commanded artillery to fire when a scout spots the target', () => {
     const world = battlefield();
     const artillery = world.spawnUnit(Faction.Compact, 'longbow', 0, 0);
     const enemy = world.spawnUnit(Faction.Choir, 'vanguard', 1_000, 0);
     world.spawnUnit(Faction.Compact, 'wisp', 780, 0);
+    artillery.ability!.active = true;
+    artillery.ability!.transitionTimer = 0;
+    artillery.order = { kind: 'attack', s: enemy.s, z: enemy.z, targetId: enemy.id };
 
     world.step();
 

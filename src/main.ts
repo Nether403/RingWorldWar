@@ -111,7 +111,7 @@ async function start(): Promise<void> {
 
   await boot.step(1.0, 'ready');
   boot.hide();
-  game.hud.alert('Select an engineer — build extractors, then a Fabricator');
+  if (!scenarioDriverEnabled) game.hud.alert('Select an engineer — build extractors, then a Fabricator');
 
   // ---------------------------------------------------------------- loop ----
   let last = performance.now();

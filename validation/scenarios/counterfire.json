@@ -1,0 +1,50 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "counterfire",
+  "revision": 1,
+  "worldSeed": 20260805,
+  "quality": "low",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 0, "visualTimeSeconds": 20, "settlingFrames": 3 },
+  "camera": { "focusS": 0, "focusZ": 0, "yawRadians": 0.05, "zoom": 420 },
+  "mission": {
+    "id": "counterfire",
+    "revision": 1,
+    "bindings": {
+      "protectedAsset": "protected-fabricator",
+      "defensePower": "emergency-core",
+      "aegis": "compact-aegis",
+      "wisp": "compact-wisp",
+      "playerBattery": "compact-battery",
+      "enemyLauncher": "choir-longbow",
+      "enemyGrid": "choir-grid"
+    }
+  },
+  "setup": {
+    "disableAi": true,
+    "player": { "salvage": 900, "commandCap": 6 },
+    "units": [
+      { "id": "compact-engineer", "faction": "compact", "kind": "engineer", "s": -80, "z": -120, "yawRadians": 0, "selected": true },
+      { "id": "compact-aegis", "faction": "compact", "kind": "aegis", "s": 40, "z": 30, "yawRadians": 0 },
+      { "id": "compact-wisp", "faction": "compact", "kind": "wisp", "s": 100, "z": -100, "yawRadians": 0 },
+      { "id": "choir-longbow", "faction": "choir", "kind": "longbow", "s": 1200, "z": 0, "yawRadians": 3.141592653589793, "target": "protected-fabricator", "abilityActive": true, "abilityTransitionTimer": 0, "weaponCooldowns": [0] }
+    ],
+    "structures": [
+      { "id": "protected-fabricator", "faction": "compact", "kind": "fabricator", "s": 0, "z": 0, "progress": 1 },
+      { "id": "emergency-core", "faction": "compact", "kind": "fusionCore", "s": -170, "z": -180, "progress": 0.25 },
+      { "id": "compact-battery", "faction": "compact", "kind": "rocketBattery", "s": 1500, "z": 170, "progress": 1 },
+      { "id": "compact-radar", "faction": "compact", "kind": "radarMast", "s": 160, "z": 180, "progress": 1 },
+      { "id": "choir-grid", "faction": "choir", "kind": "laserGrid", "s": 1350, "z": 0, "progress": 1 },
+      { "id": "choir-core", "faction": "choir", "kind": "fusionCore", "s": 760, "z": 180, "progress": 1 },
+      { "id": "choir-radar", "faction": "choir", "kind": "radarMast", "s": 650, "z": -180, "progress": 1 }
+    ]
+  },
+  "observationRegions": [
+    { "id": "sky", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.35 },
+    { "id": "ground", "kind": "ground", "x": 0, "y": 0.35, "width": 1, "height": 0.45 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.8, "width": 1, "height": 0.2 }
+  ],
+  "benchmark": { "warmupSeconds": 3, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 10, "minimumStructures": 13, "maximumContextLosses": 0 }
+}

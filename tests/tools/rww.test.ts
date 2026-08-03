@@ -107,6 +107,29 @@ describe('playtest session lifecycle', () => {
     expect(notes).toContain('does not collect or transmit');
   });
 
+  it('builds First Contact notes around tutorial comprehension and completion', () => {
+    const notes = buildPlaytestNotes({
+      scenarioId: 'first-contact',
+      reproductionCommand: 'npm run rww -- play first-contact',
+    });
+    expect(notes).toContain('First Contact Questions');
+    expect(notes).toContain('objective sequence');
+    expect(notes).toContain('Spinal Node');
+    expect(notes).toContain('antispinward');
+    expect(notes).not.toContain('Directional-Artillery Questions');
+  });
+
+  it('builds Break the Line notes around pacing evidence', () => {
+    const notes = buildPlaytestNotes({
+      scenarioId: 'break-the-line',
+      reproductionCommand: 'npm run rww -- play break-the-line',
+    });
+    expect(notes).toContain('Break the Line Questions');
+    expect(notes).toContain('Time to first contact');
+    expect(notes).toContain('travel without a meaningful decision');
+    expect(notes).toContain('movement speed');
+  });
+
   it('ends timed sessions and removes lifecycle listeners', async () => {
     const page = new EventEmitter();
     const browser = new EventEmitter();

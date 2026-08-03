@@ -1,8 +1,8 @@
 {
   "schema": "rww.full-suite-evidence",
   "version": 1,
-  "capturedAt": "2026-08-02T12:53:39Z",
-  "status": "pass",
+  "capturedAt": "2026-08-02T22:06:43Z",
+  "status": "pass-with-isolated-infrastructure-retry",
   "commands": [
     {
       "command": "npm run check",
@@ -10,12 +10,12 @@
       "results": {
         "lint": "pass",
         "typecheck": "pass",
-        "unitTestFilesPassed": 26,
+        "unitTestFilesPassed": 31,
         "unitTestFilesSkipped": 1,
-        "unitTestsPassed": 235,
+        "unitTestsPassed": 260,
         "unitTestsSkipped": 1,
         "build": "pass",
-        "buildModulesTransformed": 39
+        "buildModulesTransformed": 41
       }
     },
     {
@@ -24,29 +24,40 @@
       "results": {
         "browser": "Chromium",
         "workers": 1,
-        "testsPassed": 21,
+        "testsPassed": 25,
+        "testsFailed": 1,
+        "failure": "nested CLI smoke process failed under full-suite browser load",
+        "duration": "9.0m"
+      }
+    },
+    {
+      "command": "npx playwright test e2e/play.spec.ts",
+      "exitCode": 0,
+      "results": {
+        "testsPassed": 1,
         "testsFailed": 0,
-        "duration": "3.6m"
+        "duration": "21.2s",
+        "classification": "isolated infrastructure retry"
       }
     }
   ],
   "buildArtifacts": [
     {
       "path": "dist/index.html",
-      "sha256": "29956f20a9289545afe416fe273ba62e1558fef222ec8e8cf519273d567a3214"
+      "sha256": "b6f170201afdac3e33844e6765578ddcac74356e6e1099dbacc2cbe24cf4b3bf"
     },
     {
-      "path": "dist/assets/index-BcLvIVbm.js",
-      "sha256": "81b624bf9382a4dda073c24f72a8289ee6d5983dbf891a2525d8e3d4bf864bbe"
+      "path": "dist/assets/index-BPvFBJvx.js",
+      "sha256": "9b986fee2d25f3378f8fb7dd18613dacaa8f496bbf4a4aa577c76d3d80bd0221"
     }
   ],
   "code": {
-    "sourceBaseSha": "c3af807e4f31c69a312ec710a5b080497e30ea0f",
+    "sourceBaseSha": "d182bde4915afb8aa2c934b3b59dcd0e69912d48",
     "branch": "master",
     "dirty": true,
-    "trackedPatchSha256": "33e50452fd7a0ac435d65217cc80428ff2c1186a0780edd04baac43ae1902e8d",
-    "untrackedSourceManifestSha256": "8d95daa28ab94f49161d2185c957881583a3df51ea46e86acc5aa2ec9742e1ec",
-    "untrackedSourceCount": 35,
+    "trackedPatchSha256": "8bde21484869305b2f517a50ba094926181762ee5832222115700faf0e7975bb",
+    "untrackedSourceManifestSha256": "27eaed7166b8e08edd2c85d7c2da2ef375a9665f56817f94ab563e65a711f2a5",
+    "untrackedSourceCount": 15,
     "untrackedSourceExclusions": ["validation/evidence/**"],
     "caveat": "Dirty source is content-addressed by the tracked patch and untracked-source manifest digests; validation/evidence is excluded to avoid self-reference."
   }

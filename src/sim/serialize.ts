@@ -103,12 +103,12 @@ function readWorld(value: unknown, path: string): WorldPersistenceState {
   ]);
   const players = array(state.players, `${path}.players`);
   if (players.length !== 2) fail(`${path}.players`, 'expected exactly two players');
-  const units = array(state.units, `${path}.units`).map((unit, index) => readUnit(unit, `${path}.units[${index}]`));
-  const structures = array(state.structures, `${path}.structures`).map((structure, index) =>
+  const units = boundedArray(state.units, `${path}.units`, 512).map((unit, index) => readUnit(unit, `${path}.units[${index}]`));
+  const structures = boundedArray(state.structures, `${path}.structures`, 256).map((structure, index) =>
     readStructure(structure, `${path}.structures[${index}]`));
-  const projectiles = array(state.projectiles, `${path}.projectiles`).map((projectile, index) =>
+  const projectiles = boundedArray(state.projectiles, `${path}.projectiles`, 2048).map((projectile, index) =>
     readProjectile(projectile, `${path}.projectiles[${index}]`));
-  const wreckages = array(state.wreckages, `${path}.wreckages`).map((wreck, index) =>
+  const wreckages = boundedArray(state.wreckages, `${path}.wreckages`, 512).map((wreck, index) =>
     readWreck(wreck, `${path}.wreckages[${index}]`));
   assertUniqueEntityIds(units, structures, projectiles, wreckages, path);
   const nextId = integer(state.nextId, `${path}.nextId`, 1);
@@ -139,7 +139,7 @@ function readWorld(value: unknown, path: string): WorldPersistenceState {
     units,
     structures,
     projectiles,
-    deposits: array(state.deposits, `${path}.deposits`).map((deposit, index) =>
+    deposits: boundedArray(state.deposits, `${path}.deposits`, 256).map((deposit, index) =>
       readDeposit(deposit, `${path}.deposits[${index}]`)),
     wreckages,
   };
@@ -300,7 +300,7 @@ function readStructure(value: unknown, path: string): Structure {
     burstTimer: numberArray(structure.burstTimer, `${path}.burstTimer`, weaponCount),
     targetId: integer(structure.targetId, `${path}.targetId`, 0),
     revealed: finite(structure.revealed, `${path}.revealed`, 0),
-    queue: array(structure.queue, `${path}.queue`).map((queued, index) =>
+    queue: boundedArray(structure.queue, `${path}.queue`, 128).map((queued, index) =>
       unitKind(queued, `${path}.queue[${index}]`)),
     queueTimer: finite(structure.queueTimer, `${path}.queueTimer`, 0),
     capture: finite(structure.capture, `${path}.capture`, -1, 1),
@@ -415,6 +415,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function array(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) fail(path, 'expected an array');
   return value;
+}
+
+function boundedArray(value: unknown, path: string, maximum: number): unknown[] {
+  const values = array(value, path);
+  if (values.length > maximum) fail(path, `expected at most ${maximum} entries`);
+  return values;
 }
 
 function numberArray(value: unknown, path: string, length: number, minimum = -Infinity): number[] {

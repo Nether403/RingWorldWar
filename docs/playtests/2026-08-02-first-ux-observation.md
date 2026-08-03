@@ -41,13 +41,18 @@ development feedback, not a completed USP-comprehension cohort.
   visible multi-unit drag rectangle.
 - The T480s 1280x720 Low heavy-combat gate remains passing after these changes.
 
-## Still Open
+## Follow-up Observation
 
-- Whether players understand nominal sensor coverage versus exact terrain LOS.
-- Whether `PREVIEW ONLY` resolves the expectation that a visible path implies a
-  valid shot.
-- Whether the minimap command scheme is discovered without prompting.
-- Whether players can explain the antispinward advantage after play.
+The follow-up internal playtest passed the four comprehension checks:
 
-These require another uncoached human observation and should feed the tutorial
-rather than being treated as closed by automated tests.
+- Nominal sensor coverage versus exact terrain LOS was clear.
+- The tester understood that a visible trajectory is a preview and could name
+  the invalid game states that block the projected action.
+- Minimap commands worked and their semantics felt logical.
+- The tester understood that spinward and antispinward firing produce different
+  velocity outcomes. The mechanic required some acclimation, but was described
+  as original and functional rather than arbitrary.
+
+This is sufficient evidence to begin the tutorial alpha. It is one internal
+observation, not the full five-player USP cohort, so final tutorial copy and
+balance remain provisional.

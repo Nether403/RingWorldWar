@@ -1,0 +1,32 @@
+{
+  "schema": "rww.counterfire-completion",
+  "version": 1,
+  "capturedAt": "2026-08-03T08:56:32Z",
+  "status": "pass",
+  "command": "npx playwright test e2e/counterfire.spec.ts",
+  "test": "Counterfire completes through power restoration, interception, and ammunition adaptation",
+  "scenario": {
+    "id": "counterfire",
+    "revision": 1,
+    "path": "validation/scenarios/counterfire.json",
+    "sha256": "36e5820b4f990411ce1bf8c6d404c012e029fe64ef088c6bb2bfee77b356dc60"
+  },
+  "verified": [
+    "authoritative enemy mortar launch",
+    "Fusion Core construction and brownout recovery",
+    "Aegis Umbrella activation and attributed interception",
+    "bound-Wisp exact sensor contact",
+    "Standard Rocket attribution through Laser Grid interception",
+    "Cruise Missile bypass and launcher destruction",
+    "mission completion debrief rendering",
+    "completed mission save and load with identical debrief"
+  ],
+  "result": { "testsPassed": 1, "testsFailed": 0, "duration": "10.3s" },
+  "code": {
+    "sourceBaseSha": "d182bde4915afb8aa2c934b3b59dcd0e69912d48",
+    "trackedPatchSha256": "efd35af480589a6140f4a8d61a5388ee7b10ebc355da97481f8794632c873bed",
+    "untrackedSourceManifestSha256": "de97b233d3a4bd369f5fd66f6c6f58f380c2708ef886655cdf85a437dfaa7091",
+    "untrackedSourceCount": 21,
+    "untrackedSourceExclusions": ["validation/evidence/**"]
+  }
+}

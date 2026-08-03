@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { RING_CIRCUMFERENCE } from '@core/constants';
 import { deltaS } from '@core/ringMath';
 import { FACTION_COLOR, Faction, STRUCTURES, UNITS, type StructureKind } from '@sim/data';
-import type { BallisticFireResult, World } from '@sim/world';
+import { DEPOSIT_PLACEMENT_RADIUS, type BallisticFireResult, type World } from '@sim/world';
 import type { TrajectorySample } from '@sim/ballistics';
 import type { RenderAnchor } from './anchor';
 
@@ -161,6 +161,7 @@ export class Markers {
       radius: number,
       col: [number, number, number],
       dashed = false,
+      height = 1.2,
     ): void => {
       for (let i = 0; i < RING_STEPS; i++) {
         if (dashed && i % 2 === 1) continue;
@@ -171,13 +172,28 @@ export class Markers {
           cz + Math.sin(a0) * radius,
           cs + Math.cos(a1) * radius,
           cz + Math.sin(a1) * radius,
-          1.2,
+          height,
           col[0],
           col[1],
           col[2],
         );
       }
     };
+
+    let depositGuidanceCount = 0;
+    if (placing === 'extractor') {
+      for (const deposit of world.deposits) {
+        if (!world.isDepositAvailable(deposit)) continue;
+        if (!world.isVisible(player, deposit.s, deposit.z)) continue;
+        if (Math.abs(deltaS(anchor.s, deposit.s)) > MARKER_RANGE) continue;
+        circle(deposit.s, deposit.z, DEPOSIT_PLACEMENT_RADIUS, [1, 0.72, 0.18], false, 3.5);
+        circle(deposit.s, deposit.z, 16, [1, 0.9, 0.42], true, 3.5);
+        pushRingSeg(deposit.s - 24, deposit.z, deposit.s + 24, deposit.z, 3.5, 1, 0.9, 0.42);
+        pushRingSeg(deposit.s, deposit.z - 24, deposit.s, deposit.z + 24, 3.5, 1, 0.9, 0.42);
+        depositGuidanceCount++;
+      }
+    }
+    this.object.userData.depositGuidanceCount = depositGuidanceCount;
 
     // --- Selection rings -----------------------------------------------------
     for (const id of selection) {

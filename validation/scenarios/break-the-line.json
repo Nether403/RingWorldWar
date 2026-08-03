@@ -1,0 +1,60 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "break-the-line",
+  "revision": 1,
+  "worldSeed": 20260804,
+  "quality": "low",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 0, "visualTimeSeconds": 14, "settlingFrames": 3 },
+  "camera": { "focusS": 0, "focusZ": 0, "yawRadians": 0.08, "zoom": 460 },
+  "mission": {
+    "id": "break-the-line",
+    "revision": 1,
+    "bindings": {
+      "forwardNode": "forward-node",
+      "protectedExtractor": "protected-extractor",
+      "enemyArtillery": "choir-battery",
+      "strongpointIds": ["choir-core", "choir-radar"],
+      "raiderIds": ["raider-one", "raider-three"]
+    }
+  },
+  "setup": {
+    "disableAi": true,
+    "player": { "salvage": 1200, "commandCap": 13 },
+    "units": [
+      { "id": "compact-wisp", "faction": "compact", "kind": "wisp", "s": 120, "z": 0, "yawRadians": 0 },
+      { "id": "compact-vanguard-one", "faction": "compact", "kind": "vanguard", "s": 40, "z": 120, "yawRadians": 0, "selected": true },
+      { "id": "compact-vanguard-two", "faction": "compact", "kind": "vanguard", "s": 40, "z": -120, "yawRadians": 0, "selected": true },
+      { "id": "compact-vanguard-three", "faction": "compact", "kind": "vanguard", "s": -100, "z": 100, "yawRadians": 0, "selected": true },
+      { "id": "compact-vanguard-four", "faction": "compact", "kind": "vanguard", "s": -100, "z": -100, "yawRadians": 0, "selected": true },
+      { "id": "compact-aegis", "faction": "compact", "kind": "aegis", "s": -80, "z": 180, "yawRadians": 0, "selected": true },
+      { "id": "compact-longbow", "faction": "compact", "kind": "longbow", "s": -100, "z": -180, "yawRadians": 0, "weaponCooldowns": [0] },
+      { "id": "raider-one", "faction": "choir", "kind": "vanguard", "s": 850, "z": 70, "yawRadians": 3.141592653589793, "target": "protected-extractor", "targetMode": "attackMove" },
+      { "id": "raider-three", "faction": "choir", "kind": "wisp", "s": 900, "z": -100, "yawRadians": 3.141592653589793, "target": "protected-extractor", "targetMode": "attackMove" }
+    ],
+    "structures": [
+      { "id": "compact-solar-one", "faction": "compact", "kind": "solarArray", "s": 130, "z": 280, "progress": 1 },
+      { "id": "compact-solar-two", "faction": "compact", "kind": "solarArray", "s": -130, "z": -280, "progress": 1 },
+      { "id": "protected-extractor", "faction": "compact", "kind": "extractor", "s": 190, "z": 150, "progress": 1 },
+      { "id": "compact-fabricator", "faction": "compact", "kind": "fabricator", "s": 220, "z": -260, "progress": 1 },
+      { "id": "compact-foundry", "faction": "compact", "kind": "mechFoundry", "s": -220, "z": 280, "progress": 1 },
+      { "id": "compact-fusion", "faction": "compact", "kind": "fusionCore", "s": -320, "z": 0, "progress": 1 },
+      { "id": "compact-radar", "faction": "compact", "kind": "radarMast", "s": 340, "z": -40, "progress": 1 },
+      { "id": "compact-command-node-one", "faction": "compact", "kind": "spinalNode", "s": -520, "z": 520, "progress": 1 },
+      { "id": "compact-command-node-two", "faction": "compact", "kind": "spinalNode", "s": -620, "z": 0, "progress": 1 },
+      { "id": "compact-command-node-three", "faction": "compact", "kind": "spinalNode", "s": -520, "z": -520, "progress": 1 },
+      { "id": "forward-node", "faction": "neutral", "kind": "spinalNode", "s": 3500, "z": 950, "progress": 1 },
+      { "id": "choir-battery", "faction": "choir", "kind": "rocketBattery", "s": 2200, "z": 0, "progress": 1 },
+      { "id": "choir-core", "faction": "choir", "kind": "fusionCore", "s": 2340, "z": 180, "progress": 1 },
+      { "id": "choir-radar", "faction": "choir", "kind": "radarMast", "s": 2380, "z": -180, "progress": 1 }
+    ]
+  },
+  "observationRegions": [
+    { "id": "sky", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.35 },
+    { "id": "ground", "kind": "ground", "x": 0, "y": 0.35, "width": 1, "height": 0.45 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.8, "width": 1, "height": 0.2 }
+  ],
+  "benchmark": { "warmupSeconds": 3, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 15, "minimumStructures": 20, "maximumContextLosses": 0 }
+}

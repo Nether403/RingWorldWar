@@ -1,0 +1,52 @@
+{
+  "schema": "rww.tracked-performance-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-02T19:25:11.762Z",
+  "status": "pass",
+  "scenario": {
+    "id": "first-contact",
+    "revision": 1,
+    "path": "validation/scenarios/first-contact.json",
+    "sha256": "87385228a29908fc14586d4fdbe744f45e2082f4eafdce1ce17edb5b37fc57da"
+  },
+  "target": {
+    "id": "t480s-low-candidate",
+    "path": "validation/hardware/t480s-low.json",
+    "sha256": "1578c7fad49766717878aae90950c6e4080b8329b3703f61b36e2af9c9866512",
+    "budget": "720p-low-hard-candidate",
+    "classification": "candidate-hard",
+    "verdict": "pass",
+    "failures": []
+  },
+  "measurement": {
+    "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+    "quality": "low",
+    "warmupSeconds": 2,
+    "sampleSeconds": 5,
+    "samples": 301,
+    "frameMilliseconds": { "median": 16.7, "p95": 16.7, "p99": 16.8 },
+    "renderMilliseconds": { "median": 3.4, "p95": 6.3, "p99": 8.4 },
+    "simulationMilliseconds": { "median": 0.1, "p95": 0.2, "p99": 0.5 },
+    "fullFrameMilliseconds": { "median": 5.3, "p95": 9.3, "p99": 11.1 },
+    "over100MillisecondsCount": 0,
+    "drawCalls": 18,
+    "triangles": 72386,
+    "contextLosses": 0,
+    "blackFrame": false,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  "artifacts": {
+    "reportSha256": "d69806667aa37db415b3781bc21a5c934eb047fbb683a2bc9bc648f763a40e6c",
+    "sourceArtifact": "output/runs/20260802T192511.762Z-7848-8639b482/artifacts/browser-heavy.json",
+    "sourceReceipt": "output/runs/20260802T192511.762Z-7848-8639b482/receipt.json",
+    "sourceReceiptSha256": "59d2808880a534212e3b6ada1aeab06e4874b8aa5e1dec6737dda5eaa5996243"
+  },
+  "code": {
+    "sourceBaseSha": "d182bde4915afb8aa2c934b3b59dcd0e69912d48",
+    "trackedPatchSha256": "2d8e29b58096af7b799c69171c39877945b543623857768911a7465b39b44eed",
+    "untrackedSourceManifestSha256": "0de343fca9869a7ff81685f1d9dc4cbfa2a8e1c4240eb456d5242d7783fc7a12",
+    "untrackedSourceCount": 11,
+    "untrackedSourceExclusions": ["validation/evidence/**"]
+  }
+}

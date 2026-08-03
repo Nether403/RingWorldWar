@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as a prototype. Automated behavior and rendering checks pass. Human comprehension is **unverified** and remains the release gate for the USP.
+Implemented as a prototype. Automated behavior and rendering checks pass. One internal follow-up playtest understood the coverage/LOS distinction, blocked previews, minimap commands, and direction-dependent velocity. The broader five-player comprehension cohort remains the release gate for the USP.
 
 ## Player-Facing Behavior
 
@@ -61,7 +61,7 @@ The durable visual signature, renderer metadata, scenario hash, artifact hashes,
 
 ## Human Success Criteria
 
-Human comprehension is **unverified**. A moderated or instrumented playtest should pass all of these criteria before treating the USP as validated:
+One internal comprehension pass is recorded in `docs/playtests/2026-08-02-first-ux-observation.md`. A moderated or instrumented cohort should still pass all of these criteria before treating the USP as broadly validated:
 
 1. On first selection, at least 4 of 5 players identify antispinward as the longer shot direction within five seconds without coaching.
 2. At least 4 of 5 players correctly choose which side of a target is favorable after seeing the target-side arrow once.

@@ -119,7 +119,7 @@ function readController(value: unknown, path: string, world: WorldPersistenceSta
   ]);
   const controllerFaction = readFaction(controller.faction, `${path}.faction`);
   const controllerDifficulty = readDifficulty(controller.difficulty, `${path}.difficulty`);
-  const scores = readArray(controller.lastGoalScores, `${path}.lastGoalScores`).map((score, index) =>
+  const scores = readBoundedArray(controller.lastGoalScores, `${path}.lastGoalScores`, 16).map((score, index) =>
     readGoalScore(score, `${path}.lastGoalScores[${index}]`));
   const pushTarget = controller.pushTarget === null
     ? null
@@ -165,7 +165,7 @@ function readArtilleryRevealTracking(
   faction: Faction,
   units: readonly Unit[],
 ): ArtilleryRevealTrackingState[] {
-  const tracked = readArray(value, path).map((value, index) => {
+  const tracked = readBoundedArray(value, path, 512).map((value, index) => {
     const entryPath = `${path}[${index}]`;
     const entry = readObject(value, entryPath, ['unitId']);
     return { unitId: readInteger(entry.unitId, `${entryPath}.unitId`, 1) };
@@ -240,10 +240,10 @@ function readTactician(
   const tactician = readObject(value, path, [
     'faction', 'difficulty', 'reactionTimer', 'elapsed', 'squads',
   ]);
-  const squads = readArray(tactician.squads, `${path}.squads`).map((value, index) => {
+  const squads = readBoundedArray(tactician.squads, `${path}.squads`, 256).map((value, index) => {
     const squadPath = `${path}.squads[${index}]`;
     const squad = readObject(value, squadPath, ['id', 'unitIds', 'rallyPoint', 'targetId']);
-    const unitIds = readArray(squad.unitIds, `${squadPath}.unitIds`).map((id, unitIndex) =>
+    const unitIds = readBoundedArray(squad.unitIds, `${squadPath}.unitIds`, 128).map((id, unitIndex) =>
       readInteger(id, `${squadPath}.unitIds[${unitIndex}]`, 1));
     if (new Set(unitIds).size !== unitIds.length) fail(`${squadPath}.unitIds`, 'contains duplicate unit ids');
     for (let unitIndex = 0; unitIndex < unitIds.length; unitIndex++) {
@@ -310,6 +310,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readArray(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) fail(path, 'expected an array');
   return value;
+}
+
+function readBoundedArray(value: unknown, path: string, maximum: number): unknown[] {
+  const values = readArray(value, path);
+  if (values.length > maximum) fail(path, `expected at most ${maximum} entries`);
+  return values;
 }
 
 function readFinite(value: unknown, path: string, minimum = -Infinity, maximum = Infinity): number {

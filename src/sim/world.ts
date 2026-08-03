@@ -230,7 +230,11 @@ export interface SimEvent {
   weapon?: string;
   entityKind?: UnitKind | StructureKind;
   sourceFaction?: Faction;
+  actorId?: number;
+  projectileId?: number;
 }
+
+export const DEPOSIT_PLACEMENT_RADIUS = 70;
 
 export interface PlayerState {
   salvage: number;
@@ -324,6 +328,8 @@ interface BallisticFireDetails {
   /** Normalized coordinates inspected by the authoritative command boundary. */
   targetS?: number;
   targetZ?: number;
+  /** Projectile created by a successful authoritative fire command. */
+  projectileId?: number;
 }
 
 export type BallisticFireResult = BallisticFireDetails & (
@@ -903,8 +909,16 @@ export class World {
   }
 
   depositAt(s: number, z: number): Deposit | undefined {
-    for (const d of this.deposits) if (surfaceDistSq(d.s, d.z, s, z) < 70 * 70) return d;
+    for (const d of this.deposits) {
+      if (surfaceDistSq(d.s, d.z, s, z) < DEPOSIT_PLACEMENT_RADIUS ** 2) return d;
+    }
     return undefined;
+  }
+
+  isDepositAvailable(deposit: Deposit): boolean {
+    if (deposit.amount <= 0) return false;
+    if (deposit.claimedBy === 0) return true;
+    return !this.structureById(deposit.claimedBy)?.alive;
   }
 
   private recomputeCommandCaps(): void {
@@ -985,8 +999,7 @@ export class World {
     if (!this.terrain.isBuildable(s, z)) return false;
     if (def.needsDeposit) {
       const d = this.depositAt(s, z);
-      if (!d || d.amount <= 0) return false;
-      if (d.claimedBy !== 0 && this.structureById(d.claimedBy)) return false;
+      if (!d || !this.isDepositAvailable(d)) return false;
     }
     // No overlapping footprints.
     for (const o of this.structures) {
@@ -1055,7 +1068,7 @@ export class World {
           if (site.progress >= 1) {
             this.players[site.faction as Faction].unlocked.add(site.kind);
             this.recomputeCommandCaps();
-            this.emit('structureComplete', site.s, site.z, 0, site.faction, 1, site.id);
+            this.emit('structureComplete', site.s, site.z, 0, site.faction, 1, site.id, undefined, site.kind);
             u.order = { kind: 'idle', s: 0, z: 0, targetId: 0 };
             u.buildTargetId = 0;
           }
@@ -1071,7 +1084,12 @@ export class World {
       // --- Target acquisition ----------------------------------------------
       if (def.weapons.length > 0) {
         const maxRange = this.bestRange(def.weapons, u);
-        if (u.order.kind === 'attack' && u.order.targetId) {
+        const ballisticOnly = def.weapons.every((weaponId) => WEAPONS[weaponId]?.kind === 'ballistic');
+        const canAutoAcquire = !ballisticOnly || u.order.kind === 'attack' || u.order.kind === 'attackMove';
+        if (!canAutoAcquire) {
+          // Ballistic-only units reserve idle shots for explicit ground commands.
+          u.targetId = 0;
+        } else if (u.order.kind === 'attack' && u.order.targetId) {
           if (this.isValidTarget(u.faction, u.order.targetId, u.s, u.z, maxRange)) {
             u.targetId = u.order.targetId;
           } else {
@@ -1524,8 +1542,8 @@ export class World {
 
     source.ent.cd[source.weaponIndex] =
       this.weaponCooldown(source.ent, source.weapon) / Math.max(0.35, this.powerRatio(faction));
-    this.commitBallistic(source, plan);
-    return withBallisticTarget(assessment.result, targetS, targetZ);
+    const projectileId = this.commitBallistic(source, plan);
+    return withBallisticTarget({ ...assessment.result, projectileId }, targetS, targetZ);
   }
 
   fireBallisticAt(
@@ -1851,8 +1869,9 @@ export class World {
     };
   }
 
-  private commitBallistic(source: BallisticSource, plan: BallisticPlan): void {
+  private commitBallistic(source: BallisticSource, plan: BallisticPlan): number {
     const impact = plan.path[plan.path.length - 1]!;
+    const projectileId = this.nextId++;
     source.ent.revealed = Math.max(source.ent.revealed, FIRING_REVEAL_TIME);
     if (source.isUnit) this.breakCloak(source.ent as Unit);
     this.clearVisibilityCache();
@@ -1865,9 +1884,13 @@ export class World {
       source.weapon.muzzleFlashScale ?? 1,
       source.ent.id,
       source.weapon.id,
+      undefined,
+      undefined,
+      undefined,
+      projectileId,
     );
     this.projectiles.push({
-      id: this.nextId++,
+      id: projectileId,
       alive: true,
       faction: source.faction,
       st: launchToInertial(plan.from, plan.velocity, this.time),
@@ -1883,6 +1906,7 @@ export class World {
       sourceS: source.s,
       sourceZ: source.z,
     });
+    return projectileId;
   }
 
   private fireWeapons(
@@ -2061,7 +2085,7 @@ export class World {
       if (!this.consumeWeaponPower(faction, w)) return;
       pr.doomed = true;
       ent.cd[i] = this.weaponCooldown(ent, w) / power;
-      this.emit('intercepted', pr.p.s, pr.p.z, pr.p.h, faction, 1, pr.id);
+      this.emit('intercepted', pr.p.s, pr.p.z, pr.p.h, faction, 1, pr.id, pr.weapon, undefined, undefined, ent.id);
       break;
     }
   }
@@ -2101,7 +2125,10 @@ export class World {
       if (!this.consumeWeaponPower(grid.faction as Faction, weapon)) return;
       projectile.doomed = true;
       grid.cd[0] = weapon.cooldown / this.powerRatio(grid.faction as Faction);
-      this.emit('intercepted', projectile.p.s, projectile.p.z, projectile.p.h, grid.faction, 1, projectile.id);
+      this.emit(
+        'intercepted', projectile.p.s, projectile.p.z, projectile.p.h,
+        grid.faction, 1, projectile.id, projectile.weapon, undefined, undefined, grid.id,
+      );
       break;
     }
   }
@@ -2553,8 +2580,12 @@ export class World {
     weapon?: string,
     entityKind?: UnitKind | StructureKind,
     sourceFaction?: Faction,
+    actorId?: number,
+    projectileId?: number,
   ): void {
-    this.events.push({ kind, s, z, h, faction, scale, id, weapon, entityKind, sourceFaction });
+    this.events.push({
+      kind, s, z, h, faction, scale, id, weapon, entityKind, sourceFaction, actorId, projectileId,
+    });
   }
 
   drainEvents(): SimEvent[] {
@@ -2703,6 +2734,14 @@ export class World {
     const structure = this.structureById(entityId);
     if (!structure || structure.faction !== faction || structure.progress < 1) return 0;
     return structure.vision * this.sensorPowerScale(faction);
+  }
+
+  hasExactSensorContactFrom(entityId: number, faction: Faction, s: number, z: number): boolean {
+    const unit = this.unitById(entityId);
+    if (!unit || unit.faction !== faction) return false;
+    const range = unit.vision * this.sensorPowerScale(faction);
+    return surfaceDistSq(unit.s, unit.z, s, z) < range * range &&
+      this.hasLineOfSight(unit.s, unit.z, UNITS[unit.kind].height * 0.8, s, z);
   }
 
   sensorStatusAt(faction: Faction, s: number, z: number): {

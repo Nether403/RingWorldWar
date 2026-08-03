@@ -74,6 +74,19 @@ describe('world snapshots', () => {
     expect(world.stateHash()).toBe(before);
   });
 
+  it('rejects oversized authoritative arrays before nested expansion', () => {
+    const world = createWorld(821);
+    const oversizedUnits = createWorldSnapshot(world) as unknown as { world: { units: unknown[] } };
+    oversizedUnits.world.units = Array.from({ length: 513 }, () => oversizedUnits.world.units[0]);
+    expect(() => loadWorldSnapshot(world, oversizedUnits)).toThrow(/units.*at most 512/i);
+
+    const oversizedQueue = createWorldSnapshot(world) as unknown as {
+      world: { structures: Array<{ queue: unknown[] }> };
+    };
+    oversizedQueue.world.structures[0]!.queue = Array.from({ length: 129 }, () => 'engineer');
+    expect(() => loadWorldSnapshot(world, oversizedQueue)).toThrow(/queue.*at most 128/i);
+  });
+
   it('validates both persisted seeds', () => {
     const world = createWorld(85);
     const invalidWorldSeed = createWorldSnapshot(world) as unknown as {
@@ -143,6 +156,20 @@ describe('world snapshots', () => {
 });
 
 describe('match-session snapshots', () => {
+  it('rejects oversized controller squad arrays before nested expansion', () => {
+    const world = createWorld(961);
+    const controllers = [
+      new AiOpponent(Faction.Compact, 'veteran', 1961),
+      new AiOpponent(Faction.Choir, 'veteran', 2961),
+    ] as const;
+    const snapshot = createMatchSessionSnapshot(world, controllers) as unknown as {
+      controllers: Array<{ tactician: { squads: unknown[] } }>;
+    };
+    snapshot.controllers[0]!.tactician.squads = Array.from({ length: 257 }, () => ({
+      id: 1, unitIds: [], rallyPoint: { s: 0, z: 0 }, targetId: 0,
+    }));
+    expect(() => parseMatchSessionSnapshot(snapshot)).toThrow(/squads.*at most 256/i);
+  });
   it('rejects alive enemy and non-mech squad unit references', () => {
     const world = new World(terrain, 96);
     const friendlyMech = world.spawnUnit(Faction.Compact, 'vanguard', 100, 0);

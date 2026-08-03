@@ -1,0 +1,32 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "first-contact",
+  "revision": 1,
+  "worldSeed": 20260803,
+  "quality": "low",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 0, "visualTimeSeconds": 8, "settlingFrames": 3 },
+  "camera": { "focusS": 0, "focusZ": 0, "yawRadians": 0, "zoom": 420 },
+  "mission": {
+    "id": "first-contact",
+    "revision": 1,
+    "bindings": { "tutorialNode": "tutorial-node", "artilleryTarget": "choir-power-core" }
+  },
+  "setup": {
+    "disableAi": true,
+    "player": { "salvage": 3000 },
+    "units": [],
+    "structures": [
+      { "id": "tutorial-node", "faction": "neutral", "kind": "spinalNode", "s": 20419.46710584651, "z": 0, "progress": 1 },
+      { "id": "choir-power-core", "faction": "choir", "kind": "fusionCore", "s": 20019.46710584651, "z": 0, "progress": 1 }
+    ]
+  },
+  "observationRegions": [
+    { "id": "sky", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.35 },
+    { "id": "ground", "kind": "ground", "x": 0, "y": 0.35, "width": 1, "height": 0.45 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.8, "width": 1, "height": 0.2 }
+  ],
+  "benchmark": { "warmupSeconds": 2, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 6, "minimumStructures": 8, "maximumContextLosses": 0 }
+}

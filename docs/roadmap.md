@@ -12,10 +12,13 @@ This is the authoritative source for current delivery status and near-term seque
 | Phase 2 systems implementation | Delivered | AI tiers, weapons, abilities, faction modifiers, save/load, quality settings, and headless orchestration are summarized in `tasks/phase-2-systems-depth/execution-report.md` |
 | Gate 2 gameplay cohorts | Passed | Veteran mirror, Veteran vs Recruit, and Commander vs Veteran cohorts all pass the configured gameplay gates in `docs/core-match-validation-results.md` |
 | Requirement 17.5 | Open | Current local receipt median is 13.884 seconds; the 40-simulated-minute match has not been robustly qualified under 10 seconds on pinned CI hardware |
-| Human playtesting | Open | AI proxies are not human evidence; no completed first-time-player observation is claimed |
+| Human playtesting | Internal pass | One follow-up internal observation passed the four first-player UX checks; the broader five-player cohort remains open |
 | Validation CLI and visual scenario tooling | Completed | Direct `doctor`, `run`, `visual`, `play`, and `perf` workflows are documented in `docs/cli.md` |
 | T480s 720p Low rendering gate | Completed | The candidate hard gate passes with evidence in `docs/t480s-low-performance.md` |
-| Directional artillery prototype | Completed | Automated behavior and rendering validation are recorded in `docs/directional-artillery-prototype.md`; human comprehension remains unverified |
+| Directional artillery prototype | Internal comprehension pass | Automated validation and the first successful internal observation are recorded; broader cohort validation remains open |
+| First Contact tutorial alpha | Internal completion pass | One tester reported completing all ten objectives with zero gameplay confusion or mechanical faults; broader pacing/copy cohort remains open |
+| Break the Line core-loop mission | Automated completion pass | Normal commands complete the established-base loop in 15:45; human pacing runs now determine whether a speed experiment is warranted |
+| Counterfire defensive mission | Playable candidate | Existing power, Umbrella, Laser Grid, Standard Rocket, and Cruise Missile systems form a deterministic defensive/counterbattery loop with persisted debrief stats |
 | Phase 2 overall | Qualification in progress | Gameplay cohorts pass, but performance qualification and human observation remain open |
 
 ## Immediate Sequence
@@ -25,8 +28,10 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 1. **Completed - CLI and visual scenario tooling:** direct reproducible validation, visual capture, play, and profiling workflows are available.
 2. **Completed - T480s Low rendering gate:** the measured 720p Low candidate hard gate passes. Requirement 17.5 remains separately open at the current 13.884-second local median.
 3. **Completed - directional artillery prototype:** the antispinward long-range territorial question is implemented and technically validated.
-4. **Current - human USP observation:** observe a first-time player and record whether the direction and strategic value are legible without coaching the intended answer.
-5. **Tutorial:** design and tune onboarding from the directional-artillery validation and player-observation evidence. Do not finalize tutorial copy or objective timing before those observations.
+4. **Completed - first internal USP observation:** the tester understood sensor coverage versus LOS, blocked previews, minimap commands, and direction-dependent artillery velocity.
+5. **Completed - First Contact tutorial alpha:** deterministic onboarding passed one tester-reported internal completion; broader copy validation remains open.
+6. **Completed - Break the Line pacing validation:** the tester completed in roughly 12–15 minutes and chose to keep current movement and projectile speeds.
+7. **Current - Counterfire validation:** test defensive power, interception, ammunition adaptation, and whether the reusable debrief explains the outcome without coaching.
 
 ## Direction Decisions
 
@@ -39,7 +44,7 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 ## Open Exit Evidence
 
 - A repeatable Requirement 17.5 result on the named target or stable pinned CI hardware.
-- A recorded first-time-player session with match outcome, duration, points of confusion, artillery-direction comprehension, and unprompted observations.
+- A broader recorded first-time-player cohort with match outcomes, durations, points of confusion, artillery-direction comprehension, and unprompted observations.
 - A go, rebalance, or re-scope decision based on that human evidence.
 
 ## Historical Sources

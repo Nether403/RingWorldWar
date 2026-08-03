@@ -21,14 +21,48 @@ export function waitForPlaySession({ page, browser, seconds, signals = process }
 }
 
 export function buildPlaytestNotes({ scenarioId, reproductionCommand }) {
-  return `# Ring World War Playtest Notes
+  let questions;
+  if (scenarioId === 'first-contact') {
+    questions = `## First Contact Questions
 
-- Scenario: ${scenarioId}
-- Tester ID: [anonymous/local identifier]
-- Completed: [yes/no]
-- Reproduction: \`${reproductionCommand}\`
+1. Was the objective sequence clear without coaching?
+   - Observation/answer:
+2. Could the tester establish power, salvage income, and mech production?
+   - Observation/answer:
+3. Did moving the Wisp to the Spinal Node make capture and sensor reveal understandable?
+   - Observation/answer:
+4. Could the tester deploy the Longbow and resolve any blocked preview from the status text?
+   - Observation/answer:
+5. Why was the antispinward firing position favorable?
+   - Observation/answer:`;
+  } else if (scenarioId === 'break-the-line') {
+    questions = `## Break the Line Questions
 
-## Directional-Artillery Questions
+1. Time to first contact:
+   - Observation/answer:
+2. Which stretches felt like travel without a meaningful decision?
+   - Observation/answer:
+3. Did scouting, defence, artillery positioning, assault, and consolidation form a coherent loop?
+   - Observation/answer:
+4. Which objective created the most idle time or unclear pressure?
+   - Observation/answer:
+5. Should movement speed remain unchanged, increase slightly, or be reconsidered after another run?
+   - Observation/answer:`;
+  } else if (scenarioId === 'counterfire') {
+    questions = `## Counterfire Questions
+
+1. Was the relationship between power reserve and interception clear?
+   - Observation/answer:
+2. Did activating Umbrella feel like an intentional defensive decision?
+   - Observation/answer:
+3. Was it clear why the Standard Rocket failed against the Laser Grid?
+   - Observation/answer:
+4. Was switching to Cruise Missile discoverable without coaching?
+   - Observation/answer:
+5. Which debrief statistic best explained the outcome?
+   - Observation/answer:`;
+  } else {
+    questions = `## Directional-Artillery Questions
 
 1. Which direction lets this launcher shoot farther?
    - Observation/answer:
@@ -39,7 +73,16 @@ export function buildPlaytestNotes({ scenarioId, reproductionCommand }) {
 4. What do the footprint halves wrapping across the joined minimap edges represent?
    - Observation/answer:
 5. Without coaching, can the tester deploy the Longbow, find Siege Mortar, preview a shot, and fire?
-   - Observation/answer:
+   - Observation/answer:`;
+  }
+  return `# Ring World War Playtest Notes
+
+- Scenario: ${scenarioId}
+- Tester ID: [anonymous/local identifier]
+- Completed: [yes/no]
+- Reproduction: \`${reproductionCommand}\`
+
+${questions}
 
 ## Session Observations
 

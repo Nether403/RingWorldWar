@@ -1,0 +1,17 @@
+{
+  "schema": "rww.tracked-performance-evidence", "version": 1,
+  "capturedAt": "2026-08-03T01:10:18.261Z", "status": "pass",
+  "scenario": { "id": "counterfire", "revision": 1, "path": "validation/scenarios/counterfire.json", "sha256": "36e5820b4f990411ce1bf8c6d404c012e029fe64ef088c6bb2bfee77b356dc60" },
+  "target": { "id": "t480s-low-candidate", "path": "validation/hardware/t480s-low.json", "sha256": "1578c7fad49766717878aae90950c6e4080b8329b3703f61b36e2af9c9866512", "verdict": "pass" },
+  "measurement": {
+    "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 }, "quality": "low", "samples": 297,
+    "frameMilliseconds": { "median": 16.7, "p95": 16.8, "p99": 33.304 },
+    "renderMilliseconds": { "median": 3.4, "p95": 7.3, "p99": 9.52 },
+    "simulationMilliseconds": { "median": 0.2, "p95": 0.62, "p99": 2.44 },
+    "fullFrameMilliseconds": { "median": 5.6, "p95": 11.4, "p99": 13.604 },
+    "over100MillisecondsCount": 0, "drawCalls": 40, "triangles": 81370,
+    "contextLosses": 0, "blackFrame": false, "consoleErrors": [], "pageErrors": []
+  },
+  "artifacts": { "reportSha256": "ccafa2d065e88ffc65c71054009d4044656e02ccc838f87863b7a582180e0fb5", "sourceReceipt": "output/runs/20260803T011018.261Z-9340-f6d0d5c1/receipt.json", "sourceReceiptSha256": "6f5d763727d877010df7109897fa627c2ff8093c806f1d2a41885190ce18a4ca" },
+  "code": { "sourceBaseSha": "d182bde4915afb8aa2c934b3b59dcd0e69912d48", "trackedPatchSha256": "3613a473c64be187291f08cd181be5953b52460b589f56231840c26d26a71f2d", "untrackedSourceManifestSha256": "ebad312db2fd5d07ab90365d84e71d1bf1e43046a754bc397771d6ba70e9584a", "untrackedSourceCount": 20, "untrackedSourceExclusions": ["validation/evidence/**"] }
+}

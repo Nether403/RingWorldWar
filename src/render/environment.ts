@@ -21,6 +21,7 @@
 import * as THREE from 'three';
 import {
   DAY_LENGTH,
+  RING_OMEGA,
   RING_CIRCUMFERENCE,
   RING_HALF_WIDTH,
   RING_RADIUS,
@@ -153,12 +154,16 @@ export class Environment {
   private filamentGlow!: THREE.Mesh;
   private panels: THREE.Mesh[] = [];
   private stars!: THREE.Points;
+  private readonly starPivot = new THREE.Group();
   private envTarget: THREE.WebGLRenderTarget | null = null;
 
   private readonly _v = new THREE.Vector3();
 
   constructor(seed: number) {
     this.group.name = 'environment';
+    this.starPivot.name = 'environment:star-pivot';
+    this.starPivot.position.set(0, RING_RADIUS, 0);
+    this.group.add(this.starPivot);
 
     // --- Lighting -----------------------------------------------------------
     this.keyLight = new THREE.DirectionalLight(0xfff2e0, 1.6);
@@ -298,7 +303,7 @@ export class Environment {
       const phi = rng.next() * Math.PI * 2;
       const r = Math.sqrt(1 - u * u);
       pos[i * 3] = Math.cos(phi) * r * R;
-      pos[i * 3 + 1] = u * R + RING_RADIUS;
+      pos[i * 3 + 1] = u * R;
       pos[i * 3 + 2] = Math.sin(phi) * r * R;
 
       // Most stars are dim; a few are bright. Power law keeps it believable.
@@ -330,8 +335,10 @@ export class Environment {
           varying vec3 vColor;
           void main() {
             vColor = color;
-            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            vec3 viewDirection = mat3(viewMatrix) * mat3(modelMatrix) * position;
+            vec4 mv = vec4(viewDirection, 1.0);
             gl_Position = projectionMatrix * mv;
+            gl_Position.z = gl_Position.w * 0.9999;
             gl_PointSize = aSize * uScale;
           }
         `,
@@ -351,8 +358,9 @@ export class Environment {
         vertexColors: true,
       }),
     );
+    this.stars.name = 'environment:stars';
     this.stars.frustumCulled = false;
-    this.group.add(this.stars);
+    this.starPivot.add(this.stars);
   }
 
   // -------------------------------------------------------------------------
@@ -361,6 +369,7 @@ export class Environment {
     this.cycle.update(time, anchor.s);
 
     const anchorAngle = (anchor.s / RING_CIRCUMFERENCE) * Math.PI * 2;
+    this.starPivot.rotation.z = -(RING_OMEGA * time + anchorAngle);
 
     // --- Filament, positioned relative to the anchor -------------------------
     const rel = this.cycle.filamentAngle - anchorAngle;
@@ -398,7 +407,6 @@ export class Environment {
     // --- Stars fade in as the light drops ------------------------------------
     const starMat = this.stars.material as THREE.ShaderMaterial;
     starMat.uniforms.uOpacity!.value = 0.25 + (1 - this.cycle.daylight) * 0.75;
-    this.stars.position.set(0, 0, 0);
   }
 
   /** Fog colour for the current lighting. */

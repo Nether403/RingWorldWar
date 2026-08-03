@@ -454,6 +454,21 @@ describe('commanded artillery', () => {
     expect(world.previewBallistic(battery.id, 1_000, 0, Faction.Compact)).not.toBeNull();
     expect(world.fireBallisticAt(battery.id, 1_000, 0, Faction.Compact)).toBe(true);
   });
+
+  it('keeps an idle Longbow ready for an explicit ground-target command', () => {
+    const world = battlefield();
+    const longbow = world.spawnUnit(Faction.Compact, 'longbow', 0, 0);
+    longbow.ability!.active = true;
+    longbow.ability!.transitionTimer = 0;
+    world.spawnUnit(Faction.Compact, 'wisp', 1_000, 0);
+    world.spawnStructure(Faction.Choir, 'fusionCore', 1_000, 0, 1);
+
+    world.step();
+
+    expect(world.projectiles.filter((projectile) => projectile.weapon === 'siegeMortar')).toHaveLength(0);
+    expect(longbow.cd[0]).toBe(0);
+    expect(world.fireBallisticAt(longbow.id, 1_000, 0, Faction.Compact, 'siegeMortar')).toBe(true);
+  });
 });
 
 function battlefield(): World {

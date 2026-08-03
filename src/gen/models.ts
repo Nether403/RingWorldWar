@@ -42,7 +42,7 @@ class MeshBuilder {
     return this.idx.length / 3;
   }
 
-  /** Add a quad given four corners in CCW order. */
+  /** Add a quad using the generator's clockwise exterior-corner order. */
   quad(
     a: THREE.Vector3,
     b: THREE.Vector3,
@@ -53,7 +53,7 @@ class MeshBuilder {
     const base = this.pos.length / 3;
     _e1.subVectors(b, a);
     _e2.subVectors(d, a);
-    _n.crossVectors(_e1, _e2).normalize();
+    _n.crossVectors(_e2, _e1).normalize();
 
     for (const [v, u, w] of [
       [a, 0, 0],
@@ -66,7 +66,26 @@ class MeshBuilder {
       this.uv.push(u, w);
       this.mask.push(mask);
     }
-    this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    this.idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+  }
+
+  /** Add one non-degenerate triangle in the same exterior-corner order. */
+  triangle(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, mask: number): void {
+    const base = this.pos.length / 3;
+    _e1.subVectors(b, a);
+    _e2.subVectors(c, a);
+    _n.crossVectors(_e2, _e1).normalize();
+    for (const [v, u, w] of [
+      [a, 0.5, 0.5],
+      [b, 0, 0],
+      [c, 1, 0],
+    ] as const) {
+      this.pos.push(v.x, v.y, v.z);
+      this.nrm.push(_n.x, _n.y, _n.z);
+      this.uv.push(u, w);
+      this.mask.push(mask);
+    }
+    this.idx.push(base, base + 2, base + 1);
   }
 
   /** Append another builder's contents, transformed. */
@@ -271,11 +290,10 @@ function addCylinder(
       mask,
     );
     // Caps.
-    mb.quad(
+    mb.triangle(
       new THREE.Vector3(px, py + height, pz),
       new THREE.Vector3(px + c0 * topRadius, py + height, pz + s0 * topRadius),
       new THREE.Vector3(px + c1 * topRadius, py + height, pz + s1 * topRadius),
-      new THREE.Vector3(px, py + height, pz),
       mask,
     );
   }

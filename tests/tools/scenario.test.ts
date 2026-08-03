@@ -52,12 +52,129 @@ describe('browser scenario schema', () => {
     })).toThrow(/disableAi.*boolean/i);
   });
 
+  it('parses tutorial mission bindings and player setup against declared scenario entities', () => {
+    const tutorial = {
+      ...scenario,
+      mission: {
+        id: 'first-contact',
+        revision: 1,
+        bindings: { tutorialNode: 'node', artilleryTarget: 'target' },
+      },
+      simulation: { ...scenario.simulation, targetTick: 0 },
+      setup: {
+        ...scenario.setup,
+        player: { salvage: 3000 },
+        structures: [
+          { id: 'node', faction: 'neutral', kind: 'spinalNode', s: 150, z: 0, progress: 1 },
+          { id: 'target', faction: 'choir', kind: 'fusionCore', s: 200, z: 0, progress: 1 },
+        ],
+      },
+    };
+
+    expect(parseScenario(tutorial)).toMatchObject({
+      mission: tutorial.mission,
+      setup: { player: { salvage: 3000 } },
+    });
+    expect(() => parseScenario({
+      ...tutorial,
+      mission: { ...tutorial.mission, bindings: { ...tutorial.mission.bindings, tutorialNode: 'missing' } },
+    })).toThrow(/tutorialNode.*setup id/i);
+    expect(() => parseScenario({
+      ...tutorial,
+      setup: { ...tutorial.setup, player: { salvage: -1 } },
+    })).toThrow(/salvage.*non-negative/i);
+    expect(() => parseScenario({
+      ...tutorial,
+      mission: {
+        ...tutorial.mission,
+        bindings: { tutorialNode: 'node', artilleryTarget: 'node' },
+      },
+    })).toThrow(/bindings.*distinct/i);
+    expect(() => parseScenario({
+      ...tutorial,
+      setup: {
+        ...tutorial.setup,
+        structures: tutorial.setup.structures.map((structure) =>
+          structure.id === 'node' ? { ...structure, faction: 'compact' } : structure),
+      },
+    })).toThrow(/tutorialNode.*neutral/i);
+    expect(() => parseScenario({
+      ...tutorial,
+      setup: {
+        ...tutorial.setup,
+        structures: tutorial.setup.structures.map((structure) =>
+          structure.id === 'target' ? { ...structure, kind: 'radarMast' } : structure),
+      },
+    })).toThrow(/artilleryTarget.*fusionCore/i);
+    expect(() => parseScenario({
+      ...tutorial,
+      simulation: { ...tutorial.simulation, targetTick: 1 },
+    })).toThrow(/targetTick.*zero/i);
+  });
+
+  it('strictly binds every Break the Line objective entity', () => {
+    const breakLine = {
+      ...scenario,
+      simulation: { ...scenario.simulation, targetTick: 0 },
+      mission: {
+        id: 'break-the-line',
+        revision: 1,
+        bindings: {
+          forwardNode: 'node',
+          protectedExtractor: 'extractor',
+          enemyArtillery: 'battery',
+          strongpointIds: ['core', 'radar'],
+          raiderIds: ['raider'],
+        },
+      },
+      setup: {
+        ...scenario.setup,
+        units: [{ id: 'raider', faction: 'choir', kind: 'vanguard', s: 800, z: 0 }],
+        structures: [
+          { id: 'node', faction: 'neutral', kind: 'spinalNode', s: 4_700, z: 0, progress: 1 },
+          { id: 'extractor', faction: 'compact', kind: 'extractor', s: 190, z: 150, progress: 1 },
+          { id: 'battery', faction: 'choir', kind: 'rocketBattery', s: 3_200, z: 0, progress: 1 },
+          { id: 'core', faction: 'choir', kind: 'fusionCore', s: 3_300, z: 150, progress: 1 },
+          { id: 'radar', faction: 'choir', kind: 'radarMast', s: 3_300, z: -150, progress: 1 },
+        ],
+      },
+    };
+
+    expect(parseScenario(breakLine).mission).toEqual(breakLine.mission);
+    expect(() => parseScenario({
+      ...breakLine,
+      mission: {
+        ...breakLine.mission,
+        bindings: { ...breakLine.mission.bindings, raiderIds: ['missing'] },
+      },
+    })).toThrow(/raiderIds.*setup id/i);
+    expect(() => parseScenario({
+      ...breakLine,
+      mission: {
+        ...breakLine.mission,
+        bindings: { ...breakLine.mission.bindings, enemyArtillery: 'core', strongpointIds: ['radar'] },
+      },
+    })).toThrow(/enemyArtillery.*Rocket Battery/i);
+  });
+
   it('rejects unsupported versions and unknown nested fields', () => {
     expect(() => parseScenario({ ...scenario, version: 2 })).toThrow(/version/i);
     expect(() => parseScenario({ ...scenario, camera: { ...scenario.camera, pitch: 1 } })).toThrow(/camera\.pitch.*unknown/i);
     expect(() => parseScenario({ ...scenario, setup: { ...scenario.setup, units: [
       { ...scenario.setup.units[0], kind: 'tank' },
     ] } })).toThrow(/kind/i);
+  });
+
+  it('bounds scenario entity setup before browser expansion', () => {
+    expect(() => parseScenario({
+      ...scenario,
+      setup: {
+        ...scenario.setup,
+        units: Array.from({ length: 129 }, (_, index) => ({
+          id: `unit-${index}`, faction: 'compact', kind: 'engineer', s: index, z: 0,
+        })),
+      },
+    })).toThrow(/setup\.units.*at most 128/i);
   });
 
   it('validates optional deterministic selection and ability state', () => {

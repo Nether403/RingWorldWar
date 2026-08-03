@@ -1,0 +1,9 @@
+{
+  "schema": "rww.tracked-visual-evidence", "version": 1,
+  "capturedAt": "2026-08-03T00:47:01.622Z", "status": "baseline-created",
+  "warning": "No cross-GPU exact-pixel pass is inferred until the scenario embeds an accepted expected signature.",
+  "scenario": { "id": "counterfire", "revision": 1, "path": "validation/scenarios/counterfire.json", "sha256": "36e5820b4f990411ce1bf8c6d404c012e029fe64ef088c6bb2bfee77b356dc60" },
+  "signatureSummary": { "meanLuminance": 127.930448, "luminanceVariance": 2638.82603, "liveUnits": 10, "liveStructures": 13, "drawCalls": 40, "triangles": 81370, "contextLosses": 0, "consoleErrors": [], "pageErrors": [] },
+  "artifacts": { "signatureSha256": "5143aa41649d545d6af9a26c1a5c1f0c0df58ea133679bbd0bc2b1637cb203d6", "manifestSha256": "46b0aaa3fc457024f1d17264817ea00b20f02815bbea84053ea1c48e78a9add5", "screenshotSha256": "44372986089dfad9a60960909ce3fb2d556cb819d7d3086c1f1db0c7e8889f4c", "sourceReceipt": "output/runs/20260803T004701.622Z-11660-9ddba734/receipt.json", "sourceReceiptSha256": "e89426b3f4f886f9ee91d5c50b80f8462142bded1abd4e53b6992b87dcf4a92a" },
+  "code": { "sourceBaseSha": "d182bde4915afb8aa2c934b3b59dcd0e69912d48", "trackedPatchSha256": "63f0d132fd3172a3b719382d1e7d6de51ac448b50ff7dbe11fe273642db84382", "untrackedSourceManifestSha256": "c0c773332a87f0011681128c56927a626f6b5b795a68eeb7141dcc592ab91bfd", "untrackedSourceCount": 20, "untrackedSourceExclusions": ["validation/evidence/**"] }
+}
