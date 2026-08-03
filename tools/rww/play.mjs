@@ -61,6 +61,19 @@ export function buildPlaytestNotes({ scenarioId, reproductionCommand }) {
    - Observation/answer:
 5. Which debrief statistic best explained the outcome?
    - Observation/answer:`;
+  } else if (scenarioId === 'a-signal-in-the-spine') {
+    questions = `## A Signal in the Spine Questions
+
+1. Did the briefing establish the objective without overexplaining the setting?
+   - Observation/answer:
+2. Did the Bulwark feel meaningfully different from the Vanguard during the escort?
+   - Observation/answer:
+3. Were cloaked Needles readable and threatening without feeling arbitrary?
+   - Observation/answer:
+4. Was the Migration Protocol transmission understandable during play?
+   - Observation/answer:
+5. Did the final one-operation revelation create a clear reason to continue?
+   - Observation/answer:`;
   } else {
     questions = `## Directional-Artillery Questions
 

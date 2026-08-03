@@ -1,0 +1,51 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "a-signal-in-the-spine",
+  "revision": 1,
+  "worldSeed": 20260806,
+  "quality": "low",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 0, "visualTimeSeconds": 24, "settlingFrames": 3 },
+  "camera": { "focusS": 300, "focusZ": 0, "yawRadians": 0.04, "zoom": 430 },
+  "mission": {
+    "id": "a-signal-in-the-spine",
+    "revision": 1,
+    "bindings": {
+      "signalNode": "signal-node",
+      "engineer": "restoration-engineer",
+      "bulwark": "compact-bulwark",
+      "needleIds": ["needle-one", "needle-two"],
+      "restorationPower": "restoration-core",
+      "fieldCommand": "choir-field-command"
+    }
+  },
+  "setup": {
+    "disableAi": true,
+    "player": { "salvage": 1000, "commandCap": 12 },
+    "units": [
+      { "id": "restoration-engineer", "faction": "compact", "kind": "engineer", "s": 160, "z": -60, "yawRadians": 0, "selected": true },
+      { "id": "compact-bulwark", "faction": "compact", "kind": "bulwark", "s": 120, "z": 60, "yawRadians": 0, "selected": true },
+      { "id": "compact-vanguard-one", "faction": "compact", "kind": "vanguard", "s": 40, "z": 130, "yawRadians": 0, "selected": true },
+      { "id": "compact-vanguard-two", "faction": "compact", "kind": "vanguard", "s": 40, "z": -130, "yawRadians": 0, "selected": true },
+      { "id": "compact-vanguard-three", "faction": "compact", "kind": "vanguard", "s": -60, "z": 0, "yawRadians": 0, "selected": true },
+      { "id": "needle-one", "faction": "choir", "kind": "needle", "s": 880, "z": 180, "yawRadians": 3.141592653589793, "target": "signal-node", "targetMode": "attackMove" },
+      { "id": "needle-two", "faction": "choir", "kind": "needle", "s": 980, "z": -120, "yawRadians": 3.141592653589793, "target": "signal-node", "targetMode": "attackMove" }
+    ],
+    "structures": [
+      { "id": "signal-node", "faction": "neutral", "kind": "spinalNode", "s": 1450, "z": 0, "progress": 1 },
+      { "id": "restoration-core", "faction": "compact", "kind": "fusionCore", "s": 1320, "z": -170, "progress": 0.25 },
+      { "id": "compact-radar", "faction": "compact", "kind": "radarMast", "s": 240, "z": 220, "progress": 1 },
+      { "id": "choir-field-command", "faction": "choir", "kind": "mechFoundry", "s": 2180, "z": 0, "progress": 1 },
+      { "id": "choir-command-core", "faction": "choir", "kind": "fusionCore", "s": 2260, "z": 190, "progress": 1 },
+      { "id": "choir-command-radar", "faction": "choir", "kind": "radarMast", "s": 2100, "z": -190, "progress": 1 }
+    ]
+  },
+  "observationRegions": [
+    { "id": "sky", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.35 },
+    { "id": "ground", "kind": "ground", "x": 0, "y": 0.35, "width": 1, "height": 0.45 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.8, "width": 1, "height": 0.2 }
+  ],
+  "benchmark": { "warmupSeconds": 3, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 13, "minimumStructures": 12, "maximumContextLosses": 0 }
+}

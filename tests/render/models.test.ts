@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildStructure } from '@gen/models';
+import { buildMech, buildStructure } from '@gen/models';
 import { describe, expect, it } from 'vitest';
 
 describe('procedural hull geometry', () => {
@@ -28,5 +28,15 @@ describe('procedural hull geometry', () => {
     for (let index = 0; index < normals.count; index++) {
       expect(Math.hypot(normals.getX(index), normals.getY(index), normals.getZ(index))).toBeGreaterThan(0.99);
     }
+  });
+
+  it('builds distinct valid Bulwark and Needle silhouettes', () => {
+    const bulwark = buildMech('bulwark', 18);
+    const needle = buildMech('needle', 18);
+
+    expect(bulwark.height).toBeGreaterThan(needle.height);
+    expect(bulwark.radius).toBeGreaterThan(needle.radius);
+    expect(bulwark.parts.torso.getAttribute('position').count).toBeGreaterThan(0);
+    expect(needle.parts.torso.getAttribute('position').count).toBeGreaterThan(0);
   });
 });

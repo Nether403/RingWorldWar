@@ -23,6 +23,7 @@ import { Rng } from '@core/rng';
 import type { Terrain } from '@gen/terrain';
 import {
   BASE_ENERGY,
+  canFactionFieldUnit,
   COMMAND_PER_NODE,
   DAMAGE_TABLE,
   DOMINANCE_PER_NODE_PER_SEC,
@@ -479,6 +480,9 @@ export class World {
   // -------------------------------------------------------------------------
 
   spawnUnit(faction: Faction, kind: UnitKind, s: number, z: number): Unit {
+    if (!canFactionFieldUnit(faction, kind)) {
+      throw new Error(`${UNITS[kind].name} is not available to faction ${faction}`);
+    }
     const def = UNITS[kind];
     const effective = effectiveUnitStats(faction, kind);
     const u: Unit = {
@@ -964,6 +968,7 @@ export class World {
     if (!st || st.faction < 0 || st.progress < 1) return false;
     if (!STRUCTURES[st.kind].produces?.includes(kind)) return false;
     const f = st.faction as Faction;
+    if (!canFactionFieldUnit(f, kind)) return false;
     const p = this.players[f];
     const def = UNITS[kind];
     const cost = effectiveUnitStats(f, kind).salvageCost;
@@ -1097,7 +1102,7 @@ export class World {
             u.order = { kind: 'idle', s: 0, z: 0, targetId: 0 };
           }
         } else if (!u.targetId || !this.isValidTarget(u.faction, u.targetId, u.s, u.z, maxRange)) {
-          u.targetId = this.findTarget(u.faction, u.s, u.z, maxRange);
+          u.targetId = this.findTarget(u.faction, u.s, u.z, maxRange, u.kind);
         }
       }
 
@@ -1305,7 +1310,7 @@ export class World {
   }
 
   /** Nearest enemy in range. Prefers units over buildings. */
-  private findTarget(f: Faction, s: number, z: number, range: number): number {
+  private findTarget(f: Faction, s: number, z: number, range: number, attackerKind?: UnitKind): number {
     const near = this.nearby(s, z, range);
     let best = 0;
     let bestScore = Infinity;
@@ -1315,7 +1320,12 @@ export class World {
       const d = surfaceDist(s, z, entity.s, entity.z);
       if (d > range || !this.isEntityVisible(f, id)) continue;
       // Buildings are shot only once nothing living is in reach.
-      const score = d + ('order' in entity ? 0 : 'progress' in entity ? range * 0.9 : range * 1.2);
+      let score = d + ('order' in entity ? 0 : 'progress' in entity ? range * 0.9 : range * 1.2);
+      if (attackerKind === 'needle' && 'order' in entity) {
+        if (entity.kind === 'engineer') score -= range * 0.9;
+        else if (entity.kind === 'longbow') score -= range * 0.7;
+        else if (entity.kind === 'wisp') score -= range * 0.6;
+      }
       if (score < bestScore) {
         bestScore = score;
         best = id;

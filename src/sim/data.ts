@@ -186,6 +186,20 @@ export const WEAPONS: Record<string, WeaponDef> = {
     energyPerShot: 1,
     muzzleFlashScale: 0.8,
   },
+  needleLance: {
+    id: 'needleLance',
+    kind: 'direct',
+    damage: 22,
+    damageType: 'energy',
+    cooldown: 0.7,
+    range: 175,
+    burst: 2,
+    burstDelay: 0.08,
+    projectileSpeed: 680,
+    energyPerShot: 1,
+    spread: 0.7,
+    muzzleFlashScale: 0.55,
+  },
   batteryGun: {
     id: 'batteryGun',
     kind: 'ballistic',
@@ -266,7 +280,14 @@ export const WEAPONS: Record<string, WeaponDef> = {
 // Units
 // ---------------------------------------------------------------------------
 
-export type UnitKind = 'vanguard' | 'longbow' | 'wisp' | 'aegis' | 'engineer';
+export type UnitKind =
+  | 'vanguard'
+  | 'longbow'
+  | 'wisp'
+  | 'aegis'
+  | 'bulwark'
+  | 'needle'
+  | 'engineer';
 
 export interface UnitDef {
   kind: UnitKind;
@@ -293,6 +314,8 @@ export interface UnitDef {
   canBuild?: boolean;
   /** Passive energy draw while alive. */
   upkeep?: number;
+  /** Omitted means both factions. */
+  availableTo?: readonly Faction[];
 }
 
 export const UNITS: Record<UnitKind, UnitDef> = {
@@ -381,7 +404,47 @@ export const UNITS: Record<UnitKind, UnitDef> = {
     isMech: true,
     upkeep: 4,
   },
+  bulwark: {
+    kind: 'bulwark',
+    name: 'Bulwark',
+    role: 'Compact escort walker. Locks down a corridor and shields a restoration team.',
+    cost: { salvage: 610, command: 3 },
+    buildTime: 30,
+    hp: 3600,
+    armor: 'heavy',
+    speed: 7.8,
+    turnRate: 0.78,
+    vision: 230,
+    radius: 6.3,
+    height: 12,
+    weapons: ['autocannon', 'autocannon'],
+    isMech: true,
+    upkeep: 3,
+    availableTo: [Faction.Compact],
+  },
+  needle: {
+    kind: 'needle',
+    name: 'Needle',
+    role: 'Choir cloaked hunter. Raids Engineers, spotters, and artillery.',
+    cost: { salvage: 330, command: 1 },
+    buildTime: 16,
+    hp: 760,
+    armor: 'light',
+    speed: 25,
+    turnRate: 3.2,
+    vision: 420,
+    radius: 3.2,
+    height: 8,
+    weapons: ['needleLance'],
+    isMech: true,
+    upkeep: 2,
+    availableTo: [Faction.Choir],
+  },
 };
+
+export function canFactionFieldUnit(faction: Faction, kind: UnitKind): boolean {
+  return UNITS[kind].availableTo?.includes(faction) ?? true;
+}
 
 // ---------------------------------------------------------------------------
 // Structures
@@ -528,7 +591,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     vision: 160,
     weapons: [],
     energy: -8,
-    produces: ['wisp', 'vanguard', 'aegis', 'longbow'],
+    produces: ['wisp', 'vanguard', 'aegis', 'longbow', 'bulwark', 'needle'],
     requires: 'fabricator',
     hotkey: 'M',
   },

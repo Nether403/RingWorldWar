@@ -28,6 +28,13 @@ interface BrowserScenario {
         protectedAsset: string; defensePower: string; aegis: string; wisp: string;
         playerBattery: string; enemyLauncher: string; enemyGrid: string;
       };
+    }
+    | {
+      id: 'a-signal-in-the-spine'; revision: 1;
+      bindings: {
+        signalNode: string; engineer: string; bulwark: string; needleIds: string[];
+        restorationPower: string; fieldCommand: string;
+      };
     };
   setup: {
     disableAi?: boolean;
@@ -148,7 +155,7 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
         strongpointIds: scenario.mission.bindings.strongpointIds.map(entityId),
         raiderIds: scenario.mission.bindings.raiderIds.map(entityId),
       });
-    } else {
+    } else if (scenario.mission.id === 'counterfire') {
       rww.game.startMission('counterfire', {
         protectedAsset: entityId(scenario.mission.bindings.protectedAsset),
         defensePower: entityId(scenario.mission.bindings.defensePower),
@@ -157,6 +164,15 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
         playerBattery: entityId(scenario.mission.bindings.playerBattery),
         enemyLauncher: entityId(scenario.mission.bindings.enemyLauncher),
         enemyGrid: entityId(scenario.mission.bindings.enemyGrid),
+      });
+    } else {
+      rww.game.startMission('a-signal-in-the-spine', {
+        signalNode: entityId(scenario.mission.bindings.signalNode),
+        engineer: entityId(scenario.mission.bindings.engineer),
+        bulwark: entityId(scenario.mission.bindings.bulwark),
+        needleIds: scenario.mission.bindings.needleIds.map(entityId),
+        restorationPower: entityId(scenario.mission.bindings.restorationPower),
+        fieldCommand: entityId(scenario.mission.bindings.fieldCommand),
       });
     }
   }
@@ -245,6 +261,9 @@ export function captureScenarioFrame(scenario: BrowserScenario): {
 
 export async function benchmarkScenario(warmupSeconds: number, sampleSeconds: number): Promise<Record<string, unknown>> {
   const rww = requiredRww();
+  // Performance qualification measures active gameplay, not a deliberately
+  // paused story briefing. Visual and human-play flows still preserve it.
+  if (rww.game.narrativeHudModel?.blocking) rww.game.acknowledgeNarrative();
   const intervals: number[] = [];
   const render: number[] = [];
   const simulation: number[] = [];

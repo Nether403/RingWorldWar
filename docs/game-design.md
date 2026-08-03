@@ -99,5 +99,5 @@ Difficulty tiers adjust reaction time, intel usage, and doctrine variety — nev
 - RTS standard: edge/MMB pan, wheel zoom (zoom out far enough and the camera tilts to reveal the ring arc — the "strategy postcard" shot), ctrl-groups, tab subselect.
 - `V` — takeover selected mech · `Esc` — back to tactical · `Space` — jump to last alert.
 
-## 12. Out of Scope (current skirmish)
-Multiplayer netcode, campaign/story missions, >1 map, faction-exclusive rosters, replays, mod support, and mobile/touch. All are architected-for where applicable, but not built.
+## 12. Expansion Boundary
+The first story slice and faction-exclusive roster pair are now implemented as a bounded validation expansion. Multiplayer netcode, a campaign map, branching narrative, >1 generated map, replays, mod support, and mobile/touch remain out of scope.

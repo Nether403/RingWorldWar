@@ -142,6 +142,26 @@ describe('strategist information and resource boundaries', () => {
 });
 
 describe('strategist production planning', () => {
+  it('queues only the faction-exclusive unit for each faction', () => {
+    for (const faction of [Faction.Compact, Faction.Choir]) {
+      const world = emptyWorld();
+      const foundries = Array.from({ length: 4 }, (_, index) =>
+        world.spawnStructure(faction, 'mechFoundry', index * 100, 0, 1));
+      world.players[faction].salvage = 10_000;
+      world.players[faction].commandCap = 20;
+
+      new AiOpponent(faction, 'commander', 70 + faction).update(world, SIM_DT);
+      const queued = foundries.flatMap((foundry) => foundry.queue);
+      if (faction === Faction.Compact) {
+        expect(queued).toContain('bulwark');
+        expect(queued).not.toContain('needle');
+      } else {
+        expect(queued).toContain('needle');
+        expect(queued).not.toContain('bulwark');
+      }
+    }
+  });
+
   it('reserves one Wisp across stable producer ordering and updates the next choice immediately', () => {
     const world = emptyWorld();
     const first = world.spawnStructure(Faction.Compact, 'mechFoundry', 0, 0, 1);

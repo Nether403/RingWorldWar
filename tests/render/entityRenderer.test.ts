@@ -24,4 +24,14 @@ describe('EntityRenderer quality materials', () => {
     entities.setLowQuality(false);
     expect(qualityValues()).toEqual([0, 0]);
   });
+
+  it('creates Needle cloak and both exclusive-unit wreck buckets', () => {
+    const renderer = new EntityRenderer(19) as unknown as {
+      cloakMeshes: Map<string, THREE.InstancedMesh>;
+      wreckMeshes: Map<string, THREE.InstancedMesh>;
+    };
+    expect(renderer.cloakMeshes.has('needle|torso|1')).toBe(true);
+    expect(renderer.wreckMeshes.has('bulwark')).toBe(true);
+    expect(renderer.wreckMeshes.has('needle')).toBe(true);
+  });
 });

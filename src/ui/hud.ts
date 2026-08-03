@@ -19,6 +19,7 @@ import { RING_CIRCUMFERENCE, RING_HALF_WIDTH } from '@core/constants';
 import { deltaS } from '@core/ringMath';
 import {
   BUILDABLE,
+  canFactionFieldUnit,
   effectiveStructureStats,
   effectiveUnitStats,
   FACTION_COLOR,
@@ -35,6 +36,7 @@ import type { DirectionalReachProfile } from '@sim/ballistics';
 import type { BallisticFireResult, Structure, Unit, World } from '@sim/world';
 import type { MissionHudModel } from '../tutorial/mission';
 import type { MissionDebriefModel } from '../tutorial/mission';
+import type { NarrativeHudModel } from '../tutorial/narrative';
 
 const CSS = `
 .rww-root { position: fixed; inset: 0; pointer-events: none; z-index: 30;
@@ -133,6 +135,16 @@ const CSS = `
   border-top: 1px solid rgba(150,180,210,.16); border-bottom: 1px solid rgba(150,180,210,.16); }
 .rww-debrief-rows span { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; opacity: .62; }
 .rww-debrief-rows b { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+.rww-narrative { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: min(620px, calc(100vw - 32px)); padding: 22px 26px; pointer-events: auto;
+  border-left: 3px solid #f0821e; background: rgba(7,11,17,.94); }
+.rww-narrative.transmission { top: 94px; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); }
+.rww-narrative small { display: block; margin-bottom: 7px; text-transform: uppercase;
+  letter-spacing: .22em; opacity: .62; }
+.rww-narrative h2 { margin: 0 0 10px; color: #f0b26e; text-transform: uppercase; letter-spacing: .12em; }
+.rww-narrative p { margin: 0; line-height: 1.55; font-size: 14px; }
+.rww-narrative button { margin-top: 18px; padding: 9px 22px; color: #f0b26e; background: transparent;
+  border: 1px solid rgba(240,130,30,.7); text-transform: uppercase; letter-spacing: .16em; cursor: pointer; }
 
 /* Hints */
 .rww-hint { position: absolute; left: 12px; bottom: 132px; font-size: 10.5px;
@@ -187,6 +199,8 @@ export class Hud {
   private alertEl: HTMLDivElement;
   private endEl: HTMLDivElement | null = null;
   private dismissedDebriefKey = '';
+  private narrativeEl: HTMLDivElement | null = null;
+  private narrativeSignature = '';
   private map: HTMLCanvasElement;
   private mapCtx: CanvasRenderingContext2D;
   private targetStatusEl: HTMLDivElement;
@@ -213,6 +227,7 @@ export class Hud {
   onAbilityToggle: ((unitId: number) => void) | null = null;
   /** Route build mode changes through the game mode coordinator. */
   onBuildRequest: ((kind: StructureKind | null) => void) | null = null;
+  onNarrativeAcknowledge: (() => void) | null = null;
 
   constructor() {
     const style = document.createElement('style');
@@ -364,6 +379,7 @@ export class Hud {
     artilleryResult: BallisticFireResult | null,
     mission: MissionHudModel | null = null,
     debrief: MissionDebriefModel | null = null,
+    narrative: NarrativeHudModel | null = null,
   ): void {
     this.cameraS = cameraS;
     this.cameraZ = cameraZ;
@@ -376,7 +392,34 @@ export class Hud {
     this.drawSelection(world, player, selection);
     this.drawMinimap(world, player, selection, cameraS, cameraZ, artilleryTargeting, artilleryResult);
     this.drawMission(mission);
-    this.drawEnd(world, player, debrief);
+    this.drawNarrative(narrative);
+    this.drawEnd(world, player, narrative ? null : debrief);
+  }
+
+  private drawNarrative(narrative: NarrativeHudModel | null): void {
+    const signature = narrative ? JSON.stringify(narrative) : '';
+    if (signature === this.narrativeSignature) return;
+    this.narrativeSignature = signature;
+    this.narrativeEl?.remove();
+    this.narrativeEl = null;
+    if (!narrative) return;
+    const panel = el('section', `rww-narrative rww-panel ${narrative.kind}`);
+    panel.dataset.narrativeId = narrative.id;
+    panel.setAttribute('role', narrative.blocking ? 'dialog' : 'status');
+    if (narrative.blocking) panel.setAttribute('aria-modal', 'true');
+    const speaker = document.createElement('small');
+    speaker.textContent = narrative.speaker;
+    const title = document.createElement('h2');
+    title.textContent = narrative.title;
+    const body = document.createElement('p');
+    body.textContent = narrative.body;
+    const acknowledge = document.createElement('button');
+    acknowledge.textContent = narrative.blocking ? 'Begin' : 'Acknowledge';
+    acknowledge.onclick = (): void => this.onNarrativeAcknowledge?.();
+    panel.append(speaker, title, body, acknowledge);
+    this.root.appendChild(panel);
+    this.narrativeEl = panel;
+    acknowledge.focus();
   }
 
   private drawMission(mission: MissionHudModel | null): void {
@@ -512,7 +555,7 @@ export class Hud {
 
       if (st.faction === player && st.progress >= 1 && def.produces) {
         for (const kind of def.produces) {
-          this.addUnitButton(world, player, st, kind);
+          if (canFactionFieldUnit(player, kind)) this.addUnitButton(world, player, st, kind);
         }
         if (st.queue.length > 0) {
           const q = el('div', 'rww-btn off');

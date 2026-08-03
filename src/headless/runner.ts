@@ -281,7 +281,7 @@ function recordEvents(results: Record<Faction, FactionMatchResult>, events: read
 }
 
 function emptyUnitCounts(): Record<UnitKind, number> {
-  return { engineer: 0, vanguard: 0, longbow: 0, wisp: 0, aegis: 0 };
+  return { engineer: 0, vanguard: 0, longbow: 0, wisp: 0, aegis: 0, bulwark: 0, needle: 0 };
 }
 
 function emptyStructureCounts(): Record<StructureKind, number> {
@@ -324,7 +324,8 @@ function isFaction(value: Faction | -1): value is Faction {
 }
 
 function isUnitKind(value: SimEvent['entityKind']): value is UnitKind {
-  return value === 'engineer' || value === 'vanguard' || value === 'longbow' || value === 'wisp' || value === 'aegis';
+  return value === 'engineer' || value === 'vanguard' || value === 'longbow' || value === 'wisp' ||
+    value === 'aegis' || value === 'bulwark' || value === 'needle';
 }
 
 function isStructureKind(value: SimEvent['entityKind']): value is StructureKind {

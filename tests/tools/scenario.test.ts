@@ -188,6 +188,21 @@ describe('browser scenario schema', () => {
     ] } })).toThrow(/abilityTransitionTimer/i);
   });
 
+  it('rejects faction-exclusive units in the wrong faction', () => {
+    expect(() => parseScenario({
+      ...scenario,
+      setup: { ...scenario.setup, units: [
+        { id: 'wrong-bulwark', faction: 'choir', kind: 'bulwark', s: 0, z: 0 },
+      ] },
+    })).toThrow(/Bulwark.*Compact-exclusive/i);
+    expect(() => parseScenario({
+      ...scenario,
+      setup: { ...scenario.setup, units: [
+        { id: 'wrong-needle', faction: 'compact', kind: 'needle', s: 0, z: 0 },
+      ] },
+    })).toThrow(/Needle.*Choir-exclusive/i);
+  });
+
   it('requires exact weapon cooldown cardinality for each unit kind', () => {
     expect(() => parseScenario({ ...scenario, setup: { ...scenario.setup, units: [
       { ...scenario.setup.units[0], weaponCooldowns: [] },

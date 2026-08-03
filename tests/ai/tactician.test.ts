@@ -34,6 +34,20 @@ describe('Tactician squad formation', () => {
 });
 
 describe('Tactician combat behavior', () => {
+  it('keeps Needle hunter priority when the Tactician assigns focus fire', () => {
+    const world = emptyWorld();
+    world.spawnStructure(Faction.Choir, 'bastion', 0, 0, 1);
+    const needle = world.spawnUnit(Faction.Choir, 'needle', 100, 0);
+    world.spawnUnit(Faction.Compact, 'vanguard', 120, 0);
+    const engineer = world.spawnUnit(Faction.Compact, 'engineer', 160, 0);
+    const tactician = new Tactician(Faction.Choir, 'commander');
+    tactician.reformSquads(world);
+
+    tactician.update(world, 1 / 30, 'harass');
+
+    expect(needle.order).toMatchObject({ kind: 'attack', targetId: engineer.id });
+  });
+
   it('assigns one optimized focus-fire target to all healthy squad members', () => {
     const world = emptyWorld();
     world.spawnStructure(Faction.Compact, 'bastion', 0, 0, 1);

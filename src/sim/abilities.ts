@@ -11,7 +11,7 @@ export interface AbilityState {
 
 interface BaseAbilityDef {
   id: AbilityId;
-  unitKind: UnitKind;
+  unitKinds: readonly UnitKind[];
   energyPerSecond: number;
   cooldownAfterDeactivation: number;
 }
@@ -48,7 +48,7 @@ export type AbilityDef = ShieldWallDef | SiegeModeDef | CloakDef | UmbrellaDef;
 export const ABILITIES = {
   shieldWall: {
     id: 'shieldWall',
-    unitKind: 'vanguard',
+    unitKinds: ['vanguard', 'bulwark'],
     energyPerSecond: 3,
     cooldownAfterDeactivation: 5,
     speedMultiplier: 0.6,
@@ -57,7 +57,7 @@ export const ABILITIES = {
   },
   siegeMode: {
     id: 'siegeMode',
-    unitKind: 'longbow',
+    unitKinds: ['longbow'],
     energyPerSecond: 0,
     cooldownAfterDeactivation: 0,
     rangeMultiplier: 1.5,
@@ -66,7 +66,7 @@ export const ABILITIES = {
   },
   cloak: {
     id: 'cloak',
-    unitKind: 'wisp',
+    unitKinds: ['wisp', 'needle'],
     energyPerSecond: 0,
     cooldownAfterDeactivation: 0,
     stationaryDelay: 1.5,
@@ -75,7 +75,7 @@ export const ABILITIES = {
   },
   umbrella: {
     id: 'umbrella',
-    unitKind: 'aegis',
+    unitKinds: ['aegis'],
     energyPerSecond: 6,
     cooldownAfterDeactivation: 8,
     protectionRadius: 120,
@@ -85,7 +85,7 @@ export const ABILITIES = {
 
 export function createAbilityState(kind: UnitKind): AbilityState | null {
   for (const ability of Object.values(ABILITIES)) {
-    if (ability.unitKind === kind) {
+    if ((ability.unitKinds as readonly UnitKind[]).includes(kind)) {
       return { id: ability.id, active: false, cooldown: 0, transitionTimer: 0 };
     }
   }

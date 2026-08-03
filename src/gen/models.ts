@@ -460,7 +460,7 @@ export function makeHullMaterial(factionColor: number): {
 // Mechs
 // ---------------------------------------------------------------------------
 
-export type MechClass = 'vanguard' | 'longbow' | 'wisp' | 'aegis';
+export type MechClass = 'vanguard' | 'longbow' | 'wisp' | 'aegis' | 'bulwark' | 'needle';
 
 export interface MechRig {
   parts: {
@@ -557,6 +557,28 @@ const PROFILES: Record<MechClass, MechProfile> = {
     barrelRadius: 0.021,
     dish: true,
   },
+  // Compact escort: broad, low, and visibly overbuilt.
+  bulwark: {
+    height: 12,
+    torso: [0.36, 0.31, 0.31],
+    legThick: 0.125,
+    hipFrac: 0.48,
+    greebles: 20,
+    shoulderSpan: 0.19,
+    barrel: 0.18,
+    barrelRadius: 0.028,
+  },
+  // Choir hunter: narrow spear-like body and long stride.
+  needle: {
+    height: 8,
+    torso: [0.16, 0.32, 0.20],
+    legThick: 0.05,
+    hipFrac: 0.64,
+    greebles: 5,
+    shoulderSpan: 0.055,
+    barrel: 0.25,
+    barrelRadius: 0.012,
+  },
 };
 
 export function buildMech(cls: MechClass, seed: number): MechRig {
@@ -593,7 +615,7 @@ export function buildMech(cls: MechClass, seed: number): MechRig {
     pos: [0, 0, 0],
     bevel: 0.16,
     taper: 0.88,
-    lean: [0, cls === 'wisp' ? td * 0.10 : 0],
+    lean: [0, cls === 'wisp' || cls === 'needle' ? td * 0.10 : 0],
     panels: 2,
   });
   // Chest emissive band -- the strongest faction read on the silhouette.

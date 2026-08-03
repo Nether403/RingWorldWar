@@ -498,6 +498,8 @@ export class AiOpponent {
     // what nobody can see.
     if (n('wisp') < 1) return 'wisp';
     if (n('vanguard') < 2) return 'vanguard';
+    if (this.faction === Faction.Compact && n('bulwark') < 1 && salvage > 850) return 'bulwark';
+    if (this.faction === Faction.Choir && n('needle') < 1 && salvage > 550) return 'needle';
     if (n('longbow') < 1 && salvage > 700) return 'longbow';
     if (n('aegis') < 1 && n('vanguard') >= 2) return 'aegis';
     if (n('vanguard') < n('longbow') * 2) return 'vanguard';
@@ -559,7 +561,7 @@ export class AiOpponent {
     const scouts = army.filter((u) => u.kind === 'wisp').sort((a, b) => a.id - b.id);
     const artillery = army.filter((u) => u.kind === 'longbow');
     const line = army
-      .filter((u) => u.kind === 'vanguard' || u.kind === 'aegis')
+      .filter((u) => u.kind === 'vanguard' || u.kind === 'aegis' || u.kind === 'bulwark' || u.kind === 'needle')
       .sort((a, b) => a.id - b.id);
 
     // Chord Shots close late games when terrain and layered defenses prevent
@@ -870,6 +872,8 @@ export class AiOpponent {
       longbow: 0,
       wisp: 0,
       aegis: 0,
+      bulwark: 0,
+      needle: 0,
     };
     for (const unit of units) counts[unit.kind]++;
     for (const structure of structures) {

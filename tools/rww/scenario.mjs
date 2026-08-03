@@ -6,9 +6,9 @@ export const SCENARIO_VERSION = 1;
 const QUALITY = new Set(['low', 'medium', 'high', 'ultra']);
 const FACTIONS = new Set(['compact', 'choir']);
 const STRUCTURE_FACTIONS = new Set(['compact', 'choir', 'neutral']);
-const UNITS = new Set(['vanguard', 'longbow', 'wisp', 'aegis', 'engineer']);
-const UNIT_WEAPON_COUNTS = { engineer: 0, vanguard: 2, longbow: 1, wisp: 1, aegis: 2 };
-const ACTIVE_ABILITY_UNITS = new Set(['vanguard', 'longbow', 'aegis']);
+const UNITS = new Set(['vanguard', 'longbow', 'wisp', 'aegis', 'bulwark', 'needle', 'engineer']);
+const UNIT_WEAPON_COUNTS = { engineer: 0, vanguard: 2, longbow: 1, wisp: 1, aegis: 2, bulwark: 2, needle: 1 };
+const ACTIVE_ABILITY_UNITS = new Set(['vanguard', 'longbow', 'aegis', 'bulwark']);
 const STRUCTURES = new Set([
   'bastion', 'extractor', 'solarArray', 'fusionCore', 'fabricator', 'mechFoundry',
   'rocketBattery', 'pointDefense', 'laserGrid', 'radarMast', 'silo', 'spinalNode',
@@ -88,6 +88,8 @@ export function parseScenario(input) {
     uniqueId(unit.id, `${path}.id`, ids);
     member(unit.faction, FACTIONS, `${path}.faction`);
     member(unit.kind, UNITS, `${path}.kind`);
+    if (unit.kind === 'bulwark' && unit.faction !== 'compact') fail(path, 'Bulwark is Compact-exclusive');
+    if (unit.kind === 'needle' && unit.faction !== 'choir') fail(path, 'Needle is Choir-exclusive');
     finiteNumber(unit.s, `${path}.s`);
     finiteNumber(unit.z, `${path}.z`);
     optionalFinite(unit.yawRadians, `${path}.yawRadians`);
@@ -100,7 +102,9 @@ export function parseScenario(input) {
     if (unit.abilityActive !== undefined && typeof unit.abilityActive !== 'boolean') fail(`${path}.abilityActive`, 'must be a boolean');
     if (unit.abilityTransitionTimer !== undefined) nonNegativeNumber(unit.abilityTransitionTimer, `${path}.abilityTransitionTimer`);
     if (unit.abilityActive !== undefined || unit.abilityTransitionTimer !== undefined) {
-      if (unit.kind === 'wisp') fail(path, 'cannot set active ability state for passive Wisp cloak');
+      if (unit.kind === 'wisp' || unit.kind === 'needle') {
+        fail(path, 'cannot set active ability state for passive Wisp cloak or Needle cloak');
+      }
       if (!ACTIVE_ABILITY_UNITS.has(unit.kind)) fail(path, 'cannot set ability state for a unit without an active ability');
     }
     if (unit.weaponCooldowns !== undefined) {
@@ -131,8 +135,9 @@ export function parseScenario(input) {
   if (input.mission !== undefined) {
     record(input.mission, 'mission');
     exactKeys(input.mission, ['id', 'revision', 'bindings'], 'mission');
-    if (input.mission.id !== 'first-contact' && input.mission.id !== 'break-the-line' && input.mission.id !== 'counterfire') {
-      fail('mission.id', 'must be first-contact, break-the-line, or counterfire');
+    if (input.mission.id !== 'first-contact' && input.mission.id !== 'break-the-line' &&
+        input.mission.id !== 'counterfire' && input.mission.id !== 'a-signal-in-the-spine') {
+      fail('mission.id', 'must be a known mission id');
     }
     if (input.mission.revision !== 1) fail('mission.revision', 'must be 1');
     if (input.simulation.targetTick !== 0) fail('simulation.targetTick', 'must be zero for mission scenarios');
@@ -141,8 +146,10 @@ export function parseScenario(input) {
       parseFirstContactBindings(input.mission.bindings, input.setup, ids);
     } else if (input.mission.id === 'break-the-line') {
       parseBreakLineBindings(input.mission.bindings, input.setup, ids);
-    } else {
+    } else if (input.mission.id === 'counterfire') {
       parseCounterfireBindings(input.mission.bindings, input.setup, ids);
+    } else {
+      parseSignalBindings(input.mission.bindings, input.setup, ids);
     }
   }
 
@@ -260,6 +267,34 @@ function parseCounterfireBindings(bindings, setup, ids) {
   if (structure(bindings.playerBattery)?.kind !== 'rocketBattery' || structure(bindings.playerBattery)?.faction !== 'compact' || structure(bindings.playerBattery)?.progress !== 1) fail('mission.bindings.playerBattery', 'must reference a completed Compact Rocket Battery');
   if (unit(bindings.enemyLauncher)?.kind !== 'longbow' || unit(bindings.enemyLauncher)?.faction !== 'choir') fail('mission.bindings.enemyLauncher', 'must reference a Choir Longbow');
   if (structure(bindings.enemyGrid)?.kind !== 'laserGrid' || structure(bindings.enemyGrid)?.faction !== 'choir' || structure(bindings.enemyGrid)?.progress !== 1) fail('mission.bindings.enemyGrid', 'must reference a completed Choir Laser Grid');
+}
+
+function parseSignalBindings(bindings, setup, ids) {
+  exactKeys(bindings, [
+    'signalNode', 'engineer', 'bulwark', 'needleIds', 'restorationPower', 'fieldCommand',
+  ], 'mission.bindings');
+  for (const key of ['signalNode', 'engineer', 'bulwark', 'restorationPower', 'fieldCommand']) {
+    safeId(bindings[key], `mission.bindings.${key}`);
+    requireSetupIds([bindings[key]], ids, `mission.bindings.${key}`);
+  }
+  const needleIds = setupIdArray(bindings.needleIds, ids, 'mission.bindings.needleIds', 1, 16);
+  const all = [bindings.signalNode, bindings.engineer, bindings.bulwark, ...needleIds,
+    bindings.restorationPower, bindings.fieldCommand];
+  if (new Set(all).size !== all.length) fail('mission.bindings', 'must reference distinct entities');
+  const structure = (id) => setup.structures.find((candidate) => candidate.id === id);
+  const unit = (id) => setup.units.find((candidate) => candidate.id === id);
+  const node = structure(bindings.signalNode);
+  if (node?.kind !== 'spinalNode' || node.faction !== 'neutral' || node.progress !== 1) {
+    fail('mission.bindings.signalNode', 'must reference a completed neutral Spinal Node');
+  }
+  if (unit(bindings.engineer)?.kind !== 'engineer' || unit(bindings.engineer)?.faction !== 'compact') fail('mission.bindings.engineer', 'must reference a Compact Engineer');
+  if (unit(bindings.bulwark)?.kind !== 'bulwark' || unit(bindings.bulwark)?.faction !== 'compact') fail('mission.bindings.bulwark', 'must reference a Compact Bulwark');
+  if (needleIds.some((id) => unit(id)?.kind !== 'needle' || unit(id)?.faction !== 'choir')) fail('mission.bindings.needleIds', 'must reference Choir Needles');
+  const power = structure(bindings.restorationPower);
+  if (power?.kind !== 'fusionCore' || power.faction !== 'compact' || power.progress >= 1) {
+    fail('mission.bindings.restorationPower', 'must reference an incomplete Compact Fusion Core');
+  }
+  if (structure(bindings.fieldCommand)?.faction !== 'choir') fail('mission.bindings.fieldCommand', 'must reference a Choir structure');
 }
 
 function setupIdArray(value, ids, path, minimum, maximum) {

@@ -19,6 +19,7 @@ This is the authoritative source for current delivery status and near-term seque
 | First Contact tutorial alpha | Internal completion pass | One tester reported completing all ten objectives with zero gameplay confusion or mechanical faults; broader pacing/copy cohort remains open |
 | Break the Line core-loop mission | Automated completion pass | Normal commands complete the established-base loop in 15:45; human pacing runs now determine whether a speed experiment is warranted |
 | Counterfire defensive mission | Playable candidate | Existing power, Umbrella, Laser Grid, Standard Rocket, and Cruise Missile systems form a deterministic defensive/counterbattery loop with persisted debrief stats |
+| A Signal in the Spine story slice | Playable candidate | Adds Compact Bulwark, Choir Needle, persisted briefings/transmissions, and a node-restoration story mission without changing accepted ring physics or speeds |
 | Phase 2 overall | Qualification in progress | Gameplay cohorts pass, but performance qualification and human observation remain open |
 
 ## Immediate Sequence
@@ -32,6 +33,7 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 5. **Completed - First Contact tutorial alpha:** deterministic onboarding passed one tester-reported internal completion; broader copy validation remains open.
 6. **Completed - Break the Line pacing validation:** the tester completed in roughly 12–15 minutes and chose to keep current movement and projectile speeds.
 7. **Current - Counterfire validation:** test defensive power, interception, ammunition adaptation, and whether the reusable debrief explains the outcome without coaching.
+8. **Current - story expansion validation:** test Bulwark escort identity, Needle hunter readability, narrative pacing, and the Last Rotation revelation in `A Signal in the Spine`.
 
 ## Direction Decisions
 

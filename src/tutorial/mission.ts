@@ -19,13 +19,32 @@ import {
   type CounterfireBindings,
   type CounterfireMilestones,
 } from './counterfire';
+import {
+  acknowledgeNarrative,
+  emptyNarrativeState,
+  enqueueNarrative,
+  validateNarrativeState,
+  type NarrativeBeat,
+  type NarrativeHudModel,
+  type NarrativeState,
+} from './narrative';
+import {
+  SIGNAL_NARRATIVE,
+  SIGNAL_OBJECTIVES,
+  emptySignalMilestones,
+  signalObjectiveMet,
+  updateSignalMilestones,
+  type SignalInSpineBindings,
+  type SignalInSpineMilestones,
+} from './signalInSpine';
 export type { BreakLineBindings } from './breakLine';
 export type { CounterfireBindings } from './counterfire';
+export type { SignalInSpineBindings } from './signalInSpine';
 
 export const MISSION_SNAPSHOT_SCHEMA = 'ring-world-war/mission';
 export const MISSION_SNAPSHOT_VERSION = 1;
 
-export type MissionId = 'first-contact' | 'break-the-line' | 'counterfire';
+export type MissionId = 'first-contact' | 'break-the-line' | 'counterfire' | 'a-signal-in-the-spine';
 export type MissionStatus = 'active' | 'completed' | 'failed';
 
 export interface MissionBindings {
@@ -53,6 +72,7 @@ export interface MissionMilestones {
   firedAntispinward: boolean;
   breakLine: BreakLineMilestones | null;
   counterfire: CounterfireMilestones | null;
+  signalInSpine: SignalInSpineMilestones | null;
 }
 
 export interface MissionSnapshot {
@@ -67,8 +87,9 @@ export interface MissionSnapshot {
   completedAtTick: number | null;
   failedAtTick: number | null;
   completedObjectiveTicks: number[];
-  bindings: MissionBindings | BreakLineBindings | CounterfireBindings;
+  bindings: MissionBindings | BreakLineBindings | CounterfireBindings | SignalInSpineBindings;
   milestones: MissionMilestones;
+  narrative: NarrativeState;
 }
 
 export interface MissionHudModel {
@@ -167,9 +188,14 @@ export class MissionController {
   static start(missionId: 'break-the-line', tick: number, bindings: BreakLineBindings): MissionController;
   static start(missionId: 'counterfire', tick: number, bindings: CounterfireBindings): MissionController;
   static start(
+    missionId: 'a-signal-in-the-spine',
+    tick: number,
+    bindings: SignalInSpineBindings,
+  ): MissionController;
+  static start(
     missionId: MissionId,
     tick: number,
-    bindings: MissionBindings | BreakLineBindings | CounterfireBindings,
+    bindings: MissionBindings | BreakLineBindings | CounterfireBindings | SignalInSpineBindings,
   ): MissionController {
     const state: MissionSnapshot = {
       schema: MISSION_SNAPSHOT_SCHEMA,
@@ -185,8 +211,10 @@ export class MissionController {
       completedObjectiveTicks: [],
       bindings: structuredClone(bindings),
       milestones: emptyMilestones(missionId),
+      narrative: emptyNarrativeState(),
     };
     validateBindings(missionId, state.bindings);
+    if (missionId === 'a-signal-in-the-spine') enqueueNarrative(state.narrative, 'signal-briefing');
     return new MissionController(state);
   }
 
@@ -199,6 +227,27 @@ export class MissionController {
 
   advanceTick(world: World, events: readonly SimEvent[]): void {
     if (this.state.status !== 'active') return;
+    if (this.state.missionId === 'a-signal-in-the-spine') {
+      const before = this.state.objectiveIndex;
+      const failure = updateSignalMilestones(
+        this.state.milestones.signalInSpine!,
+        signalBindings(this.state),
+        world,
+        before,
+      );
+      if (failure) {
+        this.state.status = 'failed';
+        this.state.failedAtTick = world.tick;
+        return;
+      }
+      this.advanceObjectives(world.tick);
+      if (before < 1 && this.state.objectiveIndex >= 1) enqueueNarrative(this.state.narrative, 'signal-hunters');
+      if (before < 5 && this.state.objectiveIndex >= 5) enqueueNarrative(this.state.narrative, 'signal-migration');
+      if (this.state.objectiveIndex === SIGNAL_OBJECTIVES.length) {
+        enqueueNarrative(this.state.narrative, 'signal-last-correction');
+      }
+      return;
+    }
     if (this.state.missionId === 'counterfire') {
       const milestones = this.state.milestones.counterfire!;
       const failure = updateCounterfireMilestones(
@@ -273,21 +322,42 @@ export class MissionController {
     return structuredClone(this.state);
   }
 
+  narrativeHudModel(): NarrativeHudModel | null {
+    const active = this.state.narrative.activeId;
+    if (!active) return null;
+    return narrativeBeats(this.state.missionId).find((beat) => beat.id === active) ?? null;
+  }
+
+  acknowledgeNarrative(): void {
+    acknowledgeNarrative(this.state.narrative);
+  }
+
+  get narrativeBlocksSimulation(): boolean {
+    return this.narrativeHudModel()?.blocking ?? false;
+  }
+
   hudModel(): MissionHudModel {
     const objectives = missionObjectives(this.state.missionId);
     const objective = objectives[this.state.objectiveIndex] ?? null;
     if (this.state.status === 'failed') {
       const reason = this.state.milestones.breakLine?.failureReason;
       const counterfireFailure = this.state.milestones.counterfire?.failureReason;
+      const signalFailure = this.state.milestones.signalInSpine?.failureReason;
       return {
         missionId: this.state.missionId,
         title: missionTitle(this.state.missionId),
         status: 'failed',
         objectiveId: null,
-        objectiveTitle: this.state.missionId === 'counterfire' ? 'Defensive line lost' : 'The line is broken',
-        objectiveBody: counterfireFailure === 'protected-asset-destroyed'
+        objectiveTitle: this.state.missionId === 'counterfire'
+          ? 'Defensive line lost'
+          : this.state.missionId === 'a-signal-in-the-spine' ? 'Signal lost' : 'The line is broken',
+        objectiveBody: signalFailure === 'node-destroyed'
+          ? 'The Spinal Node was destroyed before its archive could be secured.'
+          : signalFailure === 'engineer-killed'
+            ? 'The restoration Engineer was lost before the node came online.'
+            : counterfireFailure === 'protected-asset-destroyed'
           ? 'The protected Fabricator was destroyed before the enemy launcher was neutralized.'
-          : reason === 'match-ended' || counterfireFailure === 'match-ended'
+          : reason === 'match-ended' || counterfireFailure === 'match-ended' || signalFailure === 'match-ended'
           ? 'The battle ended before the forward-line objectives were secured.'
           : 'The protected Extractor was destroyed before the raiders were defeated.',
         hint: 'Reload the mission and re-form the established defence group.',
@@ -325,6 +395,14 @@ export class MissionController {
           ? `${Math.round((counterfire.protectedEndHp / counterfire.protectedStartHp) * 100)}%`
           : 'unknown' },
         { label: 'Lowest power ratio', value: `${Math.round(counterfire.minimumPowerRatio * 100)}%` },
+      );
+    }
+    const signal = this.state.milestones.signalInSpine;
+    if (signal) {
+      rows.push(
+        { label: 'Spinal Node', value: signal.nodeSurvived ? 'intact' : 'lost' },
+        { label: 'Needle screen', value: signal.needlesDefeated ? 'cleared' : 'active' },
+        { label: 'Correction capacity', value: this.state.status === 'completed' ? 'one operation' : 'unknown' },
       );
     }
     return {
@@ -372,11 +450,12 @@ export function parseMissionSnapshot(input: unknown): MissionSnapshot {
   const root = record(value, '$', [
     'schema', 'version', 'missionId', 'revision', 'status', 'objectiveIndex', 'startedAtTick',
     'objectiveStartedAtTick', 'completedAtTick', 'completedObjectiveTicks', 'bindings', 'milestones',
-  ], ['failedAtTick']);
+  ], ['failedAtTick', 'narrative']);
   if (root.schema !== MISSION_SNAPSHOT_SCHEMA) fail('$.schema', `expected ${MISSION_SNAPSHOT_SCHEMA}`);
   if (root.version !== MISSION_SNAPSHOT_VERSION) fail('$.version', `expected version ${MISSION_SNAPSHOT_VERSION}`);
-  if (root.missionId !== 'first-contact' && root.missionId !== 'break-the-line' && root.missionId !== 'counterfire') {
-    fail('$.missionId', 'expected first-contact, break-the-line, or counterfire');
+  if (root.missionId !== 'first-contact' && root.missionId !== 'break-the-line' &&
+      root.missionId !== 'counterfire' && root.missionId !== 'a-signal-in-the-spine') {
+    fail('$.missionId', 'expected a known mission id');
   }
   const missionId = root.missionId;
   const objectives = missionObjectives(missionId);
@@ -432,11 +511,20 @@ export function parseMissionSnapshot(input: unknown): MissionSnapshot {
   }
   const bindings = readBindings(missionId, root.bindings, '$.bindings');
   const milestones = readMilestones(missionId, root.milestones, '$.milestones');
+  if (missionId === 'a-signal-in-the-spine' && root.narrative === undefined) {
+    fail('$.narrative', 'is required for a-signal-in-the-spine');
+  }
+  const narrative = root.narrative === undefined
+    ? emptyNarrativeState()
+    : readNarrativeState(root.narrative, '$.narrative', missionId);
+  validateNarrativeProgress(missionId, objectiveIndex, root.status, narrative);
   const failureReason = missionId === 'break-the-line'
     ? milestones.breakLine?.failureReason ?? null
     : missionId === 'counterfire'
       ? milestones.counterfire?.failureReason ?? null
-      : null;
+      : missionId === 'a-signal-in-the-spine'
+        ? milestones.signalInSpine?.failureReason ?? null
+        : null;
   if (root.status === 'failed' && !failureReason) {
     fail('$.milestones', 'a failure reason is required for a failed mission');
   }
@@ -467,6 +555,7 @@ export function parseMissionSnapshot(input: unknown): MissionSnapshot {
     completedObjectiveTicks,
     bindings,
     milestones,
+    narrative,
   };
   for (let index = 0; index < objectiveIndex; index++) {
     if (!objectiveMetAt(snapshot, index)) fail('$.milestones', `does not satisfy completed objective ${index + 1}`);
@@ -479,6 +568,9 @@ function objectiveMet(state: MissionSnapshot): boolean {
 }
 
 function objectiveMetAt(state: MissionSnapshot, objectiveIndex: number): boolean {
+  if (state.missionId === 'a-signal-in-the-spine') {
+    return signalObjectiveMet(state.milestones.signalInSpine!, objectiveIndex);
+  }
   if (state.missionId === 'counterfire') {
     return counterfireObjectiveMet(state.milestones.counterfire!, objectiveIndex);
   }
@@ -516,6 +608,7 @@ function emptyMilestones(missionId: MissionId): MissionMilestones {
     firedAntispinward: false,
     breakLine: missionId === 'break-the-line' ? emptyBreakLineMilestones() : null,
     counterfire: missionId === 'counterfire' ? emptyCounterfireMilestones() : null,
+    signalInSpine: missionId === 'a-signal-in-the-spine' ? emptySignalMilestones() : null,
   };
 }
 
@@ -523,7 +616,7 @@ function readBindings(
   missionId: MissionId,
   value: unknown,
   path: string,
-): MissionBindings | BreakLineBindings | CounterfireBindings {
+): MissionBindings | BreakLineBindings | CounterfireBindings | SignalInSpineBindings {
   if (missionId === 'first-contact') {
     const bindings = record(value, path, ['tutorialNode', 'artilleryTarget']);
     const result: MissionBindings = {
@@ -549,6 +642,21 @@ function readBindings(
     validateBindings(missionId, result);
     return result;
   }
+  if (missionId === 'a-signal-in-the-spine') {
+    const bindings = record(value, path, [
+      'signalNode', 'engineer', 'bulwark', 'needleIds', 'restorationPower', 'fieldCommand',
+    ]);
+    const result: SignalInSpineBindings = {
+      signalNode: integer(bindings.signalNode, `${path}.signalNode`, 1),
+      engineer: integer(bindings.engineer, `${path}.engineer`, 1),
+      bulwark: integer(bindings.bulwark, `${path}.bulwark`, 1),
+      needleIds: idArray(bindings.needleIds, `${path}.needleIds`, 1, 16),
+      restorationPower: integer(bindings.restorationPower, `${path}.restorationPower`, 1),
+      fieldCommand: integer(bindings.fieldCommand, `${path}.fieldCommand`, 1),
+    };
+    validateBindings(missionId, result);
+    return result;
+  }
   const bindings = record(value, path, [
     'forwardNode', 'protectedExtractor', 'enemyArtillery', 'strongpointIds', 'raiderIds',
   ]);
@@ -565,7 +673,7 @@ function readBindings(
 
 function validateBindings(
   missionId: MissionId,
-  bindings: MissionBindings | BreakLineBindings | CounterfireBindings,
+  bindings: MissionBindings | BreakLineBindings | CounterfireBindings | SignalInSpineBindings,
 ): void {
   if (missionId === 'first-contact') {
     const first = bindings as MissionBindings;
@@ -581,6 +689,14 @@ function validateBindings(
   if (missionId === 'counterfire') {
     const counterfire = bindings as CounterfireBindings;
     const all = Object.values(counterfire);
+    if (all.some((id) => !Number.isSafeInteger(id) || id < 1)) fail('$.bindings', 'expected positive entity ids');
+    if (new Set(all).size !== all.length) fail('$.bindings', 'entity ids must be distinct');
+    return;
+  }
+  if (missionId === 'a-signal-in-the-spine') {
+    const signal = bindings as SignalInSpineBindings;
+    const all = [signal.signalNode, signal.engineer, signal.bulwark, ...signal.needleIds,
+      signal.restorationPower, signal.fieldCommand];
     if (all.some((id) => !Number.isSafeInteger(id) || id < 1)) fail('$.bindings', 'expected positive entity ids');
     if (new Set(all).size !== all.length) fail('$.bindings', 'entity ids must be distinct');
     return;
@@ -602,6 +718,23 @@ function validateBindings(
 
 function validateWorldBindings(state: MissionSnapshot, world: World): void {
   if (state.status === 'failed') {
+    if (state.missionId === 'a-signal-in-the-spine') {
+      const milestones = state.milestones.signalInSpine!;
+      const reason = milestones.failureReason;
+      const bindings = signalBindings(state);
+      if (reason === 'match-ended' && world.status !== 'completed') {
+        fail('$.milestones.signalInSpine.failureReason', 'match-ended requires a completed match');
+      }
+      if (reason === 'node-destroyed' && (world.structureById(bindings.signalNode) || milestones.nodeSurvived)) {
+        fail('$.milestones.signalInSpine.failureReason', 'node-destroyed requires a lost node');
+      }
+      if (reason === 'engineer-killed' &&
+          (world.unitById(bindings.engineer) || milestones.nodeSurvived === false ||
+            milestones.teamAtNode && milestones.powerRestored)) {
+        fail('$.milestones.signalInSpine.failureReason', 'engineer-killed requires a pre-restoration Engineer loss');
+      }
+      return;
+    }
     if (state.missionId === 'counterfire') {
       const milestones = state.milestones.counterfire!;
       if (milestones.failureReason === 'match-ended' && world.status !== 'completed') {
@@ -632,6 +765,10 @@ function validateWorldBindings(state: MissionSnapshot, world: World): void {
     validateCounterfireWorldBindings(state, world);
     return;
   }
+  if (state.missionId === 'a-signal-in-the-spine') {
+    validateSignalWorldBindings(state, world);
+    return;
+  }
   const bindings = firstContactBindings(state);
   if (!state.milestones.capturedNodeIds.includes(bindings.tutorialNode)) {
     const node = world.structureById(bindings.tutorialNode);
@@ -643,6 +780,64 @@ function validateWorldBindings(state: MissionSnapshot, world: World): void {
     const target = world.structureById(bindings.artilleryTarget);
     if (!target?.alive || target.faction !== Faction.Choir || target.kind !== 'fusionCore' || target.progress !== 1) {
       fail('$.bindings.artilleryTarget', 'must reference a completed live Choir Fusion Core until it is fired on');
+    }
+  }
+}
+
+function validateSignalWorldBindings(state: MissionSnapshot, world: World): void {
+  const bindings = signalBindings(state);
+  const milestones = state.milestones.signalInSpine!;
+  if (!milestones.nodeSurvived) fail('$.milestones.signalInSpine.nodeSurvived', 'active mission requires a surviving node');
+  const node = world.structureById(bindings.signalNode);
+  if (!node?.alive || node.kind !== 'spinalNode' || node.progress !== 1 ||
+      !milestones.nodeCaptured && node.faction === Faction.Compact ||
+      milestones.nodeCaptured && node.faction === -1) {
+    fail('$.bindings.signalNode', 'must reference a completed live Spinal Node');
+  }
+  if (state.objectiveIndex === 4 && milestones.holdTicks > 0 && node.faction !== Faction.Compact) {
+    fail('$.milestones.signalInSpine.holdTicks', 'partial decode hold requires Compact node ownership');
+  }
+  if (!milestones.fieldCommandDestroyed) {
+    const command = world.structureById(bindings.fieldCommand);
+    if (!command?.alive || command.faction !== Faction.Choir) fail('$.bindings.fieldCommand', 'must reference a live Choir structure');
+  }
+  const engineer = world.unitById(bindings.engineer);
+  const bulwark = world.unitById(bindings.bulwark);
+  if (engineer && (engineer.kind !== 'engineer' || engineer.faction !== Faction.Compact)) {
+    fail('$.bindings.engineer', 'must reference the Compact Engineer');
+  }
+  if (bulwark && (bulwark.kind !== 'bulwark' || bulwark.faction !== Faction.Compact)) {
+    fail('$.bindings.bulwark', 'must reference the Compact Bulwark');
+  }
+  if (!milestones.teamAtNode) {
+    if (!engineer) {
+      fail('$.bindings.engineer', 'must reference the Compact Engineer');
+    }
+    if (!bulwark) {
+      fail('$.bindings.bulwark', 'must reference the Compact Bulwark');
+    }
+  }
+  const power = world.structureById(bindings.restorationPower);
+  if (!milestones.powerRestored &&
+      (!power?.alive || power.kind !== 'fusionCore' || power.faction !== Faction.Compact || power.progress >= 1)) {
+    fail('$.bindings.restorationPower', 'must reference the incomplete Compact Fusion Core before restoration');
+  }
+  if (power && (power.kind !== 'fusionCore' || power.faction !== Faction.Compact ||
+      milestones.powerRestored && power.progress !== 1)) {
+    fail('$.bindings.restorationPower', 'remaining restoration structure must match the Compact Fusion Core state');
+  }
+  const liveNeedles = bindings.needleIds.map((id) => world.unitById(id)).filter((unit) => unit !== undefined);
+  if (liveNeedles.some((needle) => needle.kind !== 'needle' || needle.faction !== Faction.Choir) ||
+      milestones.needlesDefeated !== (liveNeedles.length === 0)) {
+    fail('$.bindings.needleIds', 'must agree with the live Choir Needle screen');
+  }
+  if (milestones.fieldCommandDestroyed !== !world.structureById(bindings.fieldCommand)) {
+    fail('$.bindings.fieldCommand', 'must agree with field-command destruction state');
+  }
+  for (const id of bindings.needleIds) {
+    const needle = world.unitById(id);
+    if (needle && (needle.kind !== 'needle' || needle.faction !== Faction.Choir)) {
+      fail('$.bindings.needleIds', 'must reference Choir Needles');
     }
   }
 }
@@ -782,13 +977,38 @@ function validateWorldChronology(state: MissionSnapshot, worldTick: number): voi
       }
     }
   }
+  const signal = state.milestones.signalInSpine;
+  if (signal) {
+    if (signal.milestoneTicks.some((tick) => tick !== null && (tick < state.startedAtTick || tick > worldTick))) {
+      fail('$.milestones.signalInSpine.milestoneTicks', 'must fall within the restored mission timeline');
+    }
+    if (signal.holdTicks > 0 && (signal.lastHoldWorldTick < state.startedAtTick || signal.lastHoldWorldTick > worldTick)) {
+      fail('$.milestones.signalInSpine.lastHoldWorldTick', 'must fall within the restored mission timeline');
+    }
+    const holdStartedAt = state.completedObjectiveTicks[3] ?? null;
+    if (signal.holdTicks > 0 && holdStartedAt === null) {
+      fail('$.milestones.signalInSpine.holdTicks', 'requires the hold objective to have started');
+    }
+    if (holdStartedAt !== null && signal.holdTicks > Math.max(0, worldTick - holdStartedAt)) {
+      fail('$.milestones.signalInSpine.holdTicks', 'cannot exceed elapsed ticks since the hold objective began');
+    }
+    if (holdStartedAt !== null && signal.lastHoldWorldTick >= 0 && signal.lastHoldWorldTick < holdStartedAt) {
+      fail('$.milestones.signalInSpine.lastHoldWorldTick', 'cannot precede the hold objective');
+    }
+    for (let index = 0; index < state.completedObjectiveTicks.length; index++) {
+      const occurredAt = signal.milestoneTicks[index];
+      if (occurredAt !== null && state.completedObjectiveTicks[index]! < occurredAt) {
+        fail('$.completedObjectiveTicks', 'cannot precede its signal milestone occurrence');
+      }
+    }
+  }
 }
 
 function readMilestones(missionId: MissionId, value: unknown, path: string): MissionMilestones {
   const milestones = record(value, path, [
     'selectedEngineer', 'structureCounts', 'unitCounts', 'capturedNodeIds',
     'deployedLongbow', 'firedAntispinward',
-  ], ['breakLine', 'counterfire']);
+  ], ['breakLine', 'counterfire', 'signalInSpine']);
   const structureCounts = countRecord<StructureKind>(
     milestones.structureCounts,
     `${path}.structureCounts`,
@@ -798,7 +1018,7 @@ function readMilestones(missionId: MissionId, value: unknown, path: string): Mis
   const unitCounts = countRecord<UnitKind>(
     milestones.unitCounts,
     `${path}.unitCounts`,
-    ['vanguard', 'longbow', 'wisp', 'aegis', 'engineer'],
+    ['vanguard', 'longbow', 'wisp', 'aegis', 'bulwark', 'needle', 'engineer'],
   );
   const capturedNodeValues = array(milestones.capturedNodeIds, `${path}.capturedNodeIds`);
   if (capturedNodeValues.length > 1) fail(`${path}.capturedNodeIds`, 'expected at most one entity id');
@@ -813,10 +1033,19 @@ function readMilestones(missionId: MissionId, value: unknown, path: string): Mis
   const counterfire = milestones.counterfire === undefined || milestones.counterfire === null
     ? null
     : readCounterfireMilestones(milestones.counterfire, `${path}.counterfire`);
+  const signalInSpine = milestones.signalInSpine === undefined || milestones.signalInSpine === null
+    ? null
+    : readSignalMilestones(milestones.signalInSpine, `${path}.signalInSpine`);
   if (missionId === 'break-the-line' && !breakLine) fail(`${path}.breakLine`, 'is required for break-the-line');
   if (missionId === 'counterfire' && !counterfire) fail(`${path}.counterfire`, 'is required for counterfire');
+  if (missionId === 'a-signal-in-the-spine' && !signalInSpine) {
+    fail(`${path}.signalInSpine`, 'is required for a-signal-in-the-spine');
+  }
   if (missionId !== 'break-the-line' && breakLine) fail(`${path}.breakLine`, 'must be null outside break-the-line');
   if (missionId !== 'counterfire' && counterfire) fail(`${path}.counterfire`, 'must be null outside counterfire');
+  if (missionId !== 'a-signal-in-the-spine' && signalInSpine) {
+    fail(`${path}.signalInSpine`, 'must be null outside a-signal-in-the-spine');
+  }
   if (missionId !== 'first-contact' && (
     milestones.selectedEngineer !== false || Object.keys(structureCounts).length > 0 ||
     Object.keys(unitCounts).length > 0 || capturedNodeIds.length > 0 ||
@@ -831,7 +1060,39 @@ function readMilestones(missionId: MissionId, value: unknown, path: string): Mis
     firedAntispinward: bool(milestones.firedAntispinward, `${path}.firedAntispinward`),
     breakLine,
     counterfire,
+    signalInSpine,
   };
+}
+
+function readSignalMilestones(value: unknown, path: string): SignalInSpineMilestones {
+  const state = record(value, path, [
+    'teamAtNode', 'needlesDefeated', 'powerRestored', 'nodeCaptured', 'holdTicks',
+    'lastHoldWorldTick', 'fieldCommandDestroyed', 'nodeSurvived', 'milestoneTicks', 'failureReason',
+  ]);
+  const ticks = array(state.milestoneTicks, `${path}.milestoneTicks`);
+  if (ticks.length !== SIGNAL_OBJECTIVES.length) fail(`${path}.milestoneTicks`, `expected ${SIGNAL_OBJECTIVES.length} entries`);
+  if (state.failureReason !== null && state.failureReason !== 'node-destroyed' &&
+      state.failureReason !== 'engineer-killed' && state.failureReason !== 'match-ended') {
+    fail(`${path}.failureReason`, 'expected a signal mission failure reason or null');
+  }
+  const result: SignalInSpineMilestones = {
+    teamAtNode: bool(state.teamAtNode, `${path}.teamAtNode`),
+    needlesDefeated: bool(state.needlesDefeated, `${path}.needlesDefeated`),
+    powerRestored: bool(state.powerRestored, `${path}.powerRestored`),
+    nodeCaptured: bool(state.nodeCaptured, `${path}.nodeCaptured`),
+    holdTicks: integer(state.holdTicks, `${path}.holdTicks`, 0, 30 * 60 * 60),
+    lastHoldWorldTick: integer(state.lastHoldWorldTick, `${path}.lastHoldWorldTick`, -1),
+    fieldCommandDestroyed: bool(state.fieldCommandDestroyed, `${path}.fieldCommandDestroyed`),
+    nodeSurvived: bool(state.nodeSurvived, `${path}.nodeSurvived`),
+    milestoneTicks: ticks.map((tick, index) => tick === null ? null : integer(tick, `${path}.milestoneTicks[${index}]`, 0)),
+    failureReason: state.failureReason,
+  };
+  for (let index = 0; index < SIGNAL_OBJECTIVES.length; index++) {
+    if (signalObjectiveMet(result, index) !== (result.milestoneTicks[index] !== null)) {
+      fail(`${path}.milestoneTicks[${index}]`, 'must agree with its milestone state');
+    }
+  }
+  return result;
 }
 
 function readBreakLineMilestones(value: unknown, path: string): BreakLineMilestones {
@@ -940,12 +1201,14 @@ function readCounterfireMilestones(value: unknown, path: string): CounterfireMil
 }
 
 function missionObjectives(missionId: MissionId): readonly ObjectiveDefinition[] {
+  if (missionId === 'a-signal-in-the-spine') return SIGNAL_OBJECTIVES;
   if (missionId === 'break-the-line') return BREAK_LINE_OBJECTIVES;
   if (missionId === 'counterfire') return COUNTERFIRE_OBJECTIVES;
   return FIRST_CONTACT_OBJECTIVES;
 }
 
 function missionTitle(missionId: MissionId): string {
+  if (missionId === 'a-signal-in-the-spine') return 'A Signal in the Spine';
   if (missionId === 'break-the-line') return 'Break the Line';
   if (missionId === 'counterfire') return 'Counterfire';
   return 'First Contact';
@@ -961,6 +1224,59 @@ function breakLineBindings(state: MissionSnapshot): BreakLineBindings {
 
 function counterfireBindings(state: MissionSnapshot): CounterfireBindings {
   return state.bindings as CounterfireBindings;
+}
+
+function signalBindings(state: MissionSnapshot): SignalInSpineBindings {
+  return state.bindings as SignalInSpineBindings;
+}
+
+function narrativeBeats(missionId: MissionId): readonly NarrativeBeat[] {
+  return missionId === 'a-signal-in-the-spine' ? SIGNAL_NARRATIVE : [];
+}
+
+function readNarrativeState(value: unknown, path: string, missionId: MissionId): NarrativeState {
+  const state = record(value, path, ['activeId', 'pendingIds', 'deliveredIds', 'acknowledgedIds']);
+  const readIds = (child: unknown, childPath: string): string[] => {
+    const values = array(child, childPath);
+    if (values.length > 64) fail(childPath, 'expected at most 64 ids');
+    return values.map((id, index) => string(id, `${childPath}[${index}]`));
+  };
+  const result: NarrativeState = {
+    activeId: state.activeId === null ? null : string(state.activeId, `${path}.activeId`),
+    pendingIds: readIds(state.pendingIds, `${path}.pendingIds`),
+    deliveredIds: readIds(state.deliveredIds, `${path}.deliveredIds`),
+    acknowledgedIds: readIds(state.acknowledgedIds, `${path}.acknowledgedIds`),
+  };
+  return validateNarrativeState(
+    result,
+    narrativeBeats(missionId).map((beat) => beat.id),
+    path,
+    fail,
+  );
+}
+
+function validateNarrativeProgress(
+  missionId: MissionId,
+  objectiveIndex: number,
+  status: MissionStatus,
+  state: NarrativeState,
+): void {
+  if (missionId !== 'a-signal-in-the-spine') {
+    if (state.activeId !== null || state.pendingIds.length || state.deliveredIds.length || state.acknowledgedIds.length) {
+      fail('$.narrative', 'must be empty outside a-signal-in-the-spine');
+    }
+    return;
+  }
+  const scheduled = new Set([state.activeId, ...state.pendingIds, ...state.deliveredIds].filter(Boolean));
+  if (!scheduled.has('signal-briefing')) fail('$.narrative', 'must include the mission briefing');
+  if (objectiveIndex < 1 && scheduled.has('signal-hunters')) fail('$.narrative', 'hunter transmission is premature');
+  if (objectiveIndex >= 1 && !scheduled.has('signal-hunters')) fail('$.narrative', 'missing hunter transmission');
+  if (objectiveIndex < 5 && scheduled.has('signal-migration')) fail('$.narrative', 'Migration Protocol transmission is premature');
+  if (objectiveIndex >= 5 && !scheduled.has('signal-migration')) fail('$.narrative', 'missing Migration Protocol transmission');
+  if (status !== 'completed' && scheduled.has('signal-last-correction')) fail('$.narrative', 'final correction transmission is premature');
+  if (status === 'completed' && !scheduled.has('signal-last-correction')) {
+    fail('$.narrative', 'missing final correction transmission');
+  }
 }
 
 function idArray(value: unknown, path: string, minimumLength: number, maximumLength: number): number[] {
@@ -1015,6 +1331,11 @@ function finiteNumber(value: unknown, path: string, minimum = -Infinity, maximum
 
 function bool(value: unknown, path: string): boolean {
   if (typeof value !== 'boolean') fail(path, 'expected a boolean');
+  return value;
+}
+
+function string(value: unknown, path: string): string {
+  if (typeof value !== 'string') fail(path, 'expected a string');
   return value;
 }
 

@@ -3,6 +3,7 @@ import { SIM_DT } from '@core/constants';
 import { ABILITIES, type AbilityId, type AbilityState } from './abilities';
 import {
   Faction,
+  canFactionFieldUnit,
   STRUCTURES,
   UNITS,
   WEAPONS,
@@ -207,6 +208,8 @@ function readUnit(value: unknown, path: string): Unit {
     'speedMultiplier',
   ]);
   const kind = unitKind(unit.kind, `${path}.kind`);
+  const unitFaction = faction(unit.faction, `${path}.faction`);
+  if (!canFactionFieldUnit(unitFaction, kind)) fail(path, `${kind} is unavailable to faction ${unitFaction}`);
   const weaponCount = UNITS[kind].weapons.length;
   const ability = readAbility(unit.ability, `${path}.ability`);
   if ((ability?.id ?? null) !== expectedAbility(kind)) {
@@ -215,7 +218,7 @@ function readUnit(value: unknown, path: string): Unit {
   return {
     id: integer(unit.id, `${path}.id`, 1),
     alive: boolean(unit.alive, `${path}.alive`),
-    faction: faction(unit.faction, `${path}.faction`),
+    faction: unitFaction,
     kind,
     s: finite(unit.s, `${path}.s`),
     z: finite(unit.z, `${path}.z`),
@@ -280,11 +283,12 @@ function readStructure(value: unknown, path: string): Structure {
     'revealed', 'queue', 'queueTimer', 'capture',
   ]);
   const kind = structureKind(structure.kind, `${path}.kind`);
+  const structureFaction = neutralFaction(structure.faction, `${path}.faction`);
   const weaponCount = STRUCTURES[kind].weapons.length;
   return {
     id: integer(structure.id, `${path}.id`, 1),
     alive: boolean(structure.alive, `${path}.alive`),
-    faction: neutralFaction(structure.faction, `${path}.faction`),
+    faction: structureFaction,
     kind,
     s: finite(structure.s, `${path}.s`),
     z: finite(structure.z, `${path}.z`),
@@ -300,8 +304,13 @@ function readStructure(value: unknown, path: string): Structure {
     burstTimer: numberArray(structure.burstTimer, `${path}.burstTimer`, weaponCount),
     targetId: integer(structure.targetId, `${path}.targetId`, 0),
     revealed: finite(structure.revealed, `${path}.revealed`, 0),
-    queue: boundedArray(structure.queue, `${path}.queue`, 128).map((queued, index) =>
-      unitKind(queued, `${path}.queue[${index}]`)),
+    queue: boundedArray(structure.queue, `${path}.queue`, 128).map((queued, index) => {
+      const queuedKind = unitKind(queued, `${path}.queue[${index}]`);
+      if (structureFaction < 0 || !canFactionFieldUnit(structureFaction as Faction, queuedKind)) {
+        fail(`${path}.queue[${index}]`, `${queuedKind} is unavailable to the producer faction`);
+      }
+      return queuedKind;
+    }),
     queueTimer: finite(structure.queueTimer, `${path}.queueTimer`, 0),
     capture: finite(structure.capture, `${path}.capture`, -1, 1),
   };
@@ -472,7 +481,8 @@ function neutralFaction(value: unknown, path: string): Faction | -1 {
 
 function unitKind(value: unknown, path: string): UnitKind {
   switch (value) {
-    case 'vanguard': case 'longbow': case 'wisp': case 'aegis': case 'engineer': return value;
+    case 'vanguard': case 'longbow': case 'wisp': case 'aegis': case 'bulwark': case 'needle':
+    case 'engineer': return value;
     default: return fail(path, 'expected a unit kind');
   }
 }
@@ -501,7 +511,9 @@ function abilityId(value: unknown, path: string): AbilityId {
 }
 
 function expectedAbility(kind: UnitKind): AbilityId | null {
-  for (const ability of Object.values(ABILITIES)) if (ability.unitKind === kind) return ability.id;
+  for (const ability of Object.values(ABILITIES)) {
+    if ((ability.unitKinds as readonly UnitKind[]).includes(kind)) return ability.id;
+  }
   return null;
 }
 

@@ -354,12 +354,14 @@ function chooseFocusTarget(ctx: TacticianContext, members: readonly Unit[]): Uni
 
   let best: Unit | Structure | null = null;
   let bestScore = -Infinity;
+  const needleHunter = members.some((member) => member.kind === 'needle');
   for (const candidate of candidates) {
     if (!members.every((member) => surfaceDist(member.s, member.z, candidate.s, candidate.z) <= attackRange(member))) {
       continue;
     }
     const distance = averageDistance(members, candidate);
-    const score = targetPriority(candidate, ctx.difficulty) - distance * 0.1 - candidate.hp * 0.0001;
+    const score = targetPriority(candidate, ctx.difficulty, needleHunter) -
+      distance * 0.1 - candidate.hp * 0.0001;
     if (score > bestScore || (score === bestScore && candidate.id < (best?.id ?? Infinity))) {
       best = candidate;
       bestScore = score;
@@ -368,19 +370,30 @@ function chooseFocusTarget(ctx: TacticianContext, members: readonly Unit[]): Uni
   return best;
 }
 
-function targetPriority(target: Unit | Structure, difficulty: Difficulty): number {
+function targetPriority(target: Unit | Structure, difficulty: Difficulty, needleHunter = false): number {
   if (!('order' in target)) {
     if (target.kind === 'rocketBattery') return difficulty === 'commander' ? 75 : 42;
     if (target.kind === 'mechFoundry') return difficulty === 'commander' ? 62 : 38;
     return target.kind === 'bastion' ? 35 : 20;
   }
-  if (difficulty !== 'commander') return target.kind === 'longbow' ? 48 : target.kind === 'aegis' ? 42 : 35;
+  if (needleHunter) {
+    if (target.kind === 'engineer') return 120;
+    if (target.kind === 'longbow') return 110;
+    if (target.kind === 'wisp') return 100;
+  }
+  if (difficulty !== 'commander') {
+    if (target.kind === 'longbow') return 48;
+    if (target.kind === 'aegis' || target.kind === 'needle') return 42;
+    return 35;
+  }
   switch (target.kind) {
     case 'longbow': return 100;
     case 'aegis': return 82;
     case 'vanguard': return 65;
     case 'wisp': return 55;
     case 'engineer': return 32;
+    case 'bulwark': return 58;
+    case 'needle': return 88;
   }
 }
 
@@ -415,9 +428,10 @@ function nearestCompatibleIndex(seed: Unit, members: readonly Unit[], candidates
   return bestIndex;
 }
 
-function roleOf(unit: Unit): 'line' | 'artillery' | 'scout' {
+function roleOf(unit: Unit): 'line' | 'artillery' | 'scout' | 'hunter' {
   if (unit.kind === 'longbow') return 'artillery';
   if (unit.kind === 'wisp') return 'scout';
+  if (unit.kind === 'needle') return 'hunter';
   return 'line';
 }
 

@@ -85,6 +85,29 @@ describe('mech abilities', () => {
     expect(wisp.revealed).toBeGreaterThan(0);
   });
 
+  it('reuses Shield Wall for the Compact Bulwark', () => {
+    const world = emptyWorld();
+    world.spawnStructure(Faction.Compact, 'fusionCore', 300, 0, 1);
+    const bulwark = world.spawnUnit(Faction.Compact, 'bulwark', 0, 0);
+
+    expect(bulwark.ability?.id).toBe('shieldWall');
+    expect(world.activateAbility(bulwark.id)).toBe(true);
+    expect(bulwark.speedMultiplier).toBe(ABILITIES.shieldWall.speedMultiplier);
+  });
+
+  it('reuses passive Cloak for the Choir Needle', () => {
+    const world = emptyWorld();
+    const needle = world.spawnUnit(Faction.Choir, 'needle', 0, 0);
+    needle.cd[0] = 999;
+    for (let tick = 0; tick < 46; tick++) world.step();
+
+    expect(needle.ability?.id).toBe('cloak');
+    expect(needle.cloaked).toBe(true);
+    needle.order = { kind: 'move', s: 100, z: 0, targetId: 0 };
+    for (let tick = 0; tick < 120 && needle.cloaked; tick++) world.step();
+    expect(needle.cloaked).toBe(false);
+  });
+
   it('adds Umbrella as rate draw and deactivates it when production becomes insufficient', () => {
     const world = emptyWorld();
     const core = world.spawnStructure(Faction.Compact, 'fusionCore', 300, 0, 1);

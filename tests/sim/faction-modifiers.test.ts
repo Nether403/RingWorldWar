@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Terrain } from '@gen/terrain';
-import { FACTION_MODS, Faction, STRUCTURES, UNITS } from '@sim/data';
+import { canFactionFieldUnit, FACTION_MODS, Faction, STRUCTURES, UNITS } from '@sim/data';
 import { World } from '@sim/world';
 
 describe('faction modifiers', () => {
@@ -46,6 +46,25 @@ describe('faction modifiers', () => {
       ),
     );
     expect(battery!.salvageCost).toBe(beforeStructure - compact.salvage);
+  });
+
+  it('enforces the faction-exclusive Bulwark and Needle roster at authority seams', () => {
+    const world = emptyWorld();
+    world.players[Faction.Compact].salvage = 10_000;
+    world.players[Faction.Choir].salvage = 10_000;
+    const compactFoundry = world.spawnStructure(Faction.Compact, 'mechFoundry', 0, 0, 1);
+    const choirFoundry = world.spawnStructure(Faction.Choir, 'mechFoundry', 500, 0, 1);
+
+    expect(canFactionFieldUnit(Faction.Compact, 'bulwark')).toBe(true);
+    expect(canFactionFieldUnit(Faction.Compact, 'needle')).toBe(false);
+    expect(canFactionFieldUnit(Faction.Choir, 'needle')).toBe(true);
+    expect(canFactionFieldUnit(Faction.Choir, 'bulwark')).toBe(false);
+    expect(world.tryQueueUnit(compactFoundry.id, 'bulwark')).toBe(true);
+    expect(world.tryQueueUnit(compactFoundry.id, 'needle')).toBe(false);
+    expect(world.tryQueueUnit(choirFoundry.id, 'needle')).toBe(true);
+    expect(world.tryQueueUnit(choirFoundry.id, 'bulwark')).toBe(false);
+    expect(() => world.spawnUnit(Faction.Compact, 'needle', 0, 0)).toThrow(/faction/i);
+    expect(() => world.spawnUnit(Faction.Choir, 'bulwark', 0, 0)).toThrow(/faction/i);
   });
 });
 

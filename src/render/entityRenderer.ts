@@ -37,7 +37,7 @@ import {
 import type { World } from '@sim/world';
 import type { RenderAnchor } from './anchor';
 
-const MECH_CLASSES: MechClass[] = ['vanguard', 'longbow', 'wisp', 'aegis'];
+const MECH_CLASSES: MechClass[] = ['vanguard', 'longbow', 'wisp', 'aegis', 'bulwark', 'needle'];
 const PART_NAMES = ['pelvis', 'torso', 'upperLeg', 'lowerLeg', 'foot'] as const;
 type PartName = (typeof PART_NAMES)[number];
 
@@ -120,7 +120,7 @@ export class EntityRenderer {
       this.object.add(wreck);
     }
 
-    // Cloaked Wisps need separate material buckets because opacity cannot vary
+    // Cloaked scouts need separate material buckets because opacity cannot vary
     // per instance on the shared hull material without another shader channel.
     for (const f of [Faction.Compact, Faction.Choir]) {
       const cloak = makeHullMaterial(FACTION_COLOR[f]);
@@ -129,16 +129,18 @@ export class EntityRenderer {
       cloak.material.opacity = 0.28;
       cloak.material.depthWrite = false;
       cloak.uniforms.uEmissive.value = 0.45;
-      const rig = this.rigs.get('wisp')!;
-      for (const part of PART_NAMES) {
-        const mesh = new THREE.InstancedMesh(rig.parts[part], cloak.material, MAX_PER_BUCKET);
-        mesh.name = `cloak:wisp:${part}:${f}`;
-        mesh.frustumCulled = false;
-        mesh.castShadow = false;
-        mesh.count = 0;
-        this.cloakMeshes.set(`${part}|${f}`, mesh);
-        this.presentationMeshes.push(mesh);
-        this.object.add(mesh);
+      for (const cls of ['wisp', 'needle'] as const) {
+        const rig = this.rigs.get(cls)!;
+        for (const part of PART_NAMES) {
+          const mesh = new THREE.InstancedMesh(rig.parts[part], cloak.material, MAX_PER_BUCKET);
+          mesh.name = `cloak:${cls}:${part}:${f}`;
+          mesh.frustumCulled = false;
+          mesh.castShadow = false;
+          mesh.count = 0;
+          this.cloakMeshes.set(`${cls}|${part}|${f}`, mesh);
+          this.presentationMeshes.push(mesh);
+          this.object.add(mesh);
+        }
       }
     }
 
@@ -465,8 +467,8 @@ export class EntityRenderer {
     this._basis.compose(this._v, this._q, ONE);
 
     const push = (part: PartName, local: THREE.Matrix4): void => {
-      const mesh = cloakedForViewer && cls === 'wisp'
-        ? this.cloakMeshes.get(`${part}|${f}`)
+      const mesh = cloakedForViewer
+        ? this.cloakMeshes.get(`${cls}|${part}|${f}`)
         : this.mechMeshes.get(`${cls}|${part}|${f}`);
       if (!mesh || mesh.count >= mesh.instanceMatrix.count) return;
       _tmp.multiplyMatrices(this._basis, local);

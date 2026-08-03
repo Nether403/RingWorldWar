@@ -32,11 +32,13 @@ import {
   type MissionBindings,
   type BreakLineBindings,
   type CounterfireBindings,
+  type SignalInSpineBindings,
   type MissionHudModel,
   type MissionDebriefModel,
   type MissionId,
   type MissionSnapshot,
 } from './tutorial/mission';
+import type { NarrativeHudModel } from './tutorial/narrative';
 
 export const PLAYER: Faction = Faction.Compact;
 export const SAVE_SLOT_KEY = 'ring-world-war/save-slot';
@@ -121,6 +123,7 @@ export class Game {
     this.hud.onArtilleryTarget = (sourceId, weaponId) => this.beginArtilleryTarget(sourceId, weaponId);
     this.hud.onAbilityToggle = (unitId) => this.toggleAbility(unitId);
     this.hud.onBuildRequest = (kind) => this.setBuild(kind);
+    this.hud.onNarrativeAcknowledge = () => this.acknowledgeNarrative();
   }
 
   get objects(): THREE.Object3D[] {
@@ -175,6 +178,7 @@ export class Game {
       this.artilleryResult,
       this.mission?.hudModel() ?? null,
       this.mission?.debriefModel() ?? null,
+      this.mission?.narrativeHudModel() ?? null,
     );
 
     // Drop dead entities from the selection so the panel does not show ghosts.
@@ -189,6 +193,7 @@ export class Game {
   }
 
   private fixedSimulationStep(): number {
+    if (this.mission?.narrativeBlocksSimulation) return 0;
     const stepStart = performance.now();
     this.world.step();
     const elapsed = performance.now() - stepStart;
@@ -210,15 +215,18 @@ export class Game {
   startMission(id: 'first-contact', bindings: MissionBindings): void;
   startMission(id: 'break-the-line', bindings: BreakLineBindings): void;
   startMission(id: 'counterfire', bindings: CounterfireBindings): void;
+  startMission(id: 'a-signal-in-the-spine', bindings: SignalInSpineBindings): void;
   startMission(
     id: MissionId,
-    bindings: MissionBindings | BreakLineBindings | CounterfireBindings,
+    bindings: MissionBindings | BreakLineBindings | CounterfireBindings | SignalInSpineBindings,
   ): void {
     const started = id === 'first-contact'
       ? MissionController.start(id, this.world.tick, bindings as MissionBindings)
       : id === 'break-the-line'
         ? MissionController.start(id, this.world.tick, bindings as BreakLineBindings)
-        : MissionController.start(id, this.world.tick, bindings as CounterfireBindings);
+        : id === 'counterfire'
+          ? MissionController.start(id, this.world.tick, bindings as CounterfireBindings)
+          : MissionController.start(id, this.world.tick, bindings as SignalInSpineBindings);
     this.mission = MissionController.fromSnapshot(started.snapshot(), this.world);
     this.hud.invalidate();
   }
@@ -233,6 +241,14 @@ export class Game {
 
   get missionDebriefModel(): MissionDebriefModel | null {
     return this.mission?.debriefModel() ?? null;
+  }
+
+  get narrativeHudModel(): NarrativeHudModel | null {
+    return this.mission?.narrativeHudModel() ?? null;
+  }
+
+  acknowledgeNarrative(): void {
+    this.mission?.acknowledgeNarrative();
   }
 
   /** Called after the anchor re-bases, so render-space effects follow it. */

@@ -305,8 +305,8 @@ function result(seed: number, winner: Faction | null, durationSeconds: number): 
       startingSalvage: 850, salvageGathered: 1_000, salvageSpent: 900,
       endingSalvage: 950, endingEnergyProduced: 20, endingEnergyDrawn: 10, dominance: 50,
     },
-    unitsProduced: { engineer: 1, vanguard: 1, longbow: 0, wisp: 1, aegis: 0 },
-    unitsLost: { engineer: 0, vanguard: 0, longbow: 0, wisp: 1, aegis: 0 },
+    unitsProduced: { engineer: 1, vanguard: 1, longbow: 0, wisp: 1, aegis: 0, bulwark: 0, needle: 0 },
+    unitsLost: { engineer: 0, vanguard: 0, longbow: 0, wisp: 1, aegis: 0, bulwark: 0, needle: 0 },
     structuresDestroyed: Object.fromEntries(Object.keys(STRUCTURES).map((kind) => [kind, 0])) as MatchResult['factions'][Faction]['structuresDestroyed'],
   });
   return {

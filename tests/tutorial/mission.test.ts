@@ -334,6 +334,7 @@ function missionAtFinalObjective(world: World, bindings: MissionBindings): Missi
       firedAntispinward: false,
       breakLine: null,
       counterfire: null,
+      signalInSpine: null,
     },
     completedObjectiveTicks: Array.from({ length: 9 }, () => world.tick),
   }, world);
