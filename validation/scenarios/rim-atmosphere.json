@@ -1,0 +1,23 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "rim-atmosphere",
+  "revision": 1,
+  "worldSeed": 20260731,
+  "quality": "high",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 0, "visualTimeSeconds": 66, "settlingFrames": 3 },
+  "camera": { "focusS": 1900, "focusZ": 1700, "yawRadians": 1.5707963267948966, "zoom": 500 },
+  "setup": {
+    "disableAi": true,
+    "units": [],
+    "structures": []
+  },
+  "observationRegions": [
+    { "id": "open-space", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.16 },
+    { "id": "rim", "kind": "ground", "x": 0, "y": 0.14, "width": 1, "height": 0.18 },
+    { "id": "foreground", "kind": "ground", "x": 0, "y": 0.32, "width": 1, "height": 0.68 }
+  ],
+  "benchmark": { "warmupSeconds": 2, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 1, "minimumStructures": 1, "maximumContextLosses": 0 }
+}

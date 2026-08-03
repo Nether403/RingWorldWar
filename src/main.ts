@@ -47,7 +47,7 @@ const boot = {
 async function start(): Promise<void> {
   const container = document.getElementById('app')!;
   const params = new URLSearchParams(location.search);
-  const scenarioDriverEnabled = params.get('scenarioDriver') === '1';
+  const scenarioDriverEnabled = import.meta.env.DEV && params.get('scenarioDriver') === '1';
   const seed = Number(params.get('seed') ?? '20260731') || 20260731;
   const settings = new Settings({ search: params });
 
@@ -101,6 +101,8 @@ async function start(): Promise<void> {
     game.effects.setParticleCap(quality.particleCap);
     game.effects.setLightCap(quality.effectLightCap);
     game.entities.setLowQuality(renderer.quality === 'low');
+    dressing.setQuality(quality.dressingDistance, quality.dressingCap, quality.dressingShadows);
+    environment.setLowQuality(renderer.quality === 'low');
   };
   renderer.onQualityChange = applyRenderQuality;
   applyRenderQuality();
@@ -108,7 +110,7 @@ async function start(): Promise<void> {
 
   // Aerial perspective. Inside a ring you are always looking through kilometres
   // of air at more world, so haze does most of the depth cueing.
-  const fog = new THREE.FogExp2(environment.fogColor.getHex(), 0.000105);
+  const fog = new THREE.FogExp2(environment.fogColor.getHex(), environment.fogDensity);
   renderer.scene.fog = fog;
   ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
 
@@ -169,7 +171,8 @@ async function start(): Promise<void> {
     ringMesh.uniforms.uAmbientTint.value.copy(environment.cycle.hazeColor);
     ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
     fog.color.copy(environment.fogColor);
-    (renderer.scene.background as THREE.Color).copy(environment.fogColor).multiplyScalar(0.5);
+    fog.density = environment.fogDensity;
+    (renderer.scene.background as THREE.Color).copy(environment.spaceColor);
 
     renderer.render(dt);
     overlay.update(dt, renderer, game, rig, environment);
@@ -258,7 +261,12 @@ async function start(): Promise<void> {
       presentFrame: (dt: number, visualTime: number): void => renderFrame(dt, visualTime, true, false),
     };
   }
-  (window as unknown as { RWW: unknown }).RWW = exposed;
+  if (import.meta.env.DEV) {
+    (window as unknown as { RWW: unknown }).RWW = exposed;
+  } else {
+    const probe = exposed.probe as () => Record<string, unknown>;
+    (window as unknown as { RWWDiagnostics: unknown }).RWWDiagnostics = Object.freeze(probe());
+  }
 
   ringMesh.syncToAnchor(anchor);
   frame();
@@ -515,8 +523,15 @@ function checkWebGL2(): boolean {
   }
 }
 
+const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
+
 if (!checkWebGL2()) {
   boot.fail(new Error('This game needs WebGL 2, which this browser did not provide.'));
+} else if (normalizedPath === '/dev/calibration') {
+  import('./dev/calibration')
+    .then(({ startCalibration }) => startCalibration(document.getElementById('app')!))
+    .then(() => boot.hide())
+    .catch((error: unknown) => boot.fail(error));
 } else {
   start().catch((e) => boot.fail(e));
 }

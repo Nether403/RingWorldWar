@@ -6,8 +6,7 @@ import type { Terrain } from '@gen/terrain';
 import type { RenderAnchor } from './anchor';
 
 const DRESSING_COUNT = 320;
-const MAX_VISIBLE = 128;
-const DRAW_DISTANCE = 2_400;
+const MAX_VISIBLE = 256;
 
 interface DressingItem {
   s: number;
@@ -33,6 +32,9 @@ export class BattlefieldDressing {
   private readonly local = new THREE.Matrix4();
   private readonly basis = new THREE.Matrix4();
   private readonly result = new THREE.Matrix4();
+  private readonly tilt = new THREE.Quaternion();
+  private drawDistance = 2_400;
+  private instanceCap = 192;
 
   constructor(seed: number) {
     this.object.name = 'battlefield-dressing';
@@ -72,14 +74,31 @@ export class BattlefieldDressing {
     }
   }
 
+  setQuality(drawDistance: number, instanceCap: number, shadows: boolean): void {
+    this.drawDistance = Math.max(200, drawDistance);
+    this.instanceCap = Math.max(0, Math.min(MAX_VISIBLE * 2, Math.floor(instanceCap)));
+    this.slabs.castShadow = shadows;
+    this.pipes.castShadow = shadows;
+    this.lastAnchorVersion = -1;
+  }
+
   update(anchor: RenderAnchor, terrain: Terrain): void {
     if (anchor.version === this.lastAnchorVersion) return;
     this.lastAnchorVersion = anchor.version;
     this.slabs.count = 0;
     this.pipes.count = 0;
 
-    for (const item of this.items) {
-      if (Math.abs(deltaS(anchor.s, item.s)) > DRAW_DISTANCE || Math.abs(item.z - anchor.z) > DRAW_DISTANCE) continue;
+    const candidates = this.items
+      .map((item) => {
+        const ds = deltaS(anchor.s, item.s);
+        const dz = item.z - anchor.z;
+        return { item, distanceSq: ds * ds + dz * dz, ds, dz };
+      })
+      .filter((candidate) => candidate.distanceSq <= this.drawDistance * this.drawDistance)
+      .sort((a, b) => a.distanceSq - b.distanceSq);
+    let placed = 0;
+    for (const { item } of candidates) {
+      if (placed >= this.instanceCap) break;
       const mesh = item.pipe ? this.pipes : this.slabs;
       if (mesh.count >= MAX_VISIBLE) continue;
       const ground = terrain.heightAt(item.s, item.z);
@@ -87,10 +106,18 @@ export class BattlefieldDressing {
       anchor.orientation(item.s, 0, this.orientation);
       this.basis.compose(this.position, this.orientation, ONE);
       this.localOrientation.setFromAxisAngle(UP, item.yaw);
+      let centerY = item.height * 0.5;
+      if (item.pipe) {
+        const tiltAngle = Math.PI * 0.5 + Math.sin(item.yaw * 3.1) * 0.12;
+        this.tilt.setFromAxisAngle(AXIAL, tiltAngle);
+        this.localOrientation.multiply(this.tilt);
+        centerY = item.width * 1.05 + Math.abs(Math.cos(tiltAngle)) * item.height * 0.5;
+      }
       this.scale.set(item.width, item.height, item.depth);
-      this.local.compose(LOCAL_CENTER.set(0, item.height * 0.5, 0), this.localOrientation, this.scale);
+      this.local.compose(LOCAL_CENTER.set(0, centerY, 0), this.localOrientation, this.scale);
       this.result.multiplyMatrices(this.basis, this.local);
       mesh.setMatrixAt(mesh.count++, this.result);
+      placed++;
     }
     this.slabs.instanceMatrix.needsUpdate = true;
     this.pipes.instanceMatrix.needsUpdate = true;
@@ -106,4 +133,5 @@ export class BattlefieldDressing {
 
 const ONE = new THREE.Vector3(1, 1, 1);
 const UP = new THREE.Vector3(0, 1, 0);
+const AXIAL = new THREE.Vector3(0, 0, 1);
 const LOCAL_CENTER = new THREE.Vector3();

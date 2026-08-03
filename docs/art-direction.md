@@ -52,6 +52,16 @@ Distance haze is what sells the 22.6 km ring as a world rather than a curved are
 - **Volumetric light shafts** (cheap raymarched, half-res, temporally jittered) at shadow-square boundaries — the terminator line sweeping across the map with god rays is a signature moment.
 - **Dust & particulate:** always-present drifting motes near camera, dust plumes from mech footsteps, smoke that persists in battle zones. Motion in the air = alive.
 
+### Phase 3B atmosphere boundary
+
+The first production atmosphere layer is a single analytic, camera-centered sky
+dome on Medium through Ultra in the stable forward pass. Low uses a zero-draw
+dark-space clear color with the same dynamic fog. Axial openings remain near-black, ringward
+horizons share the terrain fog endpoint, and day/night color comes from the
+existing shadow-square cycle. The `/dev/calibration` page locks PBR response using
+the same renderer and generated environment as gameplay. Volumetric shafts,
+post-processing, dynamic IBL, and authored LUTs remain later work.
+
 ## 5. Post-Processing Roadmap
 Gate 1 deliberately uses stable forward rendering with ACES after the composer prototype intermittently produced black frames. The following stack is a post-Gate-1 roadmap and must return behind a direct-render fallback with browser regression coverage:
 1. TAA (temporal AA — also amortizes our volumetrics and SSAO)

@@ -24,6 +24,12 @@ export interface QualitySettings {
   particleCap: number;
   /** Maximum pooled explosion lights participating in PBR shading. */
   effectLightCap: number;
+  /** Presentation-only ruin visibility distance. */
+  dressingDistance: number;
+  /** Total visible presentation-only ruin instances. */
+  dressingCap: number;
+  /** Whether environmental dressing participates in the shadow pass. */
+  dressingShadows: boolean;
   /** The stable direct renderer deliberately has no post-processing path. */
   postProcessingLevel: 'none';
 }
@@ -37,6 +43,9 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     drawDistance: 8_000,
     particleCap: 225,
     effectLightCap: 2,
+    dressingDistance: 1_400,
+    dressingCap: 72,
+    dressingShadows: false,
     postProcessingLevel: 'none',
   },
   medium: {
@@ -47,6 +56,9 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     drawDistance: 12_000,
     particleCap: 450,
     effectLightCap: 8,
+    dressingDistance: 1_900,
+    dressingCap: 112,
+    dressingShadows: true,
     postProcessingLevel: 'none',
   },
   high: {
@@ -57,6 +69,9 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     drawDistance: 18_000,
     particleCap: 675,
     effectLightCap: 14,
+    dressingDistance: 2_400,
+    dressingCap: 192,
+    dressingShadows: true,
     postProcessingLevel: 'none',
   },
   ultra: {
@@ -67,6 +82,9 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     drawDistance: 26_000,
     particleCap: 900,
     effectLightCap: 14,
+    dressingDistance: 3_000,
+    dressingCap: 256,
+    dressingShadows: true,
     postProcessingLevel: 'none',
   },
 };

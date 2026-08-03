@@ -63,6 +63,36 @@ const WARM_MID = new THREE.Color('#ffd9a8');
 const NEUTRAL = new THREE.Color('#fff4e2');
 const DAY_HAZE = new THREE.Color('#9fb4c9');
 const NIGHT_HAZE = new THREE.Color('#1a2334');
+const DAY_SPACE = new THREE.Color('#070b13');
+const NIGHT_SPACE = new THREE.Color('#010309');
+const DAY_ZENITH = new THREE.Color('#182638');
+const NIGHT_ZENITH = new THREE.Color('#080d18');
+
+export interface AtmosphereSample {
+  readonly space: THREE.Color;
+  readonly horizon: THREE.Color;
+  readonly zenith: THREE.Color;
+  fogDensity: number;
+}
+
+export function sampleAtmosphere(daylight: number, target = createAtmosphereSample()): AtmosphereSample {
+  const value = clamp01(daylight);
+  const blend = smoothstep(0, 0.75, value);
+  target.space.copy(NIGHT_SPACE).lerp(DAY_SPACE, blend);
+  target.horizon.copy(NIGHT_HAZE).lerp(DAY_HAZE, blend);
+  target.zenith.copy(NIGHT_ZENITH).lerp(DAY_ZENITH, blend);
+  target.fogDensity = 0.000132 - value * 0.000017;
+  return target;
+}
+
+function createAtmosphereSample(): AtmosphereSample {
+  return {
+    space: new THREE.Color(),
+    horizon: new THREE.Color(),
+    zenith: new THREE.Color(),
+    fogDensity: 0.000105,
+  };
+}
 
 export class DayCycle {
   /** Seconds since match start. */
@@ -76,6 +106,7 @@ export class DayCycle {
   lightIntensity = 1;
   /** Ambient/haze colour, used for fog and bounce. */
   readonly hazeColor = new THREE.Color();
+  readonly atmosphere = createAtmosphereSample();
   ambientIntensity = 1;
 
   update(time: number, anchorS: number): void {
@@ -97,7 +128,8 @@ export class DayCycle {
     // Three uses physical light units, so these numbers are small on purpose.
     this.lightIntensity = 0.30 + 1.55 * d * d;
 
-    this.hazeColor.copy(NIGHT_HAZE).lerp(DAY_HAZE, smoothstep(0.0, 0.75, d));
+    sampleAtmosphere(d, this.atmosphere);
+    this.hazeColor.copy(this.atmosphere.horizon);
     // Ambient rises as direct light falls: on a ring, the lit landscape
     // overhead keeps throwing light down even when you are in a shadow band.
     this.ambientIntensity = 0.9 - 0.25 * d;
@@ -154,6 +186,7 @@ export class Environment {
   private filamentGlow!: THREE.Mesh;
   private panels: THREE.Mesh[] = [];
   private stars!: THREE.Points;
+  private atmosphere!: THREE.Mesh;
   private readonly starPivot = new THREE.Group();
   private envTarget: THREE.WebGLRenderTarget | null = null;
 
@@ -188,12 +221,63 @@ export class Environment {
     this.ambient = new THREE.AmbientLight(0x2a3444, 0.12);
     this.group.add(this.ambient);
 
+    this.cycle.update(0, 0);
+    this.buildAtmosphere();
     this.buildFilament();
     this.buildPanels();
     this.buildStars(seed);
   }
 
   // -------------------------------------------------------------------------
+
+  private buildAtmosphere(): void {
+    const geometry = new THREE.SphereGeometry(1, 16, 8);
+    const material = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      depthTest: false,
+      transparent: false,
+      dithering: true,
+      uniforms: {
+        uSpace: { value: this.cycle.atmosphere.space.clone() },
+        uHorizonOutput: { value: this.cycle.atmosphere.horizon.clone().convertLinearToSRGB() },
+        uZenith: { value: this.cycle.atmosphere.zenith.clone() },
+      },
+      vertexShader: /* glsl */ `
+        varying vec3 vDirection;
+        void main() {
+          vDirection = normalize(position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uSpace;
+        uniform vec3 uHorizonOutput;
+        uniform vec3 uZenith;
+        varying vec3 vDirection;
+        void main() {
+          vec3 direction = normalize(vDirection);
+          float ringward = 1.0 - smoothstep(0.45, 0.9, abs(direction.z));
+          float horizon = (1.0 - smoothstep(0.0, 0.42, abs(direction.y))) * ringward;
+          float zenith = smoothstep(0.0, 0.78, max(direction.y, 0.0)) * 0.62;
+          vec3 color = mix(uSpace, uZenith, zenith);
+          float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
+          gl_FragColor = vec4(max(color + dither / 255.0, 0.0), 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          // Three's fog endpoint is mixed after output conversion in the terrain
+          // shaders, so use the same framebuffer-space endpoint at the horizon.
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, uHorizonOutput, horizon);
+        }
+      `,
+    });
+    this.atmosphere = new THREE.Mesh(geometry, material);
+    this.atmosphere.name = 'environment:atmosphere';
+    this.atmosphere.scale.setScalar(6_000);
+    this.atmosphere.renderOrder = -1_000;
+    this.atmosphere.frustumCulled = false;
+    this.group.add(this.atmosphere);
+  }
 
   private buildFilament(): void {
     // A line of fusion light running the length of the ring's axis. It recedes
@@ -367,6 +451,13 @@ export class Environment {
 
   update(time: number, anchor: RenderAnchor, cameraPos: THREE.Vector3): void {
     this.cycle.update(time, anchor.s);
+    this.atmosphere.position.copy(cameraPos);
+    const atmosphereMaterial = this.atmosphere.material as THREE.ShaderMaterial;
+    atmosphereMaterial.uniforms.uSpace!.value.copy(this.cycle.atmosphere.space);
+    atmosphereMaterial.uniforms.uHorizonOutput!.value
+      .copy(this.cycle.atmosphere.horizon)
+      .convertLinearToSRGB();
+    atmosphereMaterial.uniforms.uZenith!.value.copy(this.cycle.atmosphere.zenith);
 
     const anchorAngle = (anchor.s / RING_CIRCUMFERENCE) * Math.PI * 2;
     this.starPivot.rotation.z = -(RING_OMEGA * time + anchorAngle);
@@ -412,6 +503,18 @@ export class Environment {
   /** Fog colour for the current lighting. */
   get fogColor(): THREE.Color {
     return this.cycle.hazeColor;
+  }
+
+  get fogDensity(): number {
+    return this.cycle.atmosphere.fogDensity;
+  }
+
+  get spaceColor(): THREE.Color {
+    return this.cycle.atmosphere.space;
+  }
+
+  setLowQuality(enabled: boolean): void {
+    this.atmosphere.visible = !enabled;
   }
 
   /**
@@ -481,6 +584,8 @@ export class Environment {
 
   dispose(): void {
     this.envTarget?.dispose();
+    this.atmosphere.geometry.dispose();
+    (this.atmosphere.material as THREE.Material).dispose();
   }
 }
 

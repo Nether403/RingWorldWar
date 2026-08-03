@@ -102,7 +102,7 @@ export function makeLowTerrainMaterial(uniforms: TerrainUniforms): THREE.ShaderM
         albedo *= 1.0 - lowGrid(vSurface / 420.0, 0.008) * 0.25;
         float rel = mod(vTheta - uPanelPhase, uPanelSpacing);
         float d = min(rel, uPanelSpacing - rel);
-        float band = 1.0 - (1.0 - smoothstep(uPanelSpan * 0.55, uPanelSpan, d)) * 0.72;
+        float band = 1.0 - (1.0 - smoothstep(uPanelSpan * 0.5, uPanelSpan, d)) * 0.72;
         vec3 outgoingLight = albedo * vLight * band + uAmbientTint * (1.0 - band) * 0.035;
         gl_FragColor = vec4(outgoingLight, 1.0);
         #include <tonemapping_fragment>
@@ -212,6 +212,7 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         varying float vHeight;
         varying float vTheta;
         varying vec3 vLocalUp;
+        varying vec3 vLocalAxial;
         varying vec3 vViewPos;
         `,
       )
@@ -225,7 +226,8 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         vec2 fromAxis = vec2(position.x, position.y - ${RING_RADIUS.toFixed(1)});
         vHeight = ${RING_RADIUS.toFixed(1)} - length(fromAxis);
         vTheta = atan(position.x, ${RING_RADIUS.toFixed(1)} - position.y);
-        vLocalUp = normalize(vec3(-fromAxis, 0.0));
+        vLocalUp = normalize(normalMatrix * normalize(vec3(-fromAxis, 0.0)));
+        vLocalAxial = normalize(normalMatrix * vec3(0.0, 0.0, 1.0));
         vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
         `,
       );
@@ -247,6 +249,7 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         varying float vHeight;
         varying float vTheta;
         varying vec3 vLocalUp;
+        varying vec3 vLocalAxial;
         varying vec3 vViewPos;
         ${NOISE_GLSL}
 
@@ -254,8 +257,8 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         float rww_shadowBand(float theta) {
           float rel = mod(theta - uPanelPhase, uPanelSpacing);
           float d = min(rel, uPanelSpacing - rel);
-          float occ = 1.0 - smoothstep(uPanelSpan * 0.55, uPanelSpan, d);
-          return 1.0 - occ * 0.94;
+          float occ = 1.0 - smoothstep(uPanelSpan * 0.5, uPanelSpan, d);
+          return 1.0 - occ * 0.72;
         }
         `,
       )
@@ -393,7 +396,7 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
             vec3 bump = normalize(vec3((c0 - cx) * 9.0 * fade, 1.0, (c0 - cy) * 9.0 * fade));
             // Rotate the tangent-space bump into the local surface frame.
             vec3 up = normalize(vLocalUp);
-            vec3 t = normalize(cross(up, vec3(0.0, 0.0, 1.0)) + 1e-5);
+            vec3 t = normalize(cross(up, normalize(vLocalAxial)) + 1e-5);
             vec3 b = cross(up, t);
             normal = normalize(normal + (t * bump.x + b * bump.z) * 0.85);
           }
@@ -418,7 +421,7 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
   };
 
   // Changing onBeforeCompile requires a fresh program key.
-  material.customProgramCacheKey = () => 'rww-terrain-v1';
+  material.customProgramCacheKey = () => 'rww-terrain-v2';
 
   return { material, uniforms };
 }

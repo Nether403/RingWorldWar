@@ -21,6 +21,12 @@ describe('Settings', () => {
     expect(QUALITY.low.drawDistance).toBeLessThan(QUALITY.medium.drawDistance);
     expect(QUALITY.medium.drawDistance).toBeLessThan(QUALITY.high.drawDistance);
     expect(QUALITY.high.drawDistance).toBeLessThan(QUALITY.ultra.drawDistance);
+    expect(QUALITY.low.dressingShadows).toBe(false);
+    expect(QUALITY.medium.dressingDistance).toBeLessThan(QUALITY.high.dressingDistance);
+    expect(QUALITY.high.dressingDistance).toBeLessThan(QUALITY.ultra.dressingDistance);
+    expect(QUALITY.low.dressingCap).toBeLessThan(QUALITY.medium.dressingCap);
+    expect(QUALITY.medium.dressingCap).toBeLessThan(QUALITY.high.dressingCap);
+    expect(QUALITY.high.dressingCap).toBeLessThan(QUALITY.ultra.dressingCap);
     expect(Object.values(QUALITY).every((quality) => quality.postProcessingLevel === 'none')).toBe(true);
   });
 

@@ -20,7 +20,8 @@ This is the authoritative source for current delivery status and near-term seque
 | Break the Line core-loop mission | Automated completion pass | Normal commands complete the established-base loop in 15:45; human pacing runs now determine whether a speed experiment is warranted |
 | Counterfire defensive mission | Internal completion pass | Human play completed without blockers; defensive power, interception, ammunition adaptation, and debrief behavior are accepted in baseline `2cf2727` |
 | A Signal in the Spine story slice | Internal completion pass | Human play completed without bugs; Bulwark, Needle, narrative pacing, and the Last Rotation revelation are accepted in frozen baseline `a67ef74` |
-| Phase 3A signature battlefield | In progress | Presentation-only mech weight, procedural audio, bounded VFX, and deterministic signature-battlefield qualification are specified in `docs/phase-3a-signature-battlefield.md` |
+| Phase 3A signature battlefield | Internal completion pass | Procedural audio, mech weight, bounded VFX, battlefield dressing, and the signature battle passed human play and T480s Low qualification in frozen baseline `f599edf` |
+| Phase 3B ring atmosphere and calibration | In progress | Analytic atmosphere, matched fog, production PBR calibration, and environmental quality budgets are specified in `docs/phase-3b-atmosphere.md` |
 | Phase 2 overall | Qualification in progress | Gameplay cohorts pass, but performance qualification and human observation remain open |
 
 ## Immediate Sequence
@@ -35,7 +36,8 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 6. **Completed - Break the Line pacing validation:** the tester completed in roughly 12–15 minutes and chose to keep current movement and projectile speeds.
 7. **Completed - Counterfire validation:** defensive power, interception, ammunition adaptation, and debrief behavior passed internal human play.
 8. **Completed - story expansion validation:** Bulwark escort identity, Needle hunter readability, narrative pacing, and the Last Rotation revelation passed internal human play.
-9. **Current - Phase 3A signature battlefield:** deepen procedural mech weight, combat atmosphere, and audio while keeping the accepted simulation and balance frozen.
+9. **Completed - Phase 3A signature battlefield:** procedural mech weight, combat atmosphere, audio, and the busy signature battle passed human review and T480s qualification.
+10. **Current - Phase 3B ring atmosphere and calibration:** make open space, horizon haze, and the real ring read as one enclosed world, then lock shared PBR decisions in a production calibration scene.
 
 ## Direction Decisions
 
@@ -44,6 +46,7 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 - **Asset policy:** the current product remains procedural-only. A Blender/glTF pipeline is a proposed future option, not an active roadmap commitment, and would require an explicit change to the asset constraint.
 - **Phase 3A balance boundary:** presentation-only. Unit and structure statistics, weapons, abilities, economy, movement, AI, navigation, ballistics, visibility, and victory rules remain frozen.
 - **Gate 3 artifact policy:** generated screenshots remain ignored artifacts. Their deterministic scenario, visual signature, renderer identity, source hashes, artifact hashes, and receipt digest are durable evidence.
+- **Phase 3B renderer boundary:** one analytic atmosphere draw on Medium through Ultra; Low keeps a zero-draw dark-space/fog fallback. No post-processing composer, atmosphere render target, volumetric raymarch, or dynamic environment-map rebuild.
 - **Tutorial sequencing:** tutorial work follows directional-USP validation and first-time-player observation rather than preceding them.
 - **Evidence standard:** automated cohorts establish deterministic gameplay and AI-proxy results. They do not establish human comprehension, enjoyment, or first-time-player difficulty.
 

@@ -9,6 +9,7 @@ npm run rww -- run validation/manifests/veteran-mirror.json --repeat 2
 npm run rww -- perf headless-40m --terrain standard --runs 3 --ticks 72000
 npm run rww -- visual signature-lance
 npm run rww -- visual signature-lance --compare
+npm run rww -- visual rim-atmosphere
 npm run rww -- play signature-lance
 npm run rww -- perf browser-heavy --scenario signature-lance --target validation/hardware/t480s-low.json --seconds 30 --json
 npm run rww -- play directional-artillery
@@ -47,3 +48,18 @@ hashes.
 `perf browser-heavy` always uses Low quality and disables adaptive quality. On Windows Chromium is launched through ANGLE D3D11 with GPU rasterization enabled; a detected software renderer is an infrastructure failure. The command uses the selected target's candidate Low resolution, warms up for the scenario-defined interval, and samples real RAF intervals for `--seconds`. It reports median/p95/p99 frame intervals, long frames per minute, render/simulation/full-frame distributions, renderer resources, context loss, a coarse black-frame check, optional timer-query availability, and the candidate target verdict. `EXT_disjoint_timer_query_webgl2` is advisory and never required.
 
 The T480s frame-budget remains `not-measured` in `doctor`. Only `perf browser-heavy --target validation/hardware/t480s-low.json` evaluates that budget.
+
+## PBR calibration
+
+`/dev/calibration?quality=high` boots an isolated deterministic calibration scene
+instead of a match. It uses the production renderer, ACES exposure, output color
+space, generated environment map, analytic atmosphere, fog, key light, and hull
+material. The page contains chrome and grey reference balls, roughness and
+metalness sweeps, a generated 24-patch chart, environment material swatches, and
+a generated Compact reference mech. It creates no World, AI, HUD, gameplay input,
+or audio authority.
+
+Use `visual rim-atmosphere` for the deterministic axial-space/rim artifact and
+`visual signature-lance` for the ringward fog, far-ring, unit-readability, and
+combat composition artifact. Both remain baseline candidates until human review
+and cross-renderer tolerances are recorded.
