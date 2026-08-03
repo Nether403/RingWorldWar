@@ -1,6 +1,6 @@
 # Current Roadmap And Status
 
-**Status date:** 2026-08-02
+**Status date:** 2026-08-03
 
 This is the authoritative source for current delivery status and near-term sequencing. `tasks/plan.md` and `tasks/todo.md` preserve earlier planning history; unchecked or future-looking items there do not override this document.
 
@@ -18,8 +18,9 @@ This is the authoritative source for current delivery status and near-term seque
 | Directional artillery prototype | Internal comprehension pass | Automated validation and the first successful internal observation are recorded; broader cohort validation remains open |
 | First Contact tutorial alpha | Internal completion pass | One tester reported completing all ten objectives with zero gameplay confusion or mechanical faults; broader pacing/copy cohort remains open |
 | Break the Line core-loop mission | Automated completion pass | Normal commands complete the established-base loop in 15:45; human pacing runs now determine whether a speed experiment is warranted |
-| Counterfire defensive mission | Playable candidate | Existing power, Umbrella, Laser Grid, Standard Rocket, and Cruise Missile systems form a deterministic defensive/counterbattery loop with persisted debrief stats |
-| A Signal in the Spine story slice | Playable candidate | Adds Compact Bulwark, Choir Needle, persisted briefings/transmissions, and a node-restoration story mission without changing accepted ring physics or speeds |
+| Counterfire defensive mission | Internal completion pass | Human play completed without blockers; defensive power, interception, ammunition adaptation, and debrief behavior are accepted in baseline `2cf2727` |
+| A Signal in the Spine story slice | Internal completion pass | Human play completed without bugs; Bulwark, Needle, narrative pacing, and the Last Rotation revelation are accepted in frozen baseline `a67ef74` |
+| Phase 3A signature battlefield | In progress | Presentation-only mech weight, procedural audio, bounded VFX, and deterministic signature-battlefield qualification are specified in `docs/phase-3a-signature-battlefield.md` |
 | Phase 2 overall | Qualification in progress | Gameplay cohorts pass, but performance qualification and human observation remain open |
 
 ## Immediate Sequence
@@ -32,14 +33,17 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 4. **Completed - first internal USP observation:** the tester understood sensor coverage versus LOS, blocked previews, minimap commands, and direction-dependent artillery velocity.
 5. **Completed - First Contact tutorial alpha:** deterministic onboarding passed one tester-reported internal completion; broader copy validation remains open.
 6. **Completed - Break the Line pacing validation:** the tester completed in roughly 12–15 minutes and chose to keep current movement and projectile speeds.
-7. **Current - Counterfire validation:** test defensive power, interception, ammunition adaptation, and whether the reusable debrief explains the outcome without coaching.
-8. **Current - story expansion validation:** test Bulwark escort identity, Needle hunter readability, narrative pacing, and the Last Rotation revelation in `A Signal in the Spine`.
+7. **Completed - Counterfire validation:** defensive power, interception, ammunition adaptation, and debrief behavior passed internal human play.
+8. **Completed - story expansion validation:** Bulwark escort identity, Needle hunter readability, narrative pacing, and the Last Rotation revelation passed internal human play.
+9. **Current - Phase 3A signature battlefield:** deepen procedural mech weight, combat atmosphere, and audio while keeping the accepted simulation and balance frozen.
 
 ## Direction Decisions
 
 - **Authoritative artillery direction:** antispinward is the long-range direction; spinward is the short-range direction.
 - **Faction state:** mechanical asymmetry between the Meridian Compact and Axiom Choir is implemented. Further silhouette, roster, or doctrine differentiation remains future work.
 - **Asset policy:** the current product remains procedural-only. A Blender/glTF pipeline is a proposed future option, not an active roadmap commitment, and would require an explicit change to the asset constraint.
+- **Phase 3A balance boundary:** presentation-only. Unit and structure statistics, weapons, abilities, economy, movement, AI, navigation, ballistics, visibility, and victory rules remain frozen.
+- **Gate 3 artifact policy:** generated screenshots remain ignored artifacts. Their deterministic scenario, visual signature, renderer identity, source hashes, artifact hashes, and receipt digest are durable evidence.
 - **Tutorial sequencing:** tutorial work follows directional-USP validation and first-time-player observation rather than preceding them.
 - **Evidence standard:** automated cohorts establish deterministic gameplay and AI-proxy results. They do not establish human comprehension, enjoyment, or first-time-player difficulty.
 

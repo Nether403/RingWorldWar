@@ -8,7 +8,7 @@ import type { Unit } from '../../src/sim/world';
 interface BrowserScenario {
   worldSeed: number;
   quality: QualityLevel;
-  simulation: { targetTick: number; visualTimeSeconds: number; settlingFrames: number };
+  simulation: { fixedTickSeconds: number; targetTick: number; visualTimeSeconds: number; settlingFrames: number };
   camera: { focusS: number; focusZ: number; yawRadians: number; zoom: number };
   mission?:
     | {
@@ -56,6 +56,7 @@ interface TestDriver {
   stepWorldTo(tick: number): void;
   setCamera(s: number, z: number, yaw: number, zoom: number): void;
   renderFrame(dt: number, visualTime: number): void;
+  presentFrame(dt: number, visualTime: number): void;
 }
 
 interface RwwWindow {
@@ -97,6 +98,23 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
     validateScenarioUnitState(unit, spawned);
   }
   for (const unit of scenario.setup.units) {
+    const entity = entities.get(unit.id);
+    const spawned = entity ? rww.game.world.unitById(entity.id) : undefined;
+    if (!spawned) throw new Error(`Scenario unit was not spawned: ${unit.id}`);
+    if (spawned.ability && unit.abilityActive !== undefined && spawned.ability.active !== unit.abilityActive) {
+      if (!rww.game.world.activateAbility(spawned.id, unit.abilityActive)) {
+        throw new Error(`Scenario ability state could not be applied: ${unit.id}`);
+      }
+    }
+    if (spawned.ability && unit.abilityTransitionTimer !== undefined) {
+      spawned.ability.transitionTimer = unit.abilityTransitionTimer;
+    }
+    if (unit.weaponCooldowns) {
+      for (let index = 0; index < spawned.cd.length; index++) spawned.cd[index] = unit.weaponCooldowns[index]!;
+    }
+    if (unit.selected) rww.game.selection.add(spawned.id);
+  }
+  for (const unit of scenario.setup.units) {
     if (!unit.target) continue;
     const source = entities.get(unit.id);
     const target = entities.get(unit.target);
@@ -110,25 +128,18 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
       spawned.targetId = target.id;
     }
   }
-  rww.testDriver.stepWorldTo(scenario.simulation.targetTick);
-  for (const unit of scenario.setup.units) {
-    const entity = entities.get(unit.id);
-    const spawned = entity ? rww.game.world.unitById(entity.id) : undefined;
-    if (!spawned) throw new Error(`Scenario unit did not survive setup stepping: ${unit.id}`);
-    if (spawned.ability && unit.abilityActive !== undefined && spawned.ability.active !== unit.abilityActive) {
-      if (!rww.game.world.activateAbility(spawned.id, unit.abilityActive)) {
-        throw new Error(`Scenario ability state could not be applied: ${unit.id}`);
-      }
-    }
-    if (spawned.ability && unit.abilityTransitionTimer !== undefined) {
-      spawned.ability.transitionTimer = unit.abilityTransitionTimer;
-    }
-    if (unit.weaponCooldowns) {
-      for (let index = 0; index < spawned.cd.length; index++) {
-        spawned.cd[index] = unit.weaponCooldowns[index]!;
-      }
-    }
-    if (unit.selected) rww.game.selection.add(spawned.id);
+  rww.testDriver.setCamera(scenario.camera.focusS, scenario.camera.focusZ, scenario.camera.yawRadians, scenario.camera.zoom);
+  rww.testDriver.presentFrame(
+    0,
+    scenario.simulation.visualTimeSeconds - scenario.simulation.targetTick * scenario.simulation.fixedTickSeconds,
+  );
+  while (rww.game.world.tick < scenario.simulation.targetTick) {
+    rww.game.stepSimulationExactlyOnce();
+    const remaining = scenario.simulation.targetTick - rww.game.world.tick;
+    rww.testDriver.presentFrame(
+      scenario.simulation.fixedTickSeconds,
+      scenario.simulation.visualTimeSeconds - remaining * scenario.simulation.fixedTickSeconds,
+    );
   }
   if (scenario.setup.player) {
     rww.game.world.players[0].salvage = scenario.setup.player.salvage;
@@ -176,9 +187,8 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
       });
     }
   }
-  rww.testDriver.setCamera(scenario.camera.focusS, scenario.camera.focusZ, scenario.camera.yawRadians, scenario.camera.zoom);
   for (let index = 0; index < scenario.simulation.settlingFrames; index++) {
-    rww.testDriver.renderFrame(0, scenario.simulation.visualTimeSeconds);
+    rww.testDriver.presentFrame(0, scenario.simulation.visualTimeSeconds);
   }
   return Object.fromEntries([...entities].map(([id, entity]) => [id, entity.id]));
 }
@@ -251,6 +261,8 @@ export function captureScenarioFrame(scenario: BrowserScenario): {
     resources: {
       drawCalls: info.render.calls,
       triangles: info.render.triangles,
+      lines: info.render.lines,
+      points: info.render.points,
       geometries: info.memory.geometries,
       textures: info.memory.textures,
       programs: info.programs?.length ?? null,
@@ -303,6 +315,7 @@ export async function benchmarkScenario(warmupSeconds: number, sampleSeconds: nu
     gpuTimerMilliseconds: null,
     resources: {
       drawCalls: info.render.calls, triangles: info.render.triangles,
+      lines: info.render.lines, points: info.render.points,
       geometries: info.memory.geometries, textures: info.memory.textures,
       programs: info.programs?.length ?? null,
     },

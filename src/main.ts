@@ -14,10 +14,13 @@ import { InputController } from '@render/input';
 import { Renderer, type QualityLevel } from '@render/renderer';
 import { Settings } from '@render/settings';
 import { RingMesh } from '@render/ringMesh';
+import { BattlefieldDressing } from '@render/battlefieldDressing';
 import { BUILDABLE, STRUCTURES } from '@sim/data';
-import { Game } from './game';
+import { Game, PLAYER } from './game';
 import { DebugOverlay } from '@ui/debugOverlay';
 import { SettingsMenu } from '@ui/settingsMenu';
+import { ProceduralAudio, armAudioUnlock } from './audio/audioEngine';
+import { createWebAudioBackend } from './audio/webAudioBackend';
 
 const boot = {
   el: document.getElementById('boot')!,
@@ -59,10 +62,23 @@ async function start(): Promise<void> {
 
   await boot.step(0.3, 'generating terrain');
   const game = new Game(seed, anchor, rig);
+  const audio = new ProceduralAudio(seed, createWebAudioBackend);
+  audio.setMasterVolume(settings.volume);
+  game.onPresentationEvents = (events) => audio.consume(events, {
+    world: game.world,
+    viewer: PLAYER,
+    anchorS: anchor.s,
+    listenerS: rig.s,
+    listenerZ: rig.z,
+    listenerYaw: rig.yaw,
+  }, true);
+  game.onTransientReset = () => audio.reset();
 
   await boot.step(0.62, 'tessellating the floor');
   const ringMesh = new RingMesh(game.terrain, renderer.quality);
   renderer.scene.add(ringMesh.object);
+  const dressing = new BattlefieldDressing(seed);
+  renderer.scene.add(dressing.object);
 
   await boot.step(0.86, 'igniting the solar filament');
   const environment = new Environment(seed);
@@ -102,7 +118,7 @@ async function start(): Promise<void> {
   const menu = new SettingsMenu(settings, renderer, (open) => {
     input.setEnabled(!open);
     if (open) cancelCommands();
-  });
+  }, (volume) => audio.setMasterVolume(volume));
   menu.onSave = () => game.saveGame();
   menu.onLoad = () => game.loadGame();
 
@@ -110,6 +126,7 @@ async function start(): Promise<void> {
   wireKeys(game, renderer, overlay, input, settings, menu);
 
   await boot.step(1.0, 'ready');
+  armAudioUnlock(window, audio);
   boot.hide();
   if (!scenarioDriverEnabled) game.hud.alert('Select an engineer — build extractors, then a Fabricator');
 
@@ -120,10 +137,15 @@ async function start(): Promise<void> {
   // Scenario initialization must own tick zero, even if its module import is delayed.
   let loopStopped = scenarioDriverEnabled;
 
-  function renderFrame(dt: number, visualTime: number, fixedVisualClock = false): void {
+  function renderFrame(
+    dt: number,
+    visualTime: number,
+    fixedVisualClock = false,
+    advanceSimulation = true,
+  ): void {
     input.setDirectMode(game.directControlActive);
     input.update(dt);
-    game.updateDirectControl(input.moveForward, input.moveRight);
+    if (advanceSimulation) game.updateDirectControl(input.moveForward, input.moveRight);
     rig.update(dt, anchor, game.terrain);
 
     // Re-base the floating origin onto the camera when it drifts far enough.
@@ -134,9 +156,12 @@ async function start(): Promise<void> {
       game.onRebase(prevS, prevZ);
       rig.update(0, anchor, game.terrain);
     }
+    dressing.update(anchor, game.terrain);
 
     game.effects.viewportHeight = renderer.gl.getContext().drawingBufferHeight;
-    game.update(dt, visualTime);
+    if (advanceSimulation) game.update(dt, visualTime);
+    else game.updatePresentation(dt, visualTime);
+    audio.update(dt);
     environment.update(fixedVisualClock ? visualTime : game.world.time, anchor, rig.camera.position);
 
     ringMesh.uniforms.uTime.value = visualTime;
@@ -169,9 +194,11 @@ async function start(): Promise<void> {
     anchor,
     renderer,
     settings,
+    audio,
     menu,
     environment,
     ringMesh,
+    dressing,
     probe: () => ({
       camPos: rig.camera.position.toArray(),
       camUp: rig.camera.up.toArray(),
@@ -228,6 +255,7 @@ async function start(): Promise<void> {
         exactRig.focusHeight = game.terrain.heightAt(rig.s, rig.z);
       },
       renderFrame: (dt: number, visualTime: number): void => renderFrame(dt, visualTime, true),
+      presentFrame: (dt: number, visualTime: number): void => renderFrame(dt, visualTime, true, false),
     };
   }
   (window as unknown as { RWW: unknown }).RWW = exposed;

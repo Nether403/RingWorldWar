@@ -26,6 +26,8 @@ test('drives a deterministic browser scenario without page errors', async ({ pag
   });
   expect(result.pixelCount).toBe(1100 * 640 * 4);
   expect(result.resources.drawCalls).toBeGreaterThan(0);
+  expect(Number(result.state.projectiles)).toBeGreaterThan(0);
+  expect(Number(result.resources.lines)).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
 

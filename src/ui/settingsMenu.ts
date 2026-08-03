@@ -89,6 +89,7 @@ export class SettingsMenu {
     private readonly settings: Settings,
     private readonly renderer: Renderer,
     private readonly onOpenChange: (open: boolean) => void,
+    private readonly onMasterVolumeChange: (volume: number) => void = () => {},
   ) {
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -188,6 +189,7 @@ export class SettingsMenu {
     });
     this.volume.addEventListener('input', () => {
       this.settings.setVolume(Number(this.volume.value) / 100);
+      this.onMasterVolumeChange(this.settings.volume);
       this.updateVolumeOutput();
     });
     this.save.addEventListener('click', () => this.runSaveAction(this.onSave));

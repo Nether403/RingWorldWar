@@ -13,6 +13,22 @@ Three rules:
 ## 1. Signature Visual Identity
 The one screenshot that sells the game: a mech lance silhouetted on a ruined plain, rocket contrails arcing overhead, and behind them the ring surface **sweeping up into the sky on both sides**, hazing into atmospheric blue, with the far side visible as a bright band overhead crossed by the dark bars of shadow squares.
 
+### Phase 3A acceptance frame
+
+The Gate 3 frame must be captured from the normal gameplay renderer and contain:
+
+- the ring surface visibly rising on both sides;
+- a bright far-side band crossed by identifiable shadow-square bars;
+- a multi-class mech lance with Compact amber and Choir cyan remaining the only
+  large saturated accents;
+- at least one normal gameplay-generated artillery contrail;
+- active direct fire, impact, interception, or ability presentation;
+- readable health and class silhouettes at tactical zoom.
+
+Generated screenshots are review artifacts, not source assets. Any future LUT,
+flipbook, decal atlas, or sprite sheet must likewise be generated from code rather
+than committed as an authored binary.
+
 **Mood board anchors:** *Halo* (ring vista, hopeful scale), *Homeworld: Deserts of Kharak* (readable RTS terrain, warm dust, clean UI), *Elysium* / *Oblivion* (clean megastructure industrialism), *Titanfall* (mech weight and scale), Simon Stålenhag (mundane machines in vast landscapes).
 
 ## 2. Color Script

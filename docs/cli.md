@@ -9,6 +9,8 @@ npm run rww -- run validation/manifests/veteran-mirror.json --repeat 2
 npm run rww -- perf headless-40m --terrain standard --runs 3 --ticks 72000
 npm run rww -- visual signature-lance
 npm run rww -- visual signature-lance --compare
+npm run rww -- play signature-lance
+npm run rww -- perf browser-heavy --scenario signature-lance --target validation/hardware/t480s-low.json --seconds 30 --json
 npm run rww -- play directional-artillery
 npm run rww -- play directional-artillery --headless --seconds 2
 npm run rww -- perf browser-heavy --scenario heavy-combat --target validation/hardware/t480s-low.json --seconds 30
@@ -32,6 +34,15 @@ Browser scenarios live under `validation/scenarios/` and use strict `rww.browser
 Each play session writes an ignored `playtest-notes.md` beside its receipt and prints both paths plus the exact reproduction command. The receipt records the scenario and notes hashes, pre-setup/applied/post-session state, browser and renderer identity, observed duration, and console/page errors. The notes are a local template only: the launcher does not collect or transmit playtest data. See `docs/player-observation-protocol.md` before moderating a human session.
 
 `visual` launches or reuses an isolated Vite server, runs the scenario in Chromium, and writes an ignored lossless PNG, a tracked-compatible visual-signature JSON, a visual manifest, and a receipt under `output/runs/<run-id>/`. Signatures contain luminance/chroma grids, a histogram, edge density, perceptual and difference hashes, and sky/ground/unit/UI region statistics. A scenario without `expectedVisual` is reported as `baseline-created` with a warning. `--compare` only produces a pass/fail when the scenario embeds an expected signature and explicit coarse tolerances; the command never treats exact cross-GPU pixels as portable.
+
+For the Phase 3A signature gate, first capture `signature-lance` without an
+expected visual and review the generated frame against
+`docs/phase-3a-signature-battlefield.md`. Capture it on the Intel UHD 620 target
+and at least one second renderer class before choosing coarse tolerances. Embed
+the accepted signature and measured tolerances in the scenario, then run
+`visual signature-lance --compare`. Screenshots remain ignored; receipts and
+tracked evidence retain source, renderer, scenario, artifact, and signature
+hashes.
 
 `perf browser-heavy` always uses Low quality and disables adaptive quality. On Windows Chromium is launched through ANGLE D3D11 with GPU rasterization enabled; a detected software renderer is an infrastructure failure. The command uses the selected target's candidate Low resolution, warms up for the scenario-defined interval, and samples real RAF intervals for `--seconds`. It reports median/p95/p99 frame intervals, long frames per minute, render/simulation/full-frame distributions, renderer resources, context loss, a coarse black-frame check, optional timer-query availability, and the candidate target verdict. `EXT_disjoint_timer_query_webgl2` is advisory and never required.
 

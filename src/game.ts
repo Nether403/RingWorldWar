@@ -25,6 +25,7 @@ import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
 import { EntityRenderer } from '@render/entityRenderer';
 import { Effects } from '@render/effects';
+import { isPresentationEventVisible } from '@render/presentationEvents';
 import { ballisticFireMessage, Hud } from '@ui/hud';
 import { Markers } from '@render/markers';
 import {
@@ -59,6 +60,8 @@ export class Game {
   private aiEnabled = true;
   private mission: MissionController | null = null;
   private readonly presentationEvents: SimEvent[] = [];
+  onPresentationEvents: ((events: readonly SimEvent[]) => void) | null = null;
+  onTransientReset: (() => void) | null = null;
 
   selection = new Set<number>();
   /** Ground point under the cursor, in surface coordinates. */
@@ -86,7 +89,6 @@ export class Game {
   private readonly _ray = new THREE.Raycaster();
   private readonly _ndc = new THREE.Vector2();
   private readonly _v = new THREE.Vector3();
-  private readonly _prevAnchor = new THREE.Vector3();
 
   constructor(
     private readonly seed: number,
@@ -103,6 +105,10 @@ export class Game {
     this.effects = new Effects(seed);
     this.markers = new Markers();
     this.hud = new Hud();
+    this.entities.onFootfall = (event) => {
+      this.effects.footfall(event, this.anchor, this.rig.s, this.rig.z);
+      this.onPresentationEvents?.([event]);
+    };
 
     this.hud.onMinimapPointer = (s, z) => this.updateCursor(s, z);
     this.hud.onMinimapCamera = (s, z) => this.rig.setFocus(s, z);
@@ -147,14 +153,20 @@ export class Game {
     if (steps > 0) this.simStepMs = simStepTotal / steps;
     if (steps === 6) this.acc = 0;
 
+    this.updatePresentation(dt, time);
+  }
+
+  /** Advances render-only state without stepping authoritative simulation. */
+  updatePresentation(dt: number, time: number): void {
     this.refreshArtilleryInspection();
 
     const events = this.presentationEvents.splice(0);
-    this.effects.consume(events, this.world, this.anchor, PLAYER);
+    this.effects.consume(events, this.world, this.anchor, PLAYER, this.rig.s, this.rig.z, true);
+    this.entities.consumePresentation(events, time);
+    this.onPresentationEvents?.(events);
+    this.entities.update(this.world, this.anchor, time, PLAYER, this.acc / SIM_DT);
     this.effects.update(dt, this.world, this.anchor, PLAYER, this.rig.camera);
     if (this.effects.shake > 0) this.rig.addShake(this.effects.shake);
-
-    this.entities.update(this.world, this.anchor, time, PLAYER, this.acc / SIM_DT);
     this.markers.update(
       this.world,
       this.anchor,
@@ -200,7 +212,9 @@ export class Game {
     if (this.aiEnabled) this.ai.update(this.world, SIM_DT);
     const events = this.world.drainEvents();
     this.mission?.advanceTick(this.world, events);
-    this.presentationEvents.push(...events);
+    for (const event of events) {
+      if (isPresentationEventVisible(event, this.world, PLAYER)) this.presentationEvents.push(event);
+    }
     return elapsed;
   }
 
@@ -253,9 +267,7 @@ export class Game {
 
   /** Called after the anchor re-bases, so render-space effects follow it. */
   onRebase(previousS: number, previousZ: number): void {
-    // Where the old origin now sits in the new frame.
-    this.anchor.toVector(previousS, 0, previousZ, this._prevAnchor);
-    this.effects.rebase(this._prevAnchor);
+    this.effects.rebase(previousS, previousZ, this.anchor);
   }
 
   // -------------------------------------------------------------------------
@@ -887,6 +899,8 @@ export class Game {
     this.previewCooldown = 0;
     this.presentationEvents.length = 0;
     this.entities.resetTransientState();
+    this.effects.resetTransientState();
+    this.onTransientReset?.();
   }
 
   private observeSelection(): void {

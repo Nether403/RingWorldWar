@@ -34,7 +34,7 @@ import {
   WRECK_LIFETIME,
   type StructureKind,
 } from '@sim/data';
-import type { World } from '@sim/world';
+import type { SimEvent, World } from '@sim/world';
 import type { RenderAnchor } from './anchor';
 
 const MECH_CLASSES: MechClass[] = ['vanguard', 'longbow', 'wisp', 'aegis', 'bulwark', 'needle'];
@@ -78,8 +78,10 @@ export class EntityRenderer {
   private readonly _scale = new THREE.Vector3(1, 1, 1);
   private readonly _basis = new THREE.Matrix4();
 
-  /** Per-unit foot state, keyed by unit id, so gait is continuous over time. */
+  /** Per-unit render state, keyed by unit id, so gait is continuous over time. */
   private feet = new Map<number, FootState>();
+  private recoil = new Map<number, RecoilState>();
+  onFootfall: ((event: SimEvent) => void) | null = null;
 
   constructor(seed: number) {
     this.object.name = 'entities';
@@ -206,6 +208,9 @@ export class EntityRenderer {
     if (world.tick % 120 === 0) {
       const live = new Set(world.units.filter((u) => u.alive).map((u) => u.id));
       for (const id of this.feet.keys()) if (!live.has(id)) this.feet.delete(id);
+      for (const [id, state] of this.recoil) {
+        if (!live.has(id) || time - state.startedAt > 2) this.recoil.delete(id);
+      }
     }
   }
 
@@ -262,6 +267,16 @@ export class EntityRenderer {
     }
   }
 
+  consumePresentation(events: readonly SimEvent[], time: number): void {
+    for (const event of events) {
+      if (event.kind !== 'weaponFired') continue;
+      this.recoil.set(event.id, {
+        startedAt: time,
+        strength: Math.min(1, 0.35 + Math.max(0.2, event.scale) * 0.24),
+      });
+    }
+  }
+
   private drawWrecks(world: World, anchor: RenderAnchor, viewer: Faction): void {
     for (const wreck of world.wreckages) {
       if (!wreck.alive || !UNITS[wreck.kind].isMech) continue;
@@ -314,14 +329,22 @@ export class EntityRenderer {
   private drawUnits(world: World, anchor: RenderAnchor, time: number, viewer: Faction, alpha: number): void {
     for (const u of world.units) {
       if (!u.alive) continue;
-      if (!world.isEntityVisible(viewer, u.id)) continue;
+      const def = UNITS[u.kind];
+      if (!world.isEntityVisible(viewer, u.id)) {
+        this.synchronizePresentationBaseline(u, def.isMech);
+        continue;
+      }
       const s = wrapLerp(u.prevS, u.s, alpha);
       const z = THREE.MathUtils.lerp(u.prevZ, u.z, alpha);
       const yaw = angleLerp(u.prevYaw, u.yaw, alpha);
       const aimYaw = angleLerp(u.prevAimYaw, u.aimYaw, alpha);
-      if (Math.abs(deltaS(anchor.s, s)) > RING_CIRCUMFERENCE * 0.3) continue;
+      const tickDistance = Math.hypot(deltaS(u.prevS, u.s), u.z - u.prevZ);
+      const gait = Math.max(0, u.gait - tickDistance * (1 - alpha));
+      if (Math.abs(deltaS(anchor.s, s)) > RING_CIRCUMFERENCE * 0.3) {
+        this.synchronizePresentationBaseline(u, def.isMech);
+        continue;
+      }
 
-      const def = UNITS[u.kind];
       const ground = world.terrain.heightAt(s, z);
 
       if (!def.isMech) {
@@ -348,6 +371,7 @@ export class EntityRenderer {
         z,
         yaw,
         aimYaw,
+        gait,
         u.cloaked && u.faction === viewer,
       );
       this.drawUnitState(u, anchor, ground, time, s, z, yaw);
@@ -403,6 +427,25 @@ export class EntityRenderer {
     }
   }
 
+  private synchronizePresentationBaseline(u: World['units'][number], isMech: boolean): void {
+    if (!isMech) return;
+    const rig = this.rigs.get(u.kind as MechClass);
+    if (!rig) return;
+    const strideLen = rig.height * 0.55;
+    const footfallIndex = Math.floor(u.gait / (strideLen * 0.5));
+    const state = this.feet.get(u.id) ?? {
+      phase: 0,
+      lastFootfall: footfallIndex,
+      wasMoving: u.speed > 0.3,
+      settleStartedAt: -Infinity,
+    };
+    state.phase = (u.gait / strideLen) % 1;
+    state.lastFootfall = footfallIndex;
+    state.wasMoving = u.speed > 0.3;
+    state.settleStartedAt = -Infinity;
+    this.feet.set(u.id, state);
+  }
+
   /**
    * Place one mech's parts.
    *
@@ -422,6 +465,7 @@ export class EntityRenderer {
     z: number,
     yaw: number,
     aimYaw: number,
+    gait: number,
     cloakedForViewer: boolean,
   ): void {
     const rig = this.rigs.get(cls);
@@ -430,7 +474,7 @@ export class EntityRenderer {
 
     let fs = this.feet.get(u.id);
     if (!fs) {
-      fs = { phase: 0, plant: [0, 0], lift: [0, 0], stride: [0, 0] };
+      fs = { phase: 0, lastFootfall: -1, wasMoving: u.speed > 0.3, settleStartedAt: -Infinity };
       this.feet.set(u.id, fs);
     }
 
@@ -438,8 +482,20 @@ export class EntityRenderer {
     // Phase advances with distance travelled, not with time, so the stride
     // length stays constant and the feet never skate.
     const strideLen = rig.height * 0.55;
-    fs.phase = (u.gait / strideLen) % 1;
+    fs.phase = (gait / strideLen) % 1;
     const moving = u.speed > 0.3;
+    const footfallIndex = Math.floor(gait / (strideLen * 0.5));
+    const contactCounts: [number, number] = [0, 0];
+    if (fs.lastFootfall < 0 || !moving) {
+      fs.lastFootfall = footfallIndex;
+    } else if (footfallIndex > fs.lastFootfall) {
+      const last = Math.min(footfallIndex, fs.lastFootfall + 4);
+      for (let index = fs.lastFootfall + 1; index <= last; index++) contactCounts[index & 1]++;
+      fs.lastFootfall = footfallIndex;
+    }
+    if (fs.wasMoving && !moving) fs.settleStartedAt = time;
+    else if (moving) fs.settleStartedAt = -Infinity;
+    fs.wasMoving = moving;
 
     // Each leg is half a cycle out of phase.
     const legPhase = [fs.phase, (fs.phase + 0.5) % 1];
@@ -449,10 +505,16 @@ export class EntityRenderer {
     // Idle sway, so a standing mech is never perfectly still.
     const idleSway = Math.sin(time * 0.9 + u.id * 1.7) * rig.height * 0.004;
     // Roll toward the loaded leg, and lean into acceleration.
-    const roll = moving ? Math.sin(fs.phase * Math.PI * 2) * 0.045 : 0;
+    const criticalSide = (u.id & 1) === 0 ? -1 : 1;
+    const limp = u.damageState === 2 ? criticalSide * 0.045 : 0;
+    const roll = (moving ? Math.sin(fs.phase * Math.PI * 2) * 0.045 : 0) + limp;
     const lean = (u.speed / Math.max(UNITS[u.kind].speed, 1)) * 0.09;
 
-    const hipY = rig.hipHeight + bob + idleSway;
+    const settleAge = time - fs.settleStartedAt;
+    const settle = settleAge >= 0 && settleAge < 1.4
+      ? Math.sin(settleAge * 15) * Math.exp(-settleAge * 5) * rig.height * 0.022
+      : 0;
+    const hipY = rig.hipHeight + bob + idleSway + settle;
 
     // Terrain under each foot, so the mech stands correctly on a slope.
     const slopeFwd =
@@ -486,12 +548,13 @@ export class EntityRenderer {
     // shoot another. That single detail does more for the sense of a piloted
     // machine than any amount of extra geometry.
     const torsoYaw = angleWrap(aimYaw - yaw);
+    const recoil = recoilAt(this.recoil.get(u.id), time);
     _local.makeRotationY(torsoYaw);
-    _rot.makeRotationX(pitch * 0.6);
+    _rot.makeRotationX(pitch * 0.6 - recoil * 0.11);
     _local.premultiply(_rot);
     _rot.makeRotationZ(roll * 0.5);
     _local.premultiply(_rot);
-    _local.setPosition(0, hipY + rig.height * 0.045, 0);
+    _local.setPosition(0, hipY + rig.height * 0.045, -recoil * rig.height * 0.018);
     push('torso', _local);
 
     // --- Legs ----------------------------------------------------------------
@@ -519,12 +582,25 @@ export class EntityRenderer {
         footFwd = strideLen * (-0.5 + t);
         footUp = Math.sin(t * Math.PI) * rig.height * 0.09;
       }
+      if (u.damageState === 2 && side === criticalSide) footUp *= 0.42;
 
       // Ground height under this foot, in local forward/side coordinates.
       const fs2 = s + Math.cos(yaw) * footFwd - Math.sin(yaw) * hipX;
       const fz2 = z + Math.sin(yaw) * footFwd + Math.cos(yaw) * hipX;
       const footGround = world.terrain.heightAt(fs2, fz2) - ground;
       const footY = footGround + footUp;
+      for (let contact = 0; contact < contactCounts[leg]!; contact++) {
+        this.onFootfall?.({
+          kind: 'footfall',
+          s: fs2,
+          z: fz2,
+          h: ground + footY,
+          faction: u.faction,
+          scale: clampN(rig.height / 9, 0.65, 1.8),
+          id: u.id,
+          entityKind: u.kind,
+        });
+      }
 
       // Two-bone IK: given hip and foot positions, find the knee. Solved
       // analytically in the plane containing both, which is exact and has no
@@ -564,6 +640,7 @@ export class EntityRenderer {
 
   resetTransientState(): void {
     this.feet.clear();
+    this.recoil.clear();
     for (const mesh of this.presentationMeshes) mesh.count = 0;
   }
 
@@ -580,9 +657,14 @@ export class EntityRenderer {
 
 interface FootState {
   phase: number;
-  plant: [number, number];
-  lift: [number, number];
-  stride: [number, number];
+  lastFootfall: number;
+  wasMoving: boolean;
+  settleStartedAt: number;
+}
+
+interface RecoilState {
+  startedAt: number;
+  strength: number;
 }
 
 const ONE = new THREE.Vector3(1, 1, 1);
@@ -609,4 +691,10 @@ function wrapLerp(from: number, to: number, alpha: number): number {
   let s = from + deltaS(from, to) * alpha;
   s %= RING_CIRCUMFERENCE;
   return s < 0 ? s + RING_CIRCUMFERENCE : s;
+}
+
+function recoilAt(state: RecoilState | undefined, time: number): number {
+  if (!state) return 0;
+  const age = Math.max(0, time - state.startedAt);
+  return state.strength * Math.exp(-age * 8) * Math.max(0, Math.cos(age * 22));
 }

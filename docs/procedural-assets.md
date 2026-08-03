@@ -70,5 +70,21 @@ System font stack (no webfont downloads). UI is DOM/CSS with procedurally genera
 ## 8. Determinism
 All generators take an explicit seed. The same seed always produces the same world, mech, and material — required for the determinism contract and for reproducible bug reports.
 
+### Presentation/simulation boundary
+
+Procedural presentation must not consume simulation RNG, mutate simulation
+state, or affect stable entity ordering. Visual and audio seeds derive from
+immutable namespaced inputs such as world seed, asset kind, and stable entity ID.
+
+Phase 3A ruins and debris are dressing only. They have no collision, navigation
+cost, line-of-sight effect, cover value, salvage value, damage, or targeting
+identity. A gameplay-bearing ruin would require separate deterministic
+simulation data and a new balance decision.
+
+Allowed source assets are TypeScript, GLSL, CSS, generated in-memory geometry,
+generated `DataTexture`s, SVG, and WebAudio graphs. Authored `.blend`, `.glb`,
+image textures, binary LUTs, sampled audio, and committed screenshots remain
+forbidden while the procedural-only rule is active.
+
 ## 9. Budget
 Total download target: **< 1 MB** (JS bundle only). Generation cost at load: **< 3 s** on a mid-range machine, run on workers with a progress bar, and cached in IndexedDB where the result is deterministic and expensive.

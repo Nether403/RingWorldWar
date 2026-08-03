@@ -2,24 +2,34 @@
   "schema": "rww.browser-scenario",
   "version": 1,
   "id": "signature-lance",
-  "revision": 1,
+  "revision": 2,
   "worldSeed": 20260731,
   "quality": "high",
   "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
-  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 24, "visualTimeSeconds": 66, "settlingFrames": 3 },
-  "camera": { "focusS": 1900, "focusZ": 0, "yawRadians": 0.18, "zoom": 330 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 120, "visualTimeSeconds": 66, "settlingFrames": 3 },
+  "camera": { "focusS": 1900, "focusZ": 0, "yawRadians": 0.18, "zoom": 260 },
   "setup": {
+    "disableAi": true,
+    "player": { "salvage": 850, "commandCap": 20 },
     "units": [
-      { "id": "compact-vanguard", "faction": "compact", "kind": "vanguard", "s": 1870, "z": -20, "yawRadians": 0, "target": "choir-vanguard" },
-      { "id": "compact-aegis", "faction": "compact", "kind": "aegis", "s": 1860, "z": 28, "yawRadians": 0, "target": "choir-vanguard" },
-      { "id": "choir-vanguard", "faction": "choir", "kind": "vanguard", "s": 1990, "z": 12, "yawRadians": 3.141592653589793, "target": "compact-vanguard" },
-      { "id": "choir-wisp", "faction": "choir", "kind": "wisp", "s": 2010, "z": -34, "yawRadians": 3.141592653589793, "target": "compact-aegis" }
+      { "id": "compact-vanguard-a", "faction": "compact", "kind": "vanguard", "s": 1830, "z": -55, "yawRadians": 0, "target": "choir-vanguard-a" },
+      { "id": "compact-vanguard-b", "faction": "compact", "kind": "vanguard", "s": 1815, "z": 20, "yawRadians": 0, "target": "choir-vanguard-b" },
+      { "id": "compact-aegis", "faction": "compact", "kind": "aegis", "s": 1795, "z": 70, "yawRadians": 0, "target": "choir-aegis", "abilityActive": true, "abilityTransitionTimer": 0 },
+      { "id": "compact-bulwark", "faction": "compact", "kind": "bulwark", "s": 1810, "z": -5, "yawRadians": 0, "target": "choir-vanguard-c", "abilityActive": true, "abilityTransitionTimer": 0 },
+      { "id": "compact-longbow", "faction": "compact", "kind": "longbow", "s": 2100, "z": -105, "yawRadians": 3.141592653589793, "target": "choir-core", "abilityActive": true, "abilityTransitionTimer": 0, "weaponCooldowns": [0] },
+      { "id": "compact-spotter", "faction": "compact", "kind": "wisp", "s": 1340, "z": 35, "yawRadians": 0 },
+      { "id": "choir-vanguard-a", "faction": "choir", "kind": "vanguard", "s": 1970, "z": -55, "yawRadians": 3.141592653589793, "target": "compact-vanguard-a" },
+      { "id": "choir-vanguard-b", "faction": "choir", "kind": "vanguard", "s": 1980, "z": 20, "yawRadians": 3.141592653589793, "target": "compact-vanguard-b" },
+      { "id": "choir-vanguard-c", "faction": "choir", "kind": "vanguard", "s": 1990, "z": -5, "yawRadians": 3.141592653589793, "target": "compact-bulwark" },
+      { "id": "choir-aegis", "faction": "choir", "kind": "aegis", "s": 1960, "z": 70, "yawRadians": 3.141592653589793, "target": "compact-aegis", "abilityActive": true, "abilityTransitionTimer": 0 },
+      { "id": "choir-needle", "faction": "choir", "kind": "needle", "s": 2010, "z": -92, "yawRadians": 3.141592653589793, "target": "compact-longbow" }
     ],
     "structures": [
-      { "id": "compact-silo", "faction": "compact", "kind": "silo", "s": 1810, "z": -82, "progress": 1, "yawRadians": 0 },
-      { "id": "compact-grid", "faction": "compact", "kind": "laserGrid", "s": 1835, "z": 78, "progress": 1, "yawRadians": 0 },
-      { "id": "choir-grid", "faction": "choir", "kind": "laserGrid", "s": 2050, "z": -70, "progress": 1, "yawRadians": 3.141592653589793 },
-      { "id": "node", "faction": "neutral", "kind": "spinalNode", "s": 1940, "z": 105, "progress": 1, "yawRadians": 0 }
+      { "id": "compact-core", "faction": "compact", "kind": "fusionCore", "s": 2140, "z": -180, "progress": 1, "yawRadians": 0 },
+      { "id": "compact-radar", "faction": "compact", "kind": "radarMast", "s": 2070, "z": -190, "progress": 1, "yawRadians": 0 },
+      { "id": "choir-core", "faction": "choir", "kind": "fusionCore", "s": 1300, "z": 20, "progress": 1, "yawRadians": 3.141592653589793 },
+      { "id": "choir-radar", "faction": "choir", "kind": "radarMast", "s": 1370, "z": 130, "progress": 1, "yawRadians": 3.141592653589793 },
+      { "id": "node", "faction": "neutral", "kind": "spinalNode", "s": 1880, "z": 145, "progress": 1, "yawRadians": 0 }
     ]
   },
   "observationRegions": [
@@ -29,5 +39,5 @@
     { "id": "ui", "kind": "ui", "x": 0, "y": 0.82, "width": 1, "height": 0.18 }
   ],
   "benchmark": { "warmupSeconds": 2, "sampleSeconds": 10 },
-  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 10, "minimumStructures": 8, "maximumContextLosses": 0 }
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 12, "minimumStructures": 9, "maximumContextLosses": 0 }
 }
