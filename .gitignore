@@ -7,3 +7,4 @@ playwright-report/
 *.log
 .vite/
 .DS_Store
+image, video and voice/
