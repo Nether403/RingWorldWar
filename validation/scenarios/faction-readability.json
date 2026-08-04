@@ -1,0 +1,41 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "faction-readability",
+  "revision": 1,
+  "worldSeed": 20260731,
+  "quality": "high",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 0, "visualTimeSeconds": 66, "settlingFrames": 3 },
+  "camera": { "focusS": 2200, "focusZ": 20, "yawRadians": 0, "zoom": 195 },
+  "setup": {
+    "disableAi": true,
+    "player": { "salvage": 850, "commandCap": 24 },
+    "units": [
+      { "id": "compact-vanguard", "faction": "compact", "kind": "vanguard", "s": 2190, "z": -130, "yawRadians": 3.141592653589793 },
+      { "id": "compact-longbow", "faction": "compact", "kind": "longbow", "s": 2190, "z": -95, "yawRadians": 3.141592653589793, "healthFraction": 0.55 },
+      { "id": "compact-wisp", "faction": "compact", "kind": "wisp", "s": 2190, "z": -60, "yawRadians": 3.141592653589793 },
+      { "id": "compact-aegis", "faction": "compact", "kind": "aegis", "s": 2190, "z": -25, "yawRadians": 3.141592653589793, "healthFraction": 0.22 },
+      { "id": "compact-bulwark", "faction": "compact", "kind": "bulwark", "s": 2190, "z": 10, "yawRadians": 3.141592653589793 },
+      { "id": "choir-vanguard", "faction": "choir", "kind": "vanguard", "s": 2190, "z": 30, "yawRadians": 3.141592653589793 },
+      { "id": "choir-longbow", "faction": "choir", "kind": "longbow", "s": 2190, "z": 65, "yawRadians": 3.141592653589793, "healthFraction": 0.55 },
+      { "id": "choir-wisp", "faction": "choir", "kind": "wisp", "s": 2190, "z": 100, "yawRadians": 3.141592653589793 },
+      { "id": "choir-aegis", "faction": "choir", "kind": "aegis", "s": 2190, "z": 135, "yawRadians": 3.141592653589793, "healthFraction": 0.22 },
+      { "id": "choir-needle", "faction": "choir", "kind": "needle", "s": 2190, "z": 170, "yawRadians": 3.141592653589793 }
+    ],
+    "structures": [
+      { "id": "compact-fabricator", "faction": "compact", "kind": "fabricator", "s": 2300, "z": -100, "progress": 1, "yawRadians": 3.141592653589793 },
+      { "id": "compact-foundry", "faction": "compact", "kind": "mechFoundry", "s": 2310, "z": -30, "progress": 1, "yawRadians": 3.141592653589793, "healthFraction": 0.45 },
+      { "id": "choir-fabricator", "faction": "choir", "kind": "fabricator", "s": 2300, "z": 60, "progress": 1, "yawRadians": 3.141592653589793 },
+      { "id": "choir-foundry", "faction": "choir", "kind": "mechFoundry", "s": 2310, "z": 130, "progress": 1, "yawRadians": 3.141592653589793, "healthFraction": 0.45 }
+    ]
+  },
+  "observationRegions": [
+    { "id": "compact-line", "kind": "unit", "x": 0, "y": 0.38, "width": 0.5, "height": 0.4 },
+    { "id": "choir-line", "kind": "unit", "x": 0.5, "y": 0.38, "width": 0.5, "height": 0.4 },
+    { "id": "structures", "kind": "ground", "x": 0.08, "y": 0.16, "width": 0.84, "height": 0.28 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.82, "width": 1, "height": 0.18 }
+  ],
+  "benchmark": { "warmupSeconds": 2, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 13, "minimumStructures": 8, "maximumContextLosses": 0 }
+}

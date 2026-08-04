@@ -4,6 +4,7 @@ import type { CameraRig } from '../../src/render/cameraRig';
 import type { Renderer, QualityLevel } from '../../src/render/renderer';
 import { createWorldSnapshot } from '../../src/sim/serialize';
 import type { Unit } from '../../src/sim/world';
+import { UNITS } from '../../src/sim/data';
 
 interface BrowserScenario {
   worldSeed: number;
@@ -43,8 +44,9 @@ interface BrowserScenario {
       id: string; faction: 'compact' | 'choir'; kind: Parameters<Game['world']['spawnUnit']>[1];
       s: number; z: number; yawRadians?: number; target?: string; targetMode?: 'attack' | 'attackMove'; selected?: boolean;
       abilityActive?: boolean; abilityTransitionTimer?: number; weaponCooldowns?: number[];
+      healthFraction?: number;
     }>;
-    structures: Array<{ id: string; faction: 'compact' | 'choir' | 'neutral'; kind: Parameters<Game['world']['spawnStructure']>[1]; s: number; z: number; progress: number; yawRadians?: number }>;
+    structures: Array<{ id: string; faction: 'compact' | 'choir' | 'neutral'; kind: Parameters<Game['world']['spawnStructure']>[1]; s: number; z: number; progress: number; yawRadians?: number; healthFraction?: number }>;
   };
   observationRegions: Array<{ id: string; kind: 'sky' | 'ground' | 'unit' | 'ui'; x: number; y: number; width: number; height: number }>;
 }
@@ -80,6 +82,7 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
       faction as Parameters<Game['world']['spawnStructure']>[0], structure.kind, structure.s, structure.z, structure.progress,
     );
     if (structure.yawRadians !== undefined) spawned.yaw = structure.yawRadians;
+    if (structure.healthFraction !== undefined) spawned.hp = spawned.maxHp * structure.healthFraction;
     entities.set(structure.id, spawned);
     if (structure.kind === 'extractor') {
       const deposit = rww.game.world.depositAt(structure.s, structure.z);
@@ -94,6 +97,7 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
       spawned.yaw = unit.yawRadians;
       spawned.prevYaw = unit.yawRadians;
     }
+    if (unit.healthFraction !== undefined) applyScenarioHealth(spawned, unit.healthFraction);
     entities.set(unit.id, spawned);
     validateScenarioUnitState(unit, spawned);
   }
@@ -239,6 +243,17 @@ export function validateScenarioUnitState(
   if (!spawned.ability) {
     throw new Error(`Scenario cannot set ability state for ${unit.id} (${spawned.kind})`);
   }
+}
+
+export function applyScenarioHealth(unit: Unit, healthFraction: number): void {
+  unit.hp = unit.maxHp * healthFraction;
+  if (!UNITS[unit.kind].isMech) {
+    unit.damageState = 0;
+    unit.speedMultiplier = 1;
+    return;
+  }
+  unit.damageState = healthFraction < 0.33 ? 2 : healthFraction < 0.66 ? 1 : 0;
+  unit.speedMultiplier = unit.damageState === 2 ? 0.8 : 1;
 }
 
 export function captureScenarioFrame(scenario: BrowserScenario): {

@@ -305,6 +305,7 @@ function addCylinder(
 
 export interface HullUniforms {
   uFaction: { value: THREE.Color };
+  uFactionStyle: { value: number };
   uEmissive: { value: number };
   uDamage: { value: number };
   uTime: { value: number };
@@ -319,12 +320,15 @@ export interface HullUniforms {
  * emissive on the tagged faces. Extends MeshStandardMaterial so shadows, fog
  * and tone mapping keep working.
  */
-export function makeHullMaterial(factionColor: number): {
+export type FactionStyle = 'compact' | 'choir' | 'neutral';
+
+export function makeHullMaterial(factionColor: number, factionStyle = 0): {
   material: THREE.MeshStandardMaterial;
   uniforms: HullUniforms;
 } {
   const uniforms: HullUniforms = {
     uFaction: { value: new THREE.Color(factionColor) },
+    uFactionStyle: { value: factionStyle },
     uEmissive: { value: 1 },
     uDamage: { value: 0 },
     uTime: { value: 0 },
@@ -349,14 +353,26 @@ export function makeHullMaterial(factionColor: number): {
         '#include <common>',
         `#include <common>
          attribute float aMask;
+         #ifdef USE_INSTANCING
+         attribute float instanceDamage;
+         attribute float instancePhase;
+         #endif
          varying float vMask;
-         varying vec3 vObjPos;`,
+         varying vec3 vObjPos;
+         varying float vInstanceDamage;
+         varying float vInstancePhase;`,
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
          vMask = aMask;
-         vObjPos = position;`,
+         vObjPos = position;
+         vInstanceDamage = 0.0;
+         vInstancePhase = 0.0;
+         #ifdef USE_INSTANCING
+         vInstanceDamage = instanceDamage;
+         vInstancePhase = instancePhase;
+         #endif`,
       );
 
     shader.fragmentShader = shader.fragmentShader
@@ -364,11 +380,16 @@ export function makeHullMaterial(factionColor: number): {
         '#include <common>',
         `#include <common>
          uniform vec3 uFaction;
+         uniform float uFactionStyle;
          uniform float uEmissive;
          uniform float uDamage;
+         uniform float uTime;
          uniform float uLowQuality;
          varying float vMask;
          varying vec3 vObjPos;
+         varying float vInstanceDamage;
+         varying float vInstancePhase;
+         float rww_damage() { return max(uDamage, vInstanceDamage); }
          float hs_hash(vec3 p) {
            p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
            p *= 17.0;
@@ -394,13 +415,15 @@ export function makeHullMaterial(factionColor: number): {
         vec3 hull  = vec3(0.230, 0.238, 0.252);
         vec3 metal = vec3(0.330, 0.322, 0.305);
         vec3 recess = vec3(0.075, 0.080, 0.090);
+        hull = mix(hull, vec3(0.275, 0.225, 0.180), max(-uFactionStyle, 0.0) * 0.42);
+        hull = mix(hull, vec3(0.175, 0.235, 0.265), max(uFactionStyle, 0.0) * 0.42);
 
         vec3 base = hull;
         base = mix(base, metal, step(2.5, m));
         base = mix(base, recess, step(1.5, m) * step(m, 2.5));
         if (uLowQuality > 0.5) {
           base *= 0.92 + clamp(vNormal.y, 0.0, 1.0) * 0.08;
-          base = mix(base, base * vec3(0.42, 0.38, 0.36), uDamage * 0.75);
+          base = mix(base, base * vec3(0.42, 0.38, 0.36), rww_damage() * 0.75);
         } else {
           // Fine cast-metal grain, plus larger blotches of discoloration.
           float grain = hs_noise(vObjPos * 26.0);
@@ -416,7 +439,7 @@ export function makeHullMaterial(factionColor: number): {
           // Edge wear: bright bare metal where the chamfers face the light.
           float wear = smoothstep(0.55, 1.0, grain) * 0.35;
           base = mix(base, vec3(0.52, 0.50, 0.47), wear);
-          base = mix(base, base * vec3(0.42, 0.38, 0.36), uDamage * (0.5 + 0.5 * blotch));
+          base = mix(base, base * vec3(0.42, 0.38, 0.36), rww_damage() * (0.35 + 0.25 * blotch));
         }
 
         diffuseColor.rgb *= base;
@@ -426,11 +449,12 @@ export function makeHullMaterial(factionColor: number): {
         '#include <roughnessmap_fragment>',
         `float roughnessFactor = roughness;
          {
-           if (uLowQuality > 0.5) roughnessFactor = 0.68 + uDamage * 0.2;
-           else {
-             float g = hs_noise(vObjPos * 18.0);
-             roughnessFactor = clamp(roughness - g * 0.22 + uDamage * 0.25, 0.16, 1.0);
-           }
+            if (uLowQuality > 0.5) roughnessFactor = 0.68 + rww_damage() * 0.2;
+            else {
+              float g = hs_noise(vObjPos * 18.0);
+              roughnessFactor = clamp(roughness - g * 0.22 + rww_damage() * 0.25, 0.16, 1.0);
+            }
+            roughnessFactor += max(-uFactionStyle, 0.0) * 0.07 - max(uFactionStyle, 0.0) * 0.05;
            if (vMask > 1.5 && vMask < 2.5) roughnessFactor = 0.9;
          }`,
       )
@@ -441,18 +465,20 @@ export function makeHullMaterial(factionColor: number): {
            // Faction strips. Pushed well above 1.0 so bloom picks them up --
            // this is the cheapest way to make a unit read as powered.
            float isEm = step(0.5, vMask) * step(vMask, 1.5);
-            float flicker = uLowQuality > 0.5
-              ? 1.0 - uDamage * 0.25
-              : 1.0 - uDamage * 0.5 * step(0.5, hs_noise(vObjPos * 9.0));
+             float flickerNoise = hs_noise(vObjPos * 9.0 + vec3(vInstancePhase * 13.0, uTime * 2.7, 0.0));
+             float flickerPulse = 0.72 + 0.28 * sin(uTime * 17.0 + vInstancePhase * 6.2831853);
+             float flicker = uLowQuality > 0.5
+               ? 1.0 - rww_damage() * 0.25
+               : 1.0 - rww_damage() * 0.48 * step(0.55, flickerNoise) * flickerPulse;
             totalEmissiveRadiance += uFaction * isEm * uEmissive * 5.0 * flicker;
             // Exposed internals glow hot as damage rises.
-            float internalGlow = uLowQuality > 0.5 ? 0.35 : step(0.6, hs_noise(vObjPos * 7.0));
-            totalEmissiveRadiance += vec3(1.0, 0.28, 0.06) * uDamage * uDamage * 0.5 * internalGlow;
+             float internalGlow = uLowQuality > 0.5 ? 0.18 : step(0.82, hs_noise(vObjPos * 7.0));
+             totalEmissiveRadiance += vec3(1.0, 0.28, 0.06) * rww_damage() * rww_damage() * 0.24 * internalGlow;
          }`,
       );
   };
 
-  material.customProgramCacheKey = () => 'rww-hull-v1';
+  material.customProgramCacheKey = () => 'rww-hull-v2';
   return { material, uniforms };
 }
 
@@ -581,7 +607,7 @@ const PROFILES: Record<MechClass, MechProfile> = {
   },
 };
 
-export function buildMech(cls: MechClass, seed: number): MechRig {
+export function buildMech(cls: MechClass, seed: number, style: FactionStyle = 'neutral'): MechRig {
   const p = PROFILES[cls];
   const rng = new Rng(seed ^ 0x3ec4);
   const H = p.height;
@@ -691,6 +717,46 @@ export function buildMech(cls: MechClass, seed: number): MechRig {
       });
     }
   }
+  if (style === 'compact') {
+    // Layered shoulder armor and a blunt sensor brow keep the mass low and wide.
+    for (const side of [-1, 1]) {
+      addBlock(torsoMb, {
+        size: [tw * 0.34, th * 0.22, td * 0.42],
+        pos: [side * tw * 0.62, th * 0.62, -td * 0.08],
+        bevel: 0.12,
+        taper: 0.78,
+        lean: [side * tw * 0.06, 0],
+        mask: MASK_HULL,
+      });
+    }
+    addBlock(torsoMb, {
+      size: [tw * 0.72, th * 0.15, td * 0.24],
+      pos: [0, th * 1.02, td * 0.23],
+      bevel: 0.12,
+      taper: 0.72,
+      mask: MASK_METAL,
+    });
+  } else if (style === 'choir') {
+    // A narrow sensor crown and asymmetric dorsal fins create vertical rhythm.
+    for (let index = 0; index < 3; index++) {
+      const side = index - 1;
+      addBlock(torsoMb, {
+        size: [tw * (index === 1 ? 0.07 : 0.05), th * (0.34 + index * 0.08), td * 0.14],
+        pos: [side * tw * 0.23, th * 1.08, -td * (0.18 + index * 0.04)],
+        bevel: 0.3,
+        taper: 0.48,
+        lean: [side * tw * 0.025, -td * 0.06],
+        mask: index === 1 ? MASK_EMISSIVE : MASK_METAL,
+      });
+    }
+    addBlock(torsoMb, {
+      size: [tw * 0.18, th * 0.10, td * 0.48],
+      pos: [tw * 0.31, th * 0.72, -td * 0.36],
+      bevel: 0.3,
+      taper: 0.58,
+      mask: MASK_EMISSIVE,
+    });
+  }
   addGreebles(torsoMb, [tw, th, td], [0, 0, 0], p.greebles, rng);
 
   // ---- Legs ---------------------------------------------------------------
@@ -785,7 +851,7 @@ export interface StructureModel {
   muzzles: THREE.Vector3[];
 }
 
-export function buildStructure(kind: StructureKind, seed: number): StructureModel {
+export function buildStructure(kind: StructureKind, seed: number, style: FactionStyle = 'neutral'): StructureModel {
   const rng = new Rng(seed ^ 0x91a3);
   const mb = new MeshBuilder();
   const muzzles: THREE.Vector3[] = [];
@@ -1060,6 +1126,32 @@ export function buildStructure(kind: StructureKind, seed: number): StructureMode
       addGreebles(mb, [18, 8, 18], [0, 5, 0], 14, rng);
       break;
     }
+  }
+
+  if (kind !== 'spinalNode' && style === 'compact') {
+    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+      addBlock(mb, {
+        size: [radius * (dz === 0 ? 0.22 : 0.42), height * 0.34, radius * (dx === 0 ? 0.22 : 0.42)],
+        pos: [dx * radius * 0.68, height * 0.12, dz * radius * 0.68],
+        bevel: 0.12,
+        taper: 0.66,
+        lean: [dx * radius * 0.08, dz * radius * 0.08],
+        mask: MASK_HULL,
+      });
+    }
+  } else if (kind !== 'spinalNode' && style === 'choir') {
+    for (let index = 0; index < 3; index++) {
+      const angle = (index / 3) * Math.PI * 2 + 0.35;
+      addBlock(mb, {
+        size: [radius * 0.12, height * (0.38 + index * 0.07), radius * 0.16],
+        pos: [Math.cos(angle) * radius * 0.62, height * 0.28, Math.sin(angle) * radius * 0.62],
+        bevel: 0.3,
+        taper: 0.46,
+        lean: [Math.cos(angle) * radius * 0.04, Math.sin(angle) * radius * 0.04],
+        mask: index === 1 ? MASK_EMISSIVE : MASK_METAL,
+      });
+    }
+    addCylinder(mb, radius * 0.08, height * 0.32, [0, height * 0.66, 0], 7, MASK_EMISSIVE, radius * 0.035);
   }
 
   return { geometry: mb.build(), radius, height, muzzles };

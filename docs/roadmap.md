@@ -21,7 +21,8 @@ This is the authoritative source for current delivery status and near-term seque
 | Counterfire defensive mission | Internal completion pass | Human play completed without blockers; defensive power, interception, ammunition adaptation, and debrief behavior are accepted in baseline `2cf2727` |
 | A Signal in the Spine story slice | Internal completion pass | Human play completed without bugs; Bulwark, Needle, narrative pacing, and the Last Rotation revelation are accepted in frozen baseline `a67ef74` |
 | Phase 3A signature battlefield | Internal completion pass | Procedural audio, mech weight, bounded VFX, battlefield dressing, and the signature battle passed human play and T480s Low qualification in frozen baseline `f599edf` |
-| Phase 3B ring atmosphere and calibration | In progress | Analytic atmosphere, matched fog, production PBR calibration, and environmental quality budgets are specified in `docs/phase-3b-atmosphere.md` |
+| Phase 3B ring atmosphere and calibration | Internal completion pass | Atmosphere, axial rim, terrain lighting, and production calibration passed human review in frozen baseline `0178d61` |
+| Phase 3C faction and structure identity | In progress | Faction-specific merged geometry, surface treatment, and per-instance damage are specified in `docs/phase-3c-faction-identity.md` |
 | Phase 2 overall | Qualification in progress | Gameplay cohorts pass, but performance qualification and human observation remain open |
 
 ## Immediate Sequence
@@ -37,7 +38,8 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 7. **Completed - Counterfire validation:** defensive power, interception, ammunition adaptation, and debrief behavior passed internal human play.
 8. **Completed - story expansion validation:** Bulwark escort identity, Needle hunter readability, narrative pacing, and the Last Rotation revelation passed internal human play.
 9. **Completed - Phase 3A signature battlefield:** procedural mech weight, combat atmosphere, audio, and the busy signature battle passed human review and T480s qualification.
-10. **Current - Phase 3B ring atmosphere and calibration:** make open space, horizon haze, and the real ring read as one enclosed world, then lock shared PBR decisions in a production calibration scene.
+10. **Completed - Phase 3B ring atmosphere and calibration:** axial space, ringward atmosphere, terrain lighting, and production PBR calibration passed human review.
+11. **Current - Phase 3C faction and structure identity:** make faction readable through silhouette, architecture, surface response, and independent damage while preserving class and gameplay authority.
 
 ## Direction Decisions
 
@@ -47,6 +49,7 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 - **Phase 3A balance boundary:** presentation-only. Unit and structure statistics, weapons, abilities, economy, movement, AI, navigation, ballistics, visibility, and victory rules remain frozen.
 - **Gate 3 artifact policy:** generated screenshots remain ignored artifacts. Their deterministic scenario, visual signature, renderer identity, source hashes, artifact hashes, and receipt digest are durable evidence.
 - **Phase 3B renderer boundary:** one analytic atmosphere draw on Medium through Ultra; Low keeps a zero-draw dark-space/fog fallback. No post-processing composer, atmosphere render target, volumetric raymarch, or dynamic environment-map rebuild.
+- **Phase 3C geometry boundary:** faction detail is merged into geometry already owned by existing faction buckets; no accessory draw calls, gameplay footprint changes, or binary assets.
 - **Tutorial sequencing:** tutorial work follows directional-USP validation and first-time-player observation rather than preceding them.
 - **Evidence standard:** automated cohorts establish deterministic gameplay and AI-proxy results. They do not establish human comprehension, enjoyment, or first-time-player difficulty.
 

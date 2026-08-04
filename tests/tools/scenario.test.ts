@@ -6,7 +6,8 @@ import { parseScenario, resolveScenarioPath } from '../../tools/rww/scenario.mjs
 import { computeVisualSignature } from '../../tools/rww/visual-signature.mjs';
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
 import { evaluateBrowserBudget, percentile, summarizeFrameMetrics } from '../../tools/rww/browser-metrics.mjs';
-import { validateScenarioUnitState } from '../../e2e/support/scenario-driver';
+import { applyScenarioHealth, validateScenarioUnitState } from '../../e2e/support/scenario-driver';
+import type { Unit } from '../../src/sim/world';
 
 const scenario = {
   schema: 'rww.browser-scenario',
@@ -186,6 +187,36 @@ describe('browser scenario schema', () => {
     expect(() => parseScenario({ ...scenario, setup: { ...scenario.setup, units: [
       { ...scenario.setup.units[0], abilityTransitionTimer: -1 },
     ] } })).toThrow(/abilityTransitionTimer/i);
+  });
+
+  it('strictly bounds optional visual health setup', () => {
+    const withHealth = {
+      ...scenario,
+      setup: {
+        ...scenario.setup,
+        units: [{ ...scenario.setup.units[0], healthFraction: 0.25 }],
+        structures: [{ ...scenario.setup.structures[0], healthFraction: 0.6 }],
+      },
+    };
+    expect(parseScenario(withHealth).setup.units[0].healthFraction).toBe(0.25);
+    expect(() => parseScenario({
+      ...withHealth,
+      setup: { ...withHealth.setup, units: [{ ...withHealth.setup.units[0], healthFraction: 0 }] },
+    })).toThrow(/healthFraction/i);
+    expect(() => parseScenario({
+      ...withHealth,
+      setup: { ...withHealth.setup, structures: [{ ...withHealth.setup.structures[0], healthFraction: 1.1 }] },
+    })).toThrow(/healthFraction/i);
+  });
+
+  it('applies canonical mech damage thresholds without damaging engineers', () => {
+    const mech = { kind: 'vanguard', maxHp: 100, hp: 100, damageState: 0, speedMultiplier: 1 } as Unit;
+    const engineer = { kind: 'engineer', maxHp: 100, hp: 100, damageState: 0, speedMultiplier: 1 } as Unit;
+    applyScenarioHealth(mech, 0.3);
+    applyScenarioHealth(engineer, 0.3);
+
+    expect(mech).toMatchObject({ hp: 30, damageState: 2, speedMultiplier: 0.8 });
+    expect(engineer).toMatchObject({ hp: 30, damageState: 0, speedMultiplier: 1 });
   });
 
   it('rejects faction-exclusive units in the wrong faction', () => {

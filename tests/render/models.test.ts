@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildMech, buildStructure } from '@gen/models';
+import { buildMech, buildStructure, makeHullMaterial } from '@gen/models';
 import { describe, expect, it } from 'vitest';
 
 describe('procedural hull geometry', () => {
@@ -38,5 +38,61 @@ describe('procedural hull geometry', () => {
     expect(bulwark.radius).toBeGreaterThan(needle.radius);
     expect(bulwark.parts.torso.getAttribute('position').count).toBeGreaterThan(0);
     expect(needle.parts.torso.getAttribute('position').count).toBeGreaterThan(0);
+  });
+
+  it('adds faction geometry without changing mech rig authority metadata', () => {
+    const compact = buildMech('vanguard', 19, 'compact');
+    const choir = buildMech('vanguard', 19, 'choir');
+
+    expect(compact.parts.torso.getAttribute('position').count)
+      .not.toBe(choir.parts.torso.getAttribute('position').count);
+    expect({
+      height: compact.height,
+      radius: compact.radius,
+      hipOffset: compact.hipOffset,
+      hipHeight: compact.hipHeight,
+      legUpper: compact.legUpper,
+      legLower: compact.legLower,
+      muzzles: compact.muzzles.map((muzzle) => muzzle.toArray()),
+    }).toEqual({
+      height: choir.height,
+      radius: choir.radius,
+      hipOffset: choir.hipOffset,
+      hipHeight: choir.hipHeight,
+      legUpper: choir.legUpper,
+      legLower: choir.legLower,
+      muzzles: choir.muzzles.map((muzzle) => muzzle.toArray()),
+    });
+  });
+
+  it('adds faction structure grammar without changing gameplay metadata', () => {
+    const compact = buildStructure('fabricator', 20, 'compact');
+    const choir = buildStructure('fabricator', 20, 'choir');
+    const neutralNode = buildStructure('spinalNode', 20, 'neutral');
+
+    expect(compact.geometry.getAttribute('position').count)
+      .not.toBe(choir.geometry.getAttribute('position').count);
+    expect({ radius: compact.radius, height: compact.height, muzzles: compact.muzzles })
+      .toEqual({ radius: choir.radius, height: choir.height, muzzles: choir.muzzles });
+    expect(neutralNode.geometry.getAttribute('position').count).toBeGreaterThan(0);
+  });
+
+  it('compiles faction style and per-instance damage through one hull program', () => {
+    const hull = makeHullMaterial(0xf0821e, -1);
+    const shader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: [
+      '#include <common>',
+      '#include <map_fragment>',
+      '#include <roughnessmap_fragment>',
+      '#include <emissivemap_fragment>',
+    ].join('\n') };
+    hull.material.onBeforeCompile(shader as never, {} as never);
+
+    expect(shader.vertexShader).toContain('attribute float instanceDamage');
+    expect(shader.vertexShader).toContain('attribute float instancePhase');
+    expect(shader.fragmentShader).toContain('uniform float uFactionStyle');
+    expect(shader.fragmentShader).toContain('uniform float uTime');
+    expect(shader.fragmentShader).toContain('flickerPulse');
+    expect(shader.fragmentShader).toContain('rww_damage()');
+    expect(hull.material.customProgramCacheKey()).toBe('rww-hull-v2');
   });
 });

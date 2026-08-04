@@ -52,6 +52,7 @@ export class EntityRenderer {
   readonly object = new THREE.Group();
 
   private rigs = new Map<MechClass, MechRig>();
+  private factionRigs = new Map<string, MechRig>();
   private structureModels = new Map<StructureKind, StructureModel>();
   private mats: FactionMaterials[] = [];
   private cloakMats: FactionMaterials[] = [];
@@ -69,7 +70,6 @@ export class EntityRenderer {
   private counts = new Map<string, number>();
 
   /** Engineers are drawn as a simple hull rather than as a walker. */
-  private engineerGeo: THREE.BufferGeometry;
   private engineerMeshes: THREE.InstancedMesh[] = [];
 
   private readonly _v = new THREE.Vector3();
@@ -87,17 +87,20 @@ export class EntityRenderer {
     this.object.name = 'entities';
 
     for (const f of [Faction.Compact, Faction.Choir]) {
-      this.mats[f] = makeHullMaterial(FACTION_COLOR[f]);
+      this.mats[f] = makeHullMaterial(FACTION_COLOR[f], f === Faction.Compact ? -1 : 1);
     }
     // A third, desaturated material for neutral structures.
     this.mats[2] = makeHullMaterial(0x8fa0b0);
 
     for (const cls of MECH_CLASSES) {
-      const rig = buildMech(cls, seed + cls.length * 7919);
-      this.rigs.set(cls, rig);
-      for (const part of PART_NAMES) {
-        for (const f of [Faction.Compact, Faction.Choir]) {
-          const mesh = new THREE.InstancedMesh(rig.parts[part], this.mats[f]!.material, MAX_PER_BUCKET);
+      const rigSeed = seed + cls.length * 7919;
+      for (const f of [Faction.Compact, Faction.Choir]) {
+        const rig = buildMech(cls, rigSeed, f === Faction.Compact ? 'compact' : 'choir');
+        if (f === Faction.Compact) this.rigs.set(cls, rig);
+        this.factionRigs.set(`${cls}|${f}`, rig);
+        for (const part of PART_NAMES) {
+          const geometry = withInstanceDamage(rig.parts[part], MAX_PER_BUCKET);
+          const mesh = new THREE.InstancedMesh(geometry, this.mats[f]!.material, MAX_PER_BUCKET);
           mesh.frustumCulled = false;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
@@ -107,8 +110,9 @@ export class EntityRenderer {
         }
       }
 
+      const wreckRig = this.rigs.get(cls)!;
       const wreck = new THREE.InstancedMesh(
-        rig.parts.torso,
+        wreckRig.parts.torso,
         new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.9, metalness: 0.18 }),
         MAX_PER_BUCKET,
       );
@@ -125,16 +129,17 @@ export class EntityRenderer {
     // Cloaked scouts need separate material buckets because opacity cannot vary
     // per instance on the shared hull material without another shader channel.
     for (const f of [Faction.Compact, Faction.Choir]) {
-      const cloak = makeHullMaterial(FACTION_COLOR[f]);
+      const cloak = makeHullMaterial(FACTION_COLOR[f], f === Faction.Compact ? -1 : 1);
       this.cloakMats[f] = cloak;
       cloak.material.transparent = true;
       cloak.material.opacity = 0.28;
       cloak.material.depthWrite = false;
       cloak.uniforms.uEmissive.value = 0.45;
       for (const cls of ['wisp', 'needle'] as const) {
-        const rig = this.rigs.get(cls)!;
+        const rig = this.factionRigs.get(`${cls}|${f}`)!;
         for (const part of PART_NAMES) {
-          const mesh = new THREE.InstancedMesh(rig.parts[part], cloak.material, MAX_PER_BUCKET);
+          const geometry = withInstanceDamage(rig.parts[part].clone(), MAX_PER_BUCKET);
+          const mesh = new THREE.InstancedMesh(geometry, cloak.material, MAX_PER_BUCKET);
           mesh.name = `cloak:${cls}:${part}:${f}`;
           mesh.frustumCulled = false;
           mesh.castShadow = false;
@@ -152,10 +157,17 @@ export class EntityRenderer {
       'silo', 'spinalNode',
     ];
     for (const kind of kinds) {
-      const model = buildStructure(kind, seed + kind.length * 104729);
-      this.structureModels.set(kind, model);
+      const modelSeed = seed + kind.length * 104729;
+      const baseModel = buildStructure(kind, modelSeed);
+      this.structureModels.set(kind, baseModel);
       for (let f = 0; f < 3; f++) {
-        const mesh = new THREE.InstancedMesh(model.geometry, this.mats[f]!.material, 64);
+        const model = kind === 'spinalNode' || f === 2
+          ? baseModel
+          : buildStructure(kind, modelSeed, f === Faction.Compact ? 'compact' : 'choir');
+        // Ownership changes command authority, not the inherited Node's visual culture.
+        const geometry = withInstanceDamage(f === 0 ? model.geometry : model.geometry.clone(), 64);
+        const materialIndex = kind === 'spinalNode' ? 2 : f;
+        const mesh = new THREE.InstancedMesh(geometry, this.mats[materialIndex]!.material, 64);
         mesh.frustumCulled = false;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -169,10 +181,13 @@ export class EntityRenderer {
     this.createPresentationBuckets();
 
     // Engineers: a small hovering hull, visually distinct from the mechs.
-    this.engineerGeo = buildStructure('pointDefense', seed).geometry.clone();
-    this.engineerGeo.scale(0.28, 0.28, 0.28);
     for (const f of [Faction.Compact, Faction.Choir]) {
-      const mesh = new THREE.InstancedMesh(this.engineerGeo, this.mats[f]!.material, MAX_PER_BUCKET);
+      const geometry = buildStructure(
+        'pointDefense', seed, f === Faction.Compact ? 'compact' : 'choir',
+      ).geometry;
+      geometry.scale(0.28, 0.28, 0.28);
+      withInstanceDamage(geometry, MAX_PER_BUCKET);
+      const mesh = new THREE.InstancedMesh(geometry, this.mats[f]!.material, MAX_PER_BUCKET);
       mesh.frustumCulled = false;
       mesh.castShadow = true;
       mesh.count = 0;
@@ -188,6 +203,9 @@ export class EntityRenderer {
 
   update(world: World, anchor: RenderAnchor, time: number, viewer: Faction, alpha: number): void {
     this.counts.clear();
+    for (const materials of [this.mats, this.cloakMats]) {
+      for (const entry of materials) if (entry) entry.uniforms.uTime.value = time;
+    }
 
     for (const m of this.mechMeshes.values()) m.count = 0;
     for (const m of this.structMeshes.values()) m.count = 0;
@@ -198,10 +216,10 @@ export class EntityRenderer {
     this.drawWrecks(world, anchor, viewer);
     this.drawUnits(world, anchor, time, viewer, alpha);
 
-    for (const m of this.mechMeshes.values()) if (m.count > 0) m.instanceMatrix.needsUpdate = true;
-    for (const m of this.structMeshes.values()) if (m.count > 0) m.instanceMatrix.needsUpdate = true;
-    for (const m of this.engineerMeshes) if (m && m.count > 0) m.instanceMatrix.needsUpdate = true;
-    for (const m of this.presentationMeshes) if (m.count > 0) m.instanceMatrix.needsUpdate = true;
+    for (const m of this.mechMeshes.values()) if (m.count > 0) markInstanceUpdates(m);
+    for (const m of this.structMeshes.values()) if (m.count > 0) markInstanceUpdates(m);
+    for (const m of this.engineerMeshes) if (m && m.count > 0) markInstanceUpdates(m);
+    for (const m of this.presentationMeshes) if (m.count > 0) markInstanceUpdates(m);
 
     // Prune foot state for units that no longer exist, so the map cannot grow
     // without bound over a long match.
@@ -322,7 +340,9 @@ export class EntityRenderer {
       const grow = st.progress >= 1 ? 1 : 0.25 + 0.75 * st.progress;
       this._scale.set(1, grow, 1);
       this._m.compose(this._v, this._q, this._scale);
-      mesh.setMatrixAt(mesh.count++, this._m);
+      const index = mesh.count++;
+      setInstanceDamage(mesh, index, st.id, st.hp, st.maxHp);
+      mesh.setMatrixAt(index, this._m);
     }
   }
 
@@ -356,7 +376,9 @@ export class EntityRenderer {
         anchor.orientation(s, yaw, this._q);
         this._scale.set(1, 1, 1);
         this._m.compose(this._v, this._q, this._scale);
-        mesh.setMatrixAt(mesh.count++, this._m);
+        const index = mesh.count++;
+        setInstanceDamage(mesh, index, u.id, u.hp, u.maxHp);
+        mesh.setMatrixAt(index, this._m);
         continue;
       }
 
@@ -534,7 +556,9 @@ export class EntityRenderer {
         : this.mechMeshes.get(`${cls}|${part}|${f}`);
       if (!mesh || mesh.count >= mesh.instanceMatrix.count) return;
       _tmp.multiplyMatrices(this._basis, local);
-      mesh.setMatrixAt(mesh.count++, _tmp);
+      const index = mesh.count++;
+      setInstanceDamage(mesh, index, u.id, u.hp, u.maxHp);
+      mesh.setMatrixAt(index, _tmp);
     };
 
     // --- Pelvis and torso ----------------------------------------------------
@@ -697,4 +721,32 @@ function recoilAt(state: RecoilState | undefined, time: number): number {
   if (!state) return 0;
   const age = Math.max(0, time - state.startedAt);
   return state.strength * Math.exp(-age * 8) * Math.max(0, Math.cos(age * 22));
+}
+
+function withInstanceDamage(geometry: THREE.BufferGeometry, capacity: number): THREE.BufferGeometry {
+  geometry.setAttribute(
+    'instanceDamage',
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1).setUsage(THREE.DynamicDrawUsage),
+  );
+  geometry.setAttribute(
+    'instancePhase',
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1).setUsage(THREE.DynamicDrawUsage),
+  );
+  return geometry;
+}
+
+function setInstanceDamage(mesh: THREE.InstancedMesh, index: number, id: number, hp: number, maxHp: number): void {
+  const attribute = mesh.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute | undefined;
+  if (!attribute) return;
+  attribute.setX(index, clampN(1 - hp / Math.max(1, maxHp), 0, 1));
+  const phase = mesh.geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute | undefined;
+  phase?.setX(index, (id * 0.61803398875) % 1);
+}
+
+function markInstanceUpdates(mesh: THREE.InstancedMesh): void {
+  mesh.instanceMatrix.needsUpdate = true;
+  const damage = mesh.geometry.getAttribute('instanceDamage');
+  if (damage) damage.needsUpdate = true;
+  const phase = mesh.geometry.getAttribute('instancePhase');
+  if (phase) phase.needsUpdate = true;
 }

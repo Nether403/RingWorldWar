@@ -91,6 +91,15 @@ Quality presets (Low/Medium/High/Ultra) gate: SSR, volumetrics resolution, shado
 - **Animation:** authored locomotion set + runtime **foot IK** on the terrain, torso/turret aim blending (upper body aims while legs walk), procedural recoil, and hydraulic settle on stop. Weight comes from IK and secondary motion, not from more keyframes.
 - **Instancing:** all units drawn via instanced meshes with per-instance color/damage attributes; skinning via GPU skinning with a shared bone texture where possible.
 
+### Phase 3C faction grammar
+
+Compact machines use layered angular armor, external buttresses, warmer rough
+metal, and low broad mass. Choir machines use narrow composite shells, vertical
+sensor fins, cooler smoother metal, and asymmetric negative space. These details
+are merged into geometry already owned by faction-separated instance buckets, so
+they add no accessory draw calls. Per-instance HP-derived wear must preserve this
+grammar rather than covering it with generic orange damage noise.
+
 ## 8. VFX
 - **Rockets:** GPU-particle exhaust plumes, ribbon contrails that *persist and slowly disperse* (contrails crossing the sky are a core visual motif and a gameplay tell), stage-separation flashes, terminal-phase glow.
 - **Explosions:** flipbook-sprite fireballs + real light flash + shockwave distortion ring + physics debris + a lingering smoke column. The light flash is what makes explosions feel real — never skip it.

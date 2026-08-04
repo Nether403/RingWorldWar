@@ -179,8 +179,8 @@ function buildMaterialSwatches(): THREE.Group {
 }
 
 function buildReferenceMech(): THREE.Group {
-  const rig = buildMech('vanguard', 0x3bca1);
-  const hull = makeHullMaterial(0xf0821e).material;
+  const rig = buildMech('vanguard', 0x3bca1, 'compact');
+  const hull = makeHullMaterial(0xf0821e, -1).material;
   const group = new THREE.Group();
   group.name = 'calibration:reference-mech';
   addPart(group, rig.parts.pelvis, hull, 0, rig.hipHeight, 0);

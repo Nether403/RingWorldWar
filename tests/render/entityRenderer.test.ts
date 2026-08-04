@@ -134,6 +134,102 @@ describe('EntityRenderer quality materials', () => {
 
     expect(footfalls).toEqual([]);
   });
+
+  it('renders faction-specific geometry and independent damage without mutating authority', () => {
+    const terrain = {
+      heightAt: () => 0,
+      slopeAt: () => 0,
+      isBuildable: () => true,
+    } as unknown as Terrain;
+    const world = new World(terrain, 55);
+    const compact = world.spawnUnit(Faction.Compact, 'vanguard', 0, 0);
+    const compactDamaged = world.spawnUnit(Faction.Compact, 'vanguard', 10, 10);
+    const choir = world.spawnUnit(Faction.Choir, 'vanguard', 40, 0);
+    const needleHealthy = world.spawnUnit(Faction.Choir, 'needle', 20, 20);
+    const needleDamaged = world.spawnUnit(Faction.Choir, 'needle', 30, 20);
+    const engineerHealthy = world.spawnUnit(Faction.Choir, 'engineer', 20, -15);
+    const engineerDamaged = world.spawnUnit(Faction.Choir, 'engineer', 30, -15);
+    const compactStructure = world.spawnStructure(Faction.Compact, 'fabricator', 0, -30, 1);
+    const choirStructure = world.spawnStructure(Faction.Choir, 'fabricator', 30, -30, 1);
+    const choirStructureDamaged = world.spawnStructure(Faction.Choir, 'fabricator', 45, -30, 1);
+    compactDamaged.hp = compactDamaged.maxHp * 0.3;
+    choir.hp = choir.maxHp * 0.4;
+    needleHealthy.cloaked = true;
+    needleDamaged.hp = needleDamaged.maxHp * 0.5;
+    needleDamaged.cloaked = true;
+    engineerDamaged.hp = engineerDamaged.maxHp * 0.35;
+    choirStructureDamaged.hp = choirStructureDamaged.maxHp * 0.45;
+    const renderer = new EntityRenderer(55);
+    const exact = renderer as unknown as {
+      mechMeshes: Map<string, THREE.InstancedMesh>;
+      cloakMeshes: Map<string, THREE.InstancedMesh>;
+      structMeshes: Map<string, THREE.InstancedMesh>;
+      engineerMeshes: THREE.InstancedMesh[];
+      mats: Array<{ uniforms: { uTime: { value: number } } }>;
+    };
+    const compactTorso = exact.mechMeshes.get('vanguard|torso|0')!;
+    const choirTorso = exact.mechMeshes.get('vanguard|torso|1')!;
+    const anchor = new RenderAnchor();
+    const beforeHash = world.stateHash();
+
+    renderer.update(world, anchor, 2, Faction.Choir, 1);
+
+    expect(compactTorso.geometry).not.toBe(choirTorso.geometry);
+    expect(compactTorso.count).toBe(2);
+    expect(choirTorso.count).toBe(1);
+    expect((compactTorso.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(0))
+      .toBeCloseTo(0, 6);
+    expect((compactTorso.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(1))
+      .toBeCloseTo(0.7, 6);
+    const compactPhase = compactTorso.geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute;
+    expect(compactPhase.getX(0)).not.toBeCloseTo(compactPhase.getX(1), 6);
+    expect(exact.mats[Faction.Compact]!.uniforms.uTime.value).toBe(2);
+    expect((choirTorso.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(0))
+      .toBeCloseTo(0.6, 6);
+    const needleCloak = exact.cloakMeshes.get('needle|torso|1')!;
+    expect(needleCloak.count).toBe(2);
+    expect((needleCloak.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(0))
+      .toBeCloseTo(0, 6);
+    expect((needleCloak.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(1))
+      .toBeCloseTo(0.5, 6);
+    const compactFabricator = exact.structMeshes.get('fabricator|0')!;
+    const choirFabricator = exact.structMeshes.get('fabricator|1')!;
+    expect(compactFabricator.geometry).not.toBe(choirFabricator.geometry);
+    expect((compactFabricator.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(0))
+      .toBeCloseTo(0, 6);
+    expect(choirFabricator.count).toBe(2);
+    expect((choirFabricator.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(0))
+      .toBeCloseTo(0, 6);
+    expect((choirFabricator.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(1))
+      .toBeCloseTo(0.55, 6);
+    const engineerMesh = exact.engineerMeshes[Faction.Choir]!;
+    expect(engineerMesh.count).toBe(2);
+    expect((engineerMesh.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(0))
+      .toBeCloseTo(0, 6);
+    expect((engineerMesh.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(1))
+      .toBeCloseTo(0.65, 6);
+    expect(compact.id).not.toBe(choir.id);
+    expect(compactStructure.id).not.toBe(choirStructure.id);
+    expect(engineerHealthy.id).not.toBe(engineerDamaged.id);
+    expect(world.stateHash()).toBe(beforeHash);
+  });
+
+  it('keeps captured Spinal Nodes on the neutral inherited material', () => {
+    const renderer = new EntityRenderer(56);
+    const exact = renderer as unknown as {
+      structMeshes: Map<string, THREE.InstancedMesh>;
+      mats: Array<{ material: THREE.Material }>;
+    };
+    const compact = exact.structMeshes.get('spinalNode|0')!;
+    const choir = exact.structMeshes.get('spinalNode|1')!;
+    const neutral = exact.structMeshes.get('spinalNode|2')!;
+
+    expect(compact.material).toBe(exact.mats[2]!.material);
+    expect(choir.material).toBe(exact.mats[2]!.material);
+    expect(neutral.material).toBe(exact.mats[2]!.material);
+    expect(compact.geometry).not.toBe(choir.geometry);
+    expect(choir.geometry).not.toBe(neutral.geometry);
+  });
 });
 
 function mechScene(): { renderer: EntityRenderer; world: World; anchor: RenderAnchor } {

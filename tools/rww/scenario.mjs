@@ -83,7 +83,7 @@ export function parseScenario(input) {
     record(unit, path);
     exactKeys(unit, [
       'id', 'faction', 'kind', 's', 'z', 'yawRadians', 'target', 'selected',
-      'targetMode', 'abilityActive', 'abilityTransitionTimer', 'weaponCooldowns',
+      'targetMode', 'abilityActive', 'abilityTransitionTimer', 'weaponCooldowns', 'healthFraction',
     ], path);
     uniqueId(unit.id, `${path}.id`, ids);
     member(unit.faction, FACTIONS, `${path}.faction`);
@@ -93,6 +93,7 @@ export function parseScenario(input) {
     finiteNumber(unit.s, `${path}.s`);
     finiteNumber(unit.z, `${path}.z`);
     optionalFinite(unit.yawRadians, `${path}.yawRadians`);
+    if (unit.healthFraction !== undefined) boundedNumber(unit.healthFraction, Number.EPSILON, 1, `${path}.healthFraction`);
     if (unit.target !== undefined) safeId(unit.target, `${path}.target`);
     if (unit.targetMode !== undefined) {
       member(unit.targetMode, new Set(['attack', 'attackMove']), `${path}.targetMode`);
@@ -119,7 +120,7 @@ export function parseScenario(input) {
   input.setup.structures.forEach((structure, index) => {
     const path = `setup.structures[${index}]`;
     record(structure, path);
-    exactKeys(structure, ['id', 'faction', 'kind', 's', 'z', 'progress', 'yawRadians'], path);
+    exactKeys(structure, ['id', 'faction', 'kind', 's', 'z', 'progress', 'yawRadians', 'healthFraction'], path);
     uniqueId(structure.id, `${path}.id`, ids);
     member(structure.faction, STRUCTURE_FACTIONS, `${path}.faction`);
     member(structure.kind, STRUCTURES, `${path}.kind`);
@@ -127,6 +128,7 @@ export function parseScenario(input) {
     finiteNumber(structure.z, `${path}.z`);
     boundedNumber(structure.progress, 0, 1, `${path}.progress`);
     optionalFinite(structure.yawRadians, `${path}.yawRadians`);
+    if (structure.healthFraction !== undefined) boundedNumber(structure.healthFraction, Number.EPSILON, 1, `${path}.healthFraction`);
   });
   input.setup.units.forEach((unit, index) => {
     if (unit.target !== undefined && !ids.has(unit.target)) fail(`setup.units[${index}].target`, 'must reference a setup id');
@@ -364,7 +366,7 @@ function exactKeys(value, allowed, path) {
     if (![
       'expectedVisual', 'yawRadians', 'target', 'maximumContextLosses', 'selected',
       'abilityActive', 'abilityTransitionTimer', 'weaponCooldowns',
-      'targetMode', 'disableAi', 'player', 'mission', 'commandCap',
+      'targetMode', 'disableAi', 'player', 'mission', 'commandCap', 'healthFraction',
     ].includes(key) && !(key in value)) {
       fail(`${path}.${key}`, 'is required');
     }

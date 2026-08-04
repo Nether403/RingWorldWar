@@ -10,6 +10,7 @@ npm run rww -- perf headless-40m --terrain standard --runs 3 --ticks 72000
 npm run rww -- visual signature-lance
 npm run rww -- visual signature-lance --compare
 npm run rww -- visual rim-atmosphere
+npm run rww -- visual faction-readability
 npm run rww -- play signature-lance
 npm run rww -- perf browser-heavy --scenario signature-lance --target validation/hardware/t480s-low.json --seconds 30 --json
 npm run rww -- play directional-artillery
@@ -63,3 +64,8 @@ Use `visual rim-atmosphere` for the deterministic axial-space/rim artifact and
 `visual signature-lance` for the ringward fog, far-ring, unit-readability, and
 combat composition artifact. Both remain baseline candidates until human review
 and cross-renderer tolerances are recorded.
+
+`visual faction-readability` and `play faction-readability` present paired
+Compact and Choir shared classes, exclusive units, production structures, and
+controlled healthy/damaged states. Use this as the Phase 3C one-second faction,
+class, and critical-damage comprehension gate.
