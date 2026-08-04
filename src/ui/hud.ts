@@ -170,9 +170,23 @@ const CSS = `
 .rww-narrative button { margin-top: 18px; padding: 9px 22px; color: #f0b26e; background: transparent;
   border: 1px solid rgba(240,130,30,.7); text-transform: uppercase; letter-spacing: .16em; cursor: pointer; }
 
-/* Hints */
-.rww-hint { position: absolute; left: 12px; bottom: 132px; font-size: 10.5px;
-  line-height: 1.85; opacity: 0.4; letter-spacing: 0.08em; }
+/* Toggleable controls reference */
+.rww-help-toggle { position:absolute; top:max(10px,env(safe-area-inset-top)); right:10px; pointer-events:auto;
+  min-height:34px; padding:6px 10px; color:#9fd8ff; background:rgba(7,11,16,.82);
+  border:1px solid rgba(159,216,255,.28); font:600 9px/1 inherit; letter-spacing:.16em;
+  text-transform:uppercase; cursor:pointer; }
+.rww-help-toggle:hover,.rww-help-toggle:focus-visible { border-color:#9fd8ff; outline:2px solid rgba(159,216,255,.45); outline-offset:2px; }
+.rww-hint { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(520px,calc(100vw - 24px));
+  max-height:calc(100vh - 24px); overflow:auto; box-sizing:border-box; padding:18px 20px; pointer-events:auto;
+  font-size:11px; line-height:1.5; letter-spacing:.06em; }
+.rww-hint[hidden] { display:none; }
+.rww-hint h2 { margin:0 0 12px; color:#f0b26e; font-size:16px; letter-spacing:.18em; text-transform:uppercase; }
+.rww-help-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px 18px; }
+.rww-help-grid span { display:flex; justify-content:space-between; gap:12px; padding-bottom:5px;
+  border-bottom:1px solid rgba(159,192,218,.12); }
+.rww-help-grid kbd { color:#9fd8ff; font:600 10px/1.4 inherit; white-space:nowrap; }
+.rww-hint button { margin-top:14px; padding:7px 14px; color:#f0b26e; background:transparent;
+  border:1px solid rgba(240,130,30,.55); text-transform:uppercase; letter-spacing:.14em; cursor:pointer; }
 @media (max-width: 900px) {
   .rww-map { width: min(440px, calc(100vw - 20px)); }
   .rww-bottom { right:8px; bottom:108px; grid-template-columns:minmax(180px, 42vw) 1fr; }
@@ -188,29 +202,36 @@ const CSS = `
   .rww-cmds { max-height: 104px; overflow-y: auto; }
   .rww-btn { min-width: 78px; padding: 6px 8px; }
   .rww-map { left: 6px; right: 6px; bottom: 6px; width: auto; height: 86px; }
-  .rww-alert { top:78px; }
-  .rww-command-ack { top:112px; }
-  .rww-event-rail { display:grid; top:142px; bottom:auto; left:50%; right:auto; transform:translateX(-50%);
+  .rww-alert { top:92px; }
+  .rww-command-ack { top:122px; }
+  .rww-event-rail { display:grid; top:150px; bottom:auto; left:50%; right:auto; transform:translateX(-50%);
     width:min(420px,calc(100vw - 12px)); overflow:hidden; }
   .rww-bottom { max-height:calc(100vh - 158px); overflow-y:auto; }
-  .rww-hint { display: none; }
-  .rww-mission { top: 220px; left: 6px; width: min(340px, calc(100vw - 12px));
-    max-height: calc(100vh - 226px); }
+  .rww-help-toggle { top:54px; right:6px; }
+  .rww-help-grid { grid-template-columns:1fr; }
+  .rww-mission { top: 228px; left: 6px; width: min(340px, calc(100vw - 12px));
+    max-height: calc(100vh - 234px); }
 }
 @media (max-height:480px) {
   .rww-mode { display:none; }
-  .rww-alert { top:48px; max-width:calc(100vw - 12px); padding:5px 8px; white-space:nowrap;
+  .rww-help-toggle { top:48px; right:6px; }
+  .rww-alert { top:82px; max-width:calc(100vw - 12px); padding:5px 8px; white-space:nowrap;
     overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; }
-  .rww-command-ack { top:78px; }
-  .rww-event-rail { top:106px; left:auto; right:6px; transform:none; width:min(220px,calc(100vw - 12px)); }
-  .rww-mission { top:106px; left:6px; width:calc(100vw - 238px); max-height:88px; }
+  .rww-command-ack { top:112px; }
+  .rww-event-rail { top:140px; left:auto; right:6px; transform:none; width:min(220px,calc(100vw - 12px)); }
+  .rww-mission { top:140px; left:6px; width:calc(100vw - 238px); max-height:68px; }
   .rww-bottom { bottom:92px; max-height:100px; }
 }
 @media (max-height:240px) {
   .rww-alert,.rww-command-ack,.rww-event-rail,.rww-mode { display:none; }
+  .rww-top { right:48px; }
+  .rww-help-toggle { display:block; top:8px; right:6px; width:36px; min-width:36px; min-height:34px;
+    padding:0; overflow:hidden; font-size:0; }
+  .rww-help-toggle::after { content:'F1'; font-size:9px; }
   .rww-mission { top:46px; left:4px; width:calc(100vw - 8px); max-height:calc(100vh - 52px); }
   .rww-bottom { display:none; }
   .rww-map { opacity:.72; }
+  .rww-hint { inset:4px; transform:none; width:auto; max-height:calc(100vh - 8px); padding:9px 12px; }
   .rww-narrative,.rww-narrative.transmission { inset:4px; transform:none; width:auto;
     max-height:calc(100vh - 8px); padding:10px 14px; }
 }
@@ -271,6 +292,8 @@ export class Hud {
   private directControlMode = false;
   private blockingOverlay = false;
   private previousModalFocus: HTMLElement | null = null;
+  private helpEl: HTMLDivElement;
+  private helpToggleEl: HTMLButtonElement;
 
   onMinimapPointer: ((s: number, z: number) => void) | null = null;
   onMinimapPrimary: ((s: number, z: number) => void) | null = null;
@@ -289,6 +312,10 @@ export class Hud {
 
   get blocksGameplayInput(): boolean {
     return this.blockingOverlay;
+  }
+
+  get controlsOpen(): boolean {
+    return !this.helpEl.hidden;
   }
 
   constructor() {
@@ -417,13 +444,37 @@ export class Hud {
     this.eventRailEl.setAttribute('aria-label', 'Recent battlefield events');
     this.root.appendChild(this.eventRailEl);
 
-    const hint = el('div', 'rww-hint');
-    hint.innerHTML =
-      'WASD / edge — pan &nbsp;·&nbsp; wheel — zoom &nbsp;·&nbsp; Q E — rotate<br>' +
-      'left click — select &nbsp;·&nbsp; drag — box select &nbsp;·&nbsp; right click — move / attack<br>' +
-      'minimap: arrows — focus &nbsp;·&nbsp; Enter — center / fire &nbsp;·&nbsp; M / A — move / attack-move<br>' +
-      'V — pilot mech &nbsp;·&nbsp; X — ability &nbsp;·&nbsp; Alt/Ctrl+1..9 — group &nbsp;·&nbsp; esc — cancel / tactical &nbsp;·&nbsp; F3 — stats';
-    this.root.appendChild(hint);
+    this.helpToggleEl = button('rww-help-toggle');
+    this.helpToggleEl.textContent = 'F1 Controls';
+    this.helpToggleEl.setAttribute('aria-expanded', 'false');
+    this.helpToggleEl.setAttribute('aria-controls', 'rww-controls-reference');
+    this.helpToggleEl.onclick = (): void => this.toggleControls();
+    this.root.appendChild(this.helpToggleEl);
+
+    this.helpEl = el('section', 'rww-hint rww-panel');
+    this.helpEl.id = 'rww-controls-reference';
+    this.helpEl.hidden = true;
+    this.helpEl.setAttribute('role', 'dialog');
+    this.helpEl.setAttribute('aria-label', 'Game controls');
+    this.helpEl.innerHTML =
+      '<h2>Command Reference</h2><div class="rww-help-grid">' +
+      '<span><b>Pan camera</b><kbd>WASD / arrows / edge</kbd></span>' +
+      '<span><b>Zoom</b><kbd>Wheel / R F</kbd></span>' +
+      '<span><b>Rotate camera</b><kbd>Q E / MMB / Shift+RMB</kbd></span>' +
+      '<span><b>Select</b><kbd>Left click / drag</kbd></span>' +
+      '<span><b>Move / attack</b><kbd>Right click</kbd></span>' +
+      '<span><b>Ability</b><kbd>X</kbd></span>' +
+      '<span><b>Pilot mech</b><kbd>V</kbd></span>' +
+      '<span><b>Control groups</b><kbd>Alt/Ctrl + 1–9</kbd></span>' +
+      '<span><b>Minimap focus</b><kbd>Arrows / Enter</kbd></span>' +
+      '<span><b>Minimap orders</b><kbd>M / A</kbd></span>' +
+      '<span><b>Settings / cancel</b><kbd>Esc</kbd></span>' +
+      '<span><b>Performance</b><kbd>F3</kbd></span></div>';
+    const closeHelp = button('rww-help-close');
+    closeHelp.textContent = 'Close';
+    closeHelp.onclick = (): void => this.toggleControls(false);
+    this.helpEl.appendChild(closeHelp);
+    this.root.appendChild(this.helpEl);
 
     document.body.appendChild(this.root);
   }
@@ -432,6 +483,15 @@ export class Hud {
     this.alertEl.textContent = text;
     this.alertEl.style.opacity = '1';
     this.alertTimer = 2.6;
+  }
+
+  toggleControls(force?: boolean): void {
+    const open = force ?? this.helpEl.hidden;
+    if (open && this.blockingOverlay) return;
+    this.helpEl.hidden = !open;
+    this.helpToggleEl.setAttribute('aria-expanded', String(open));
+    if (open) this.helpEl.querySelector<HTMLElement>('button')?.focus();
+    else this.helpToggleEl.focus();
   }
 
   command(text: string): void {
@@ -583,7 +643,13 @@ export class Hud {
 
   private activateModal(panel: HTMLElement, focusTarget: HTMLElement): void {
     if (!this.blockingOverlay) {
-      this.previousModalFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      this.previousModalFocus = this.controlsOpen
+        ? this.helpToggleEl
+        : document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
+    if (this.controlsOpen) {
+      this.helpEl.hidden = true;
+      this.helpToggleEl.setAttribute('aria-expanded', 'false');
     }
     this.blockingOverlay = true;
     this.onBlockingOverlayChange?.(true);

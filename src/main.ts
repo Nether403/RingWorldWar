@@ -436,10 +436,18 @@ function wireKeys(
 ): void {
   window.addEventListener('keydown', (e) => {
     if (game.hud.blocksGameplayInput) return;
+    if (e.code === 'F1' && !menu.isOpen) {
+      input.consume(e.code);
+      e.preventDefault();
+      game.hud.toggleControls();
+      return;
+    }
     if (e.code === 'Escape') {
       input.consume(e.code);
       e.preventDefault();
-      if (menu.isOpen) {
+      if (game.hud.controlsOpen) {
+        game.hud.toggleControls(false);
+      } else if (menu.isOpen) {
         menu.close();
       } else {
         game.cancelInteractions();

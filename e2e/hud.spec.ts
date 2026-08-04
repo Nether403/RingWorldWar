@@ -48,6 +48,31 @@ test('HUD zones remain stable, non-overlapping, and acknowledge commands', async
   await expect(page.locator('.rww-event-item')).toHaveCount(0);
 });
 
+test('controls reference is hidden by default and toggles with F1', async ({ page }) => {
+  await page.goto('/?scenarioDriver=1');
+  await page.waitForFunction(() => Boolean((window as unknown as { RWW?: { testDriver?: unknown } }).RWW?.testDriver));
+  const toggle = page.getByRole('button', { name: 'F1 Controls' });
+  const reference = page.getByRole('dialog', { name: 'Game controls' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(reference).toBeHidden();
+  await page.keyboard.press('F1');
+  await expect(reference).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(reference).toContainText('Command Reference');
+  await page.keyboard.press('F1');
+  await expect(reference).toBeHidden();
+  await expect(toggle).toBeFocused();
+  await page.setViewportSize({ width: 320, height: 180 });
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(reference).toBeVisible();
+  const close = page.getByRole('button', { name: 'Close' });
+  await expect(close).toBeInViewport();
+  await close.click();
+  await expect(reference).toBeHidden();
+  await expect(toggle).toBeFocused();
+});
+
 test('Settings makes gameplay inert and compact HUD remains contained', async ({ page }) => {
   await page.setViewportSize({ width: 700, height: 600 });
   await page.goto('/?scenarioDriver=1');
@@ -75,12 +100,15 @@ test('Settings makes gameplay inert and compact HUD remains contained', async ({
       { kind: 'structureComplete', id: 911, s: 0, z: 0, h: 0, faction: 0, scale: 1, entityKind: 'fabricator' },
       { kind: 'intercepted', id: 912, s: 0, z: 0, h: 0, faction: 0, scale: 1 },
     ]);
+    const help = document.querySelector('.rww-help-toggle')!.getBoundingClientRect();
+    const alert = document.querySelector('.rww-alert')!.getBoundingClientRect();
     const ack = document.querySelector('.rww-command-ack')!.getBoundingClientRect();
     const rail = document.querySelector('.rww-event-rail')!.getBoundingClientRect();
     const bottom = document.querySelector('.rww-bottom')!.getBoundingClientRect();
-    return { ackBottom: ack.bottom, railTop: rail.top, railBottom: rail.bottom, bottomTop: bottom.top };
+    return { helpBottom: help.bottom, alertTop: alert.top, ackBottom: ack.bottom, railTop: rail.top, railBottom: rail.bottom, bottomTop: bottom.top };
   });
   await expect(page.locator('.rww-event-item')).toHaveCount(3);
+  expect(compact.helpBottom).toBeLessThanOrEqual(compact.alertTop);
   expect(compact.ackBottom).toBeLessThanOrEqual(compact.railTop);
   expect(compact.railBottom).toBeLessThanOrEqual(compact.bottomTop);
 
@@ -101,11 +129,19 @@ test('blocking narrative traps focus and suppresses gameplay authority', async (
   await page.setViewportSize({ width: 320, height: 180 });
   await page.goto(`/?seed=${signalScenario.worldSeed}&quality=${signalScenario.quality}&scenarioDriver=1`);
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: { testDriver?: unknown } }).RWW?.testDriver));
+  await page.keyboard.press('F1');
+  await expect(page.getByRole('dialog', { name: 'Game controls' })).toBeVisible();
   await page.evaluate(async (scenario) => {
     const modulePath = '/e2e/support/scenario-driver.ts';
     const driver = await import(/* @vite-ignore */ modulePath);
     driver.applyBrowserScenario(scenario);
   }, signalScenario);
+  await expect(page.getByRole('dialog', { name: 'Game controls' })).toBeHidden();
+  const compactLayout = await page.evaluate(() => ({
+    helpBottom: document.querySelector('.rww-help-toggle')!.getBoundingClientRect().bottom,
+    missionTop: document.querySelector('.rww-mission')!.getBoundingClientRect().top,
+  }));
+  expect(compactLayout.helpBottom).toBeLessThanOrEqual(compactLayout.missionTop);
   const begin = page.getByRole('button', { name: 'Begin' });
   await expect(begin).toBeInViewport();
   await expect(begin).toBeFocused();
@@ -117,6 +153,7 @@ test('blocking narrative traps focus and suppresses gameplay authority', async (
   await begin.click();
   await page.evaluate(() => (window as unknown as { RWW: any }).RWW.testDriver.presentFrame(0, 1));
   expect(await page.evaluate(() => (window as unknown as { RWW: any }).RWW.game.hud.blocksGameplayInput)).toBe(false);
+  await expect(page.getByRole('button', { name: 'F1 Controls' })).toBeFocused();
 });
 
 test('direct-control mode rejects tactical minimap/order authority', async ({ page }) => {

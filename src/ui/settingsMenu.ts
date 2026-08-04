@@ -71,6 +71,7 @@ const KEYBINDINGS: ReadonlyArray<readonly [string, string]> = [
   ['Select combat units', 'Ctrl + G'],
   ['Cancel / settings', 'Escape'],
   ['Performance overlay', 'F3'],
+  ['Controls reference', 'F1'],
 ];
 
 export class SettingsMenu {
