@@ -1,0 +1,39 @@
+{
+  "schema": "rww.browser-scenario",
+  "version": 1,
+  "id": "battlefield-aftermath",
+  "revision": 1,
+  "worldSeed": 20260731,
+  "quality": "high",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "simulation": { "fixedTickSeconds": 0.03333333333333333, "targetTick": 120, "visualTimeSeconds": 74, "settlingFrames": 3 },
+  "camera": { "focusS": 2400, "focusZ": 0, "yawRadians": 0.12, "zoom": 300 },
+  "setup": {
+    "disableAi": true,
+    "player": { "salvage": 850, "commandCap": 12 },
+    "units": [
+      { "id": "compact-survivor", "faction": "compact", "kind": "bulwark", "s": 2340, "z": -80, "yawRadians": 0 },
+      { "id": "choir-casualty", "faction": "choir", "kind": "vanguard", "s": 2460, "z": 30, "yawRadians": 3.141592653589793 },
+      { "id": "compact-engineer-casualty", "faction": "compact", "kind": "engineer", "s": 2390, "z": 85, "yawRadians": 0 }
+    ],
+    "structures": [
+      { "id": "compact-silo", "faction": "compact", "kind": "silo", "s": 2260, "z": -155, "progress": 1, "yawRadians": 0 },
+      { "id": "compact-power", "faction": "compact", "kind": "fusionCore", "s": 2210, "z": -80, "progress": 1, "yawRadians": 0 },
+      { "id": "compact-power-2", "faction": "compact", "kind": "fusionCore", "s": 2190, "z": -20, "progress": 1, "yawRadians": 0 },
+      { "id": "choir-fabricator-casualty", "faction": "choir", "kind": "fabricator", "s": 2500, "z": 115, "progress": 1, "yawRadians": 3.141592653589793 }
+    ]
+  },
+  "actions": [
+    { "tick": 0, "kind": "fire-ballistic", "source": "compact-silo", "weapon": "chordShot", "targetS": 13569.7335, "targetZ": 0 },
+    { "tick": 2, "kind": "apply-damage", "target": "choir-casualty", "amount": 100000, "damageType": "explosive", "sourceFaction": "compact" },
+    { "tick": 8, "kind": "apply-damage", "target": "compact-engineer-casualty", "amount": 100000, "damageType": "kinetic", "sourceFaction": "choir" },
+    { "tick": 14, "kind": "apply-damage", "target": "choir-fabricator-casualty", "amount": 100000, "damageType": "explosive", "sourceFaction": "compact" }
+  ],
+  "observationRegions": [
+    { "id": "chord-sky", "kind": "sky", "x": 0, "y": 0, "width": 1, "height": 0.34 },
+    { "id": "aftermath", "kind": "ground", "x": 0.12, "y": 0.34, "width": 0.76, "height": 0.48 },
+    { "id": "ui", "kind": "ui", "x": 0, "y": 0.82, "width": 1, "height": 0.18 }
+  ],
+  "benchmark": { "warmupSeconds": 2, "sampleSeconds": 10 },
+  "invariants": { "minimumMeanLuminance": 4, "minimumLuminanceVariance": 20, "minimumUnits": 3, "minimumStructures": 8, "maximumContextLosses": 0 }
+}

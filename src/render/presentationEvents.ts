@@ -5,6 +5,16 @@ import type { SimEvent, World } from '@sim/world';
 
 const PRESENTATION_ARC_RANGE = RING_CIRCUMFERENCE * 0.3;
 
+export type CombatPresentationKind = SimEvent['kind'] | 'chordLaunch' | 'chordImpact';
+
+export function combatPresentationKind(event: SimEvent): CombatPresentationKind {
+  if (event.weapon === 'chordShot') {
+    if (event.kind === 'weaponFired') return 'chordLaunch';
+    if (event.kind === 'impact') return 'chordImpact';
+  }
+  return event.kind;
+}
+
 /** Shared fog-of-war boundary for every sensory presentation of a sim event. */
 export function isPresentationEventEligible(
   event: SimEvent,

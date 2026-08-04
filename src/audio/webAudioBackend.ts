@@ -2,16 +2,23 @@ import type { AudioBackend, AudioCue } from './audioEngine';
 
 const MAX_VOICES = 24;
 
+interface VoiceRecord {
+  readonly sources: AudioScheduledSourceNode[];
+  readonly gain: GainNode;
+  readonly filter: BiquadFilterNode;
+  readonly pan: StereoPannerNode;
+  readonly priority: number;
+}
+
 export class WebAudioBackend implements AudioBackend {
   private readonly context: AudioContext;
   private readonly master: GainNode;
   private readonly sfx: GainNode;
   private readonly ambience: GainNode;
   private readonly ambienceFilter: BiquadFilterNode;
-  private readonly oneShots = new Set<AudioScheduledSourceNode>();
+  private readonly activeVoices = new Set<VoiceRecord>();
   private readonly ambientSources: AudioScheduledSourceNode[] = [];
   private readonly noise: AudioBuffer;
-  private voices = 0;
 
   constructor(seed: number) {
     const AudioContextClass = globalThis.AudioContext ??
@@ -49,7 +56,19 @@ export class WebAudioBackend implements AudioBackend {
   }
 
   play(cue: AudioCue): void {
-    if (this.voices >= MAX_VOICES || cue.gain <= 0.002) return;
+    if (cue.gain <= 0.002) return;
+    if (this.activeVoices.size >= MAX_VOICES) {
+      let victim: VoiceRecord | null = null;
+      let victimPriority = Infinity;
+      for (const voice of this.activeVoices) {
+        if (voice.priority < victimPriority) {
+          victim = voice;
+          victimPriority = voice.priority;
+        }
+      }
+      if (!victim || victimPriority >= cue.priority) return;
+      this.stopVoice(victim);
+    }
     const at = this.context.currentTime + cue.delaySeconds;
     const end = at + cue.durationSeconds;
     const gain = this.context.createGain();
@@ -68,21 +87,21 @@ export class WebAudioBackend implements AudioBackend {
     oscillator.frequency.setValueAtTime(cue.pitchHz, at);
     oscillator.frequency.exponentialRampToValueAtTime(Math.max(24, cue.pitchHz * pitchDrop(cue.kind)), end);
     oscillator.connect(gain);
-    this.trackOneShot(oscillator);
-    oscillator.start(at);
-    oscillator.stop(end + 0.02);
-
+    const sources: AudioScheduledSourceNode[] = [oscillator];
     if (usesNoise(cue.kind)) {
       const noise = this.context.createBufferSource();
       noise.buffer = this.noise;
       noise.loop = true;
       noise.playbackRate.setValueAtTime(noiseRate(cue.kind), at);
       noise.connect(gain);
-      this.oneShots.add(noise);
+      sources.push(noise);
       noise.start(at, (cue.pitchHz % 1) * this.noise.duration);
       noise.stop(end + 0.01);
-      noise.addEventListener('ended', () => this.oneShots.delete(noise), { once: true });
     }
+    const voice: VoiceRecord = { sources, gain, filter, pan, priority: cue.priority };
+    this.trackVoice(voice, oscillator);
+    oscillator.start(at);
+    oscillator.stop(end + 0.02);
   }
 
   update(_dt: number, tension: number): void {
@@ -91,9 +110,7 @@ export class WebAudioBackend implements AudioBackend {
   }
 
   reset(): void {
-    for (const source of this.oneShots) stopQuietly(source);
-    this.oneShots.clear();
-    this.voices = 0;
+    for (const voice of [...this.activeVoices]) this.stopVoice(voice);
   }
 
   dispose(): void {
@@ -103,13 +120,23 @@ export class WebAudioBackend implements AudioBackend {
     void this.context.close();
   }
 
-  private trackOneShot(source: AudioScheduledSourceNode): void {
-    this.voices++;
-    this.oneShots.add(source);
-    source.addEventListener('ended', () => {
-      this.oneShots.delete(source);
-      this.voices = Math.max(0, this.voices - 1);
+  private trackVoice(voice: VoiceRecord, lifetimeSource: AudioScheduledSourceNode): void {
+    this.activeVoices.add(voice);
+    lifetimeSource.addEventListener('ended', () => {
+      if (!this.activeVoices.delete(voice)) return;
+      for (const source of voice.sources) source.disconnect();
+      voice.gain.disconnect();
+      voice.filter.disconnect();
+      voice.pan.disconnect();
     }, { once: true });
+  }
+
+  private stopVoice(voice: VoiceRecord): void {
+    if (!this.activeVoices.delete(voice)) return;
+    for (const source of voice.sources) stopQuietly(source);
+    voice.gain.disconnect();
+    voice.filter.disconnect();
+    voice.pan.disconnect();
   }
 
   private startAmbience(seed: number): void {
@@ -155,12 +182,15 @@ function createNoiseBuffer(context: AudioContext, seed: number): AudioBuffer {
 }
 
 function oscillatorType(kind: AudioCue['kind']): OscillatorType {
+  if (kind === 'chord-impact' || kind === 'chord-launch') return 'sine';
   if (kind === 'energy-shot' || kind === 'intercept' || kind === 'capture') return 'sine';
   if (kind === 'completion' || kind === 'warning') return 'triangle';
   return 'sawtooth';
 }
 
 function pitchDrop(kind: AudioCue['kind']): number {
+  if (kind === 'chord-launch') return 0.18;
+  if (kind === 'chord-impact') return 0.08;
   if (kind === 'energy-shot' || kind === 'intercept') return 1.8;
   if (kind === 'completion' || kind === 'capture') return 1.25;
   return 0.35;
@@ -168,11 +198,12 @@ function pitchDrop(kind: AudioCue['kind']): number {
 
 function usesNoise(kind: AudioCue['kind']): boolean {
   return kind === 'kinetic-shot' || kind === 'ballistic-launch' || kind === 'impact' ||
-    kind === 'destruction' || kind === 'footfall';
+    kind === 'destruction' || kind === 'footfall' || kind === 'chord-launch' || kind === 'chord-impact';
 }
 
 function noiseRate(kind: AudioCue['kind']): number {
-  return kind === 'destruction' ? 0.42 : kind === 'impact' ? 0.7 : kind === 'ballistic-launch' ? 0.55 : 1.1;
+  return kind === 'chord-impact' ? 0.22 : kind === 'chord-launch' ? 0.32 :
+    kind === 'destruction' ? 0.42 : kind === 'impact' ? 0.7 : kind === 'ballistic-launch' ? 0.55 : 1.1;
 }
 
 function stopQuietly(source: AudioScheduledSourceNode): void {

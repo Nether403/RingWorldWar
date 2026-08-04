@@ -230,6 +230,39 @@ describe('EntityRenderer quality materials', () => {
     expect(compact.geometry).not.toBe(choir.geometry);
     expect(choir.geometry).not.toBe(neutral.geometry);
   });
+
+  it('derives a bounded wreck fall and settle from authoritative wreck lifetime', () => {
+    const terrain = {
+      heightAt: (s: number, z: number) => s * 0.08 + z * 0.04,
+      slopeAt: () => 0,
+      isBuildable: () => true,
+    } as unknown as Terrain;
+    const world = new World(terrain, 57);
+    const unit = world.spawnUnit(Faction.Compact, 'vanguard', 0, 0);
+    world.applyDamage(unit.id, 100_000, 'explosive', Faction.Choir);
+    const wreck = world.wreckages[0]!;
+    const renderer = new EntityRenderer(57);
+    const exact = renderer as unknown as { wreckMeshes: Map<string, THREE.InstancedMesh> };
+    const mesh = exact.wreckMeshes.get('vanguard')!;
+    const anchor = new RenderAnchor();
+    const upright = new THREE.Matrix4();
+    const fallen = new THREE.Matrix4();
+    const beforeHash = world.stateHash();
+
+    renderer.update(world, anchor, 0, Faction.Compact, 1);
+    mesh.getMatrixAt(0, upright);
+    const uprightAxis = new THREE.Vector3(upright.elements[4], upright.elements[5], upright.elements[6]).normalize();
+    expect(uprightAxis.x).toBeLessThan(0);
+    expect(uprightAxis.y).toBeGreaterThan(0.99);
+    wreck.lifetime -= 2;
+    const changedHash = world.stateHash();
+    renderer.update(world, anchor, 2, Faction.Compact, 1);
+    mesh.getMatrixAt(0, fallen);
+
+    expect(fallen.elements).not.toEqual(upright.elements);
+    expect(beforeHash).not.toBe(changedHash);
+    expect(world.stateHash()).toBe(changedHash);
+  });
 });
 
 function mechScene(): { renderer: EntityRenderer; world: World; anchor: RenderAnchor } {

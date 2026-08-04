@@ -14,6 +14,14 @@ const STRUCTURES = new Set([
   'rocketBattery', 'pointDefense', 'laserGrid', 'radarMast', 'silo', 'spinalNode',
 ]);
 const REGION_KINDS = new Set(['sky', 'ground', 'unit', 'ui']);
+const SCENARIO_ACTIONS = new Set(['apply-damage', 'fire-ballistic']);
+const DAMAGE_TYPES = new Set(['kinetic', 'explosive', 'energy']);
+const BALLISTIC_WEAPONS = new Set(['siegeMortar', 'batteryGun', 'cruiseMissile', 'chordShot']);
+const BALLISTIC_SOURCE_WEAPONS = {
+  longbow: new Set(['siegeMortar']),
+  rocketBattery: new Set(['batteryGun', 'cruiseMissile']),
+  silo: new Set(['chordShot']),
+};
 
 export function resolveScenarioPath(cwd, value) {
   if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value)) {
@@ -32,6 +40,7 @@ export function parseScenario(input) {
   exactKeys(input, [
     'schema', 'version', 'id', 'revision', 'worldSeed', 'quality', 'viewport', 'simulation',
     'camera', 'setup', 'mission', 'observationRegions', 'benchmark', 'invariants', 'expectedVisual',
+    'actions',
   ], 'scenario');
   if (input.schema !== SCENARIO_SCHEMA) fail('schema', `must be ${SCENARIO_SCHEMA}`);
   if (input.version !== SCENARIO_VERSION) fail('version', `must be ${SCENARIO_VERSION}`);
@@ -117,6 +126,7 @@ export function parseScenario(input) {
         nonNegativeNumber(cooldown, `${path}.weaponCooldowns[${cooldownIndex}]`));
     }
   });
+
   input.setup.structures.forEach((structure, index) => {
     const path = `setup.structures[${index}]`;
     record(structure, path);
@@ -133,6 +143,40 @@ export function parseScenario(input) {
   input.setup.units.forEach((unit, index) => {
     if (unit.target !== undefined && !ids.has(unit.target)) fail(`setup.units[${index}].target`, 'must reference a setup id');
   });
+
+  if (input.actions !== undefined) {
+    array(input.actions, 'actions');
+    if (input.actions.length > 32) fail('actions', 'must contain at most 32 entries');
+    input.actions.forEach((action, index) => {
+      const path = `actions[${index}]`;
+      record(action, path);
+      member(action.kind, SCENARIO_ACTIONS, `${path}.kind`);
+      nonNegativeInteger(action.tick, `${path}.tick`);
+      if (action.tick >= input.simulation.targetTick) fail(`${path}.tick`, 'must be before simulation.targetTick');
+      if (action.kind === 'apply-damage') {
+        exactKeys(action, ['tick', 'kind', 'target', 'amount', 'damageType', 'sourceFaction'], path);
+        safeId(action.target, `${path}.target`);
+        requireSetupIds([action.target], ids, `${path}.target`);
+        boundedNumber(action.amount, Number.EPSILON, 1_000_000, `${path}.amount`);
+        member(action.damageType, DAMAGE_TYPES, `${path}.damageType`);
+        member(action.sourceFaction, FACTIONS, `${path}.sourceFaction`);
+      } else {
+        exactKeys(action, ['tick', 'kind', 'source', 'weapon', 'targetS', 'targetZ'], path);
+        safeId(action.source, `${path}.source`);
+        requireSetupIds([action.source], ids, `${path}.source`);
+        member(action.weapon, BALLISTIC_WEAPONS, `${path}.weapon`);
+        const source = input.setup.units.find((candidate) => candidate.id === action.source) ??
+          input.setup.structures.find((candidate) => candidate.id === action.source);
+        if (!source || source.faction === 'neutral' ||
+            source.progress !== undefined && source.progress !== 1 ||
+            !BALLISTIC_SOURCE_WEAPONS[source.kind]?.has(action.weapon)) {
+          fail(`${path}.source`, 'must reference a completed faction source that owns the selected ballistic weapon');
+        }
+        finiteNumber(action.targetS, `${path}.targetS`);
+        finiteNumber(action.targetZ, `${path}.targetZ`);
+      }
+    });
+  }
 
   if (input.mission !== undefined) {
     record(input.mission, 'mission');
@@ -367,6 +411,7 @@ function exactKeys(value, allowed, path) {
       'expectedVisual', 'yawRadians', 'target', 'maximumContextLosses', 'selected',
       'abilityActive', 'abilityTransitionTimer', 'weaponCooldowns',
       'targetMode', 'disableAi', 'player', 'mission', 'commandCap', 'healthFraction',
+      'actions',
     ].includes(key) && !(key in value)) {
       fail(`${path}.${key}`, 'is required');
     }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { RING_CIRCUMFERENCE } from '@core/constants';
 import { Faction } from '@sim/data';
 import type { SimEvent, World } from '@sim/world';
-import { isPresentationEventEligible } from '../../src/render/presentationEvents';
+import { combatPresentationKind, isPresentationEventEligible } from '../../src/render/presentationEvents';
 
 describe('presentation event eligibility', () => {
   it('keeps friendly and visible hostile events while hiding unseen hostile events', () => {
@@ -48,6 +48,15 @@ describe('presentation event eligibility', () => {
       0,
       Faction.Compact,
     )).toBe(false);
+  });
+
+  it('classifies Chord presentation without changing simulation event kinds', () => {
+    expect(combatPresentationKind({ ...event(Faction.Compact, 1, 0, 0), kind: 'weaponFired', weapon: 'chordShot' }))
+      .toBe('chordLaunch');
+    expect(combatPresentationKind({ ...event(Faction.Compact, 2, 0, 0), weapon: 'chordShot' }))
+      .toBe('chordImpact');
+    expect(combatPresentationKind({ ...event(Faction.Compact, 3, 0, 0), weapon: 'batteryGun' }))
+      .toBe('impact');
   });
 });
 

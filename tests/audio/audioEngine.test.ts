@@ -107,6 +107,20 @@ describe('ProceduralAudio', () => {
     expect(backend.cues).toHaveLength(12);
     expect(backend.cues.some((cue) => cue.kind === 'destruction')).toBe(true);
   });
+
+  it('gives Chord launch and strike unique highest-priority cues', async () => {
+    const backend = new RecordingBackend();
+    const audio = new ProceduralAudio(32, () => backend);
+    await audio.resumeFromGesture();
+    audio.consume([
+      event('weaponFired', Faction.Compact, { id: 200, weapon: 'chordShot', scale: 4 }),
+      event('impact', Faction.Compact, { id: 201, weapon: 'chordShot', scale: 4.2 }),
+      event('impact', Faction.Compact, { id: 202, weapon: 'chordShot', scale: 0.6 }),
+    ], frame());
+
+    expect(backend.cues.map((cue) => cue.kind)).toEqual(['chord-impact', 'chord-launch']);
+    expect(backend.cues[0]!.durationSeconds).toBeGreaterThan(backend.cues[1]!.durationSeconds);
+  });
 });
 
 class RecordingBackend implements AudioBackend {

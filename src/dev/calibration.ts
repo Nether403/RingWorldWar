@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildMech, makeHullMaterial, type MechRig } from '@gen/models';
 import { RenderAnchor } from '@render/anchor';
 import { Environment } from '@render/environment';
-import { Renderer, type QualityLevel } from '@render/renderer';
+import { BASE_EXPOSURE, Renderer, type QualityLevel } from '@render/renderer';
 import { isQualityLevel } from '@render/settings';
 
 const CALIBRATION_TIME = 66;
@@ -82,7 +82,7 @@ export function startCalibration(container: HTMLElement): void {
     quality,
     toneMapping: 'ACESFilmic',
     outputColorSpace: 'srgb',
-    exposure: renderer.gl.toneMappingExposure,
+    exposure: BASE_EXPOSURE,
   };
   (window as unknown as { RWWCalibration: unknown }).RWWCalibration = {
     ready: true,

@@ -14,18 +14,22 @@
 
 import * as THREE from 'three';
 import { RING_CIRCUMFERENCE, RING_RADIUS } from '@core/constants';
-import { deltaS, surfaceDist } from '@core/ringMath';
+import { deltaS, surfaceDist, wrapS } from '@core/ringMath';
 import { Rng } from '@core/rng';
 import { FACTION_COLOR, Faction, WEAPONS } from '@sim/data';
 import type { SimEvent, World } from '@sim/world';
 import type { RenderAnchor } from './anchor';
-import { isPresentationEventEligible, isPresentationEventInRange } from './presentationEvents';
+import { combatPresentationKind, isPresentationEventEligible, isPresentationEventInRange } from './presentationEvents';
 
 const MAX_TRAIL_POINTS = 90;
 const MAX_TRAILS = 96;
 const TRAIL_LIFE = 11;
 const MAX_LIGHTS = 14;
 const MAX_PUFFS = 900;
+const MAX_SCARS = 96;
+const MAX_DEBRIS = 256;
+const MAX_SMOKE_EMITTERS = 32;
+const SCAR_SEGMENTS = 12;
 
 interface Trail {
   active: boolean;
@@ -40,6 +44,47 @@ interface Trail {
   color: THREE.Color;
   life: number;
   width: number;
+  chord: boolean;
+  maxLife: number;
+}
+
+interface Scar {
+  active: boolean;
+  s: number;
+  z: number;
+  radius: number;
+  yaw: number;
+  age: number;
+  life: number;
+  priority: number;
+  color: number;
+}
+
+interface DebrisShard {
+  active: boolean;
+  s: number;
+  z: number;
+  h: number;
+  vs: number;
+  vz: number;
+  vh: number;
+  yaw: number;
+  spin: number;
+  scale: number;
+  age: number;
+  life: number;
+  priority: number;
+}
+
+interface SmokeEmitter {
+  active: boolean;
+  s: number;
+  z: number;
+  scale: number;
+  age: number;
+  life: number;
+  nextEmission: number;
+  priority: number;
 }
 
 export class Effects {
@@ -66,6 +111,20 @@ export class Effects {
   private lightLife: number[] = [];
   private lightPriority: number[] = [];
 
+  private readonly scars: Scar[] = [];
+  private readonly scarMesh: THREE.Mesh;
+  private readonly scarPos: Float32Array;
+  private readonly scarColor: Float32Array;
+  private readonly scarAlpha: Float32Array;
+  private scarCap = MAX_SCARS;
+
+  private readonly debris: DebrisShard[] = [];
+  private readonly debrisMesh: THREE.InstancedMesh;
+  private debrisCap = MAX_DEBRIS;
+
+  private readonly smokeEmitters: SmokeEmitter[] = [];
+  private smokeEmitterCap = MAX_SMOKE_EMITTERS;
+
   private rng: Rng;
   private dustRng: Rng;
   /** Peak brightness this frame, so the renderer can push bloom on big hits. */
@@ -76,6 +135,12 @@ export class Effects {
   viewportHeight = 800;
 
   private readonly _v = new THREE.Vector3();
+  private readonly _q = new THREE.Quaternion();
+  private readonly _m = new THREE.Matrix4();
+  private readonly _scale = new THREE.Vector3();
+  private readonly _color = new THREE.Color();
+  private readonly _up = new THREE.Vector3();
+  private readonly _tangent = new THREE.Vector3();
 
   constructor(seed: number) {
     this.object.name = 'effects';
@@ -115,6 +180,8 @@ export class Effects {
         color: new THREE.Color(),
         life: 0,
         width: 1,
+        chord: false,
+        maxLife: TRAIL_LIFE,
       });
     }
 
@@ -206,6 +273,78 @@ export class Effects {
     this.puffs.frustumCulled = false;
     this.object.add(this.puffs);
 
+    // --- Terrain-conforming scars -------------------------------------------
+    const scarVertices = MAX_SCARS * SCAR_SEGMENTS * 3;
+    this.scarPos = new Float32Array(scarVertices * 3);
+    this.scarColor = new Float32Array(scarVertices * 3);
+    this.scarAlpha = new Float32Array(scarVertices);
+    const scarGeometry = new THREE.BufferGeometry();
+    scarGeometry.setAttribute('position', new THREE.BufferAttribute(this.scarPos, 3).setUsage(THREE.DynamicDrawUsage));
+    scarGeometry.setAttribute('color', new THREE.BufferAttribute(this.scarColor, 3).setUsage(THREE.DynamicDrawUsage));
+    scarGeometry.setAttribute('aAlpha', new THREE.BufferAttribute(this.scarAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+    scarGeometry.setDrawRange(0, 0);
+    this.scarMesh = new THREE.Mesh(scarGeometry, new THREE.ShaderMaterial({
+      uniforms: THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+      vertexColors: true,
+      vertexShader: /* glsl */ `
+        attribute float aAlpha;
+        varying vec3 vColor;
+        varying float vAlpha;
+        #include <fog_pars_vertex>
+        void main() {
+          vColor = color;
+          vAlpha = aAlpha;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        varying vec3 vColor;
+        varying float vAlpha;
+        #include <fog_pars_fragment>
+        void main() {
+          if (vAlpha <= 0.001) discard;
+          gl_FragColor = vec4(vColor, vAlpha);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          #include <fog_fragment>
+        }
+      `,
+      fog: true,
+    }));
+    this.scarMesh.name = 'effects:scars';
+    this.scarMesh.frustumCulled = false;
+    this.object.add(this.scarMesh);
+    for (let index = 0; index < MAX_SCARS; index++) {
+      this.scars.push({ active: false, s: 0, z: 0, radius: 0, yaw: 0, age: 0, life: 0, priority: 0, color: 0 });
+    }
+
+    // --- Cosmetic debris ----------------------------------------------------
+    this.debrisMesh = new THREE.InstancedMesh(
+      new THREE.TetrahedronGeometry(0.8, 0),
+      new THREE.MeshStandardMaterial({ color: 0x292b2c, roughness: 0.86, metalness: 0.48 }),
+      MAX_DEBRIS,
+    );
+    this.debrisMesh.name = 'effects:debris';
+    this.debrisMesh.count = 0;
+    this.debrisMesh.castShadow = false;
+    this.debrisMesh.receiveShadow = false;
+    this.debrisMesh.frustumCulled = false;
+    this.debrisMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.object.add(this.debrisMesh);
+    for (let index = 0; index < MAX_DEBRIS; index++) {
+      this.debris.push({ active: false, s: 0, z: 0, h: 0, vs: 0, vz: 0, vh: 0, yaw: 0, spin: 0, scale: 1, age: 0, life: 0, priority: 0 });
+    }
+    for (let index = 0; index < MAX_SMOKE_EMITTERS; index++) {
+      this.smokeEmitters.push({ active: false, s: 0, z: 0, scale: 1, age: 0, life: 0, nextEmission: 0, priority: 0 });
+    }
+
     // --- Pooled lights ---------------------------------------------------------
     // Quality changes may alter the visible pool size, but individual effects
     // only change intensity. This keeps shader variants stable during combat.
@@ -249,6 +388,26 @@ export class Effects {
     }
   }
 
+  setAftermathCaps(scarCap: number, debrisCap: number, smokeEmitterCap: number): void {
+    this.scars.sort((a, b) => Number(b.active) - Number(a.active) || b.priority - a.priority || a.age - b.age);
+    this.debris.sort((a, b) => Number(b.active) - Number(a.active) || b.priority - a.priority || a.age - b.age);
+    this.smokeEmitters.sort((a, b) => Number(b.active) - Number(a.active) || b.priority - a.priority || a.age - b.age);
+    this.scarCap = Math.max(0, Math.min(MAX_SCARS, Math.floor(scarCap)));
+    this.debrisCap = Math.max(0, Math.min(MAX_DEBRIS, Math.floor(debrisCap)));
+    this.smokeEmitterCap = Math.max(0, Math.min(MAX_SMOKE_EMITTERS, Math.floor(smokeEmitterCap)));
+    for (let index = this.scarCap; index < MAX_SCARS; index++) this.scars[index]!.active = false;
+    for (let index = this.debrisCap; index < MAX_DEBRIS; index++) this.debris[index]!.active = false;
+    for (let index = this.smokeEmitterCap; index < MAX_SMOKE_EMITTERS; index++) this.smokeEmitters[index]!.active = false;
+  }
+
+  get aftermathMetrics(): { scars: number; debris: number; smokeEmitters: number } {
+    return {
+      scars: this.scars.slice(0, this.scarCap).filter((item) => item.active).length,
+      debris: this.debris.slice(0, this.debrisCap).filter((item) => item.active).length,
+      smokeEmitters: this.smokeEmitters.slice(0, this.smokeEmitterCap).filter((item) => item.active).length,
+    };
+  }
+
   // -------------------------------------------------------------------------
 
   /** Handle a batch of simulation events. */
@@ -262,42 +421,88 @@ export class Effects {
     visibilityPrevalidated = false,
   ): void {
     this.shake = 0;
-    for (const e of events) {
-      const eligible = visibilityPrevalidated
-        ? isPresentationEventInRange(e, anchor.s)
-        : isPresentationEventEligible(e, world, anchor.s, viewer);
-      if (!eligible) continue;
+    const eligibleEvents = events.filter((event) => visibilityPrevalidated
+      ? isPresentationEventInRange(event, anchor.s)
+      : isPresentationEventEligible(event, world, anchor.s, viewer));
+    const deathEvents = eligibleEvents.filter((event) => event.kind === 'unitDied' || event.kind === 'structureDied');
+    const recentImpacts = eligibleEvents
+      .filter((event) => event.kind === 'impact' && !(event.weapon === 'chordShot' && event.scale <= 0.7))
+      .map((event) => ({ s: event.s, z: event.z, scale: event.scale, strategic: event.weapon === 'chordShot' }));
+    for (const e of eligibleEvents) {
       anchor.toVector(e.s, e.h, e.z, this._v);
+      anchor.upAt(e.s, this._up);
       const shakeAttenuation = distanceAttenuation(surfaceDist(listenerS, listenerZ, e.s, e.z), 700);
+
+      const presentationKind = combatPresentationKind(e);
+      if (presentationKind === 'chordLaunch') {
+        this.spawnBurst(this._v, 42, 2.4, 0xfff4d7, 1, 5.5, this.rng, this._up);
+        this.spawnBurst(this._v, 24, 4.5, 0x4e4a45, 0, 7.5, this.rng, this._up);
+        this.addLight(this._v, 0xfff4d7, 1_800, 0.45, 4);
+        this.flash = Math.max(this.flash, 1.2);
+        continue;
+      }
+      if (presentationKind === 'chordImpact') {
+        // Intercept cleanup emits a small follow-up impact for the same weapon.
+        if (e.scale <= 0.7) continue;
+        this.addScar(e, 5, 0x171513, 75);
+        this.spawnDebris(e, 18, 5);
+        this.addSmokeEmitter(e, 5, 44);
+        this.explosion(this._v, Math.max(5.2, e.scale), true, shakeAttenuation, this._up);
+        this.addLight(this._v, 0xffffff, 2_600, 0.7, 5);
+        this.flash = Math.max(this.flash, 1.8);
+        continue;
+      }
 
       switch (e.kind) {
         case 'weaponFired': {
           const w = e.weapon ? WEAPONS[e.weapon] : undefined;
           const col = e.faction >= 0 ? FACTION_COLOR[e.faction as Faction] : 0xffffff;
           // Radii below are METRES. A muzzle flash is about a metre across.
-          this.spawnBurst(this._v, 9 * e.scale, 0.22, col, 1, 0.9 * e.scale);
+          this.spawnBurst(this._v, 9 * e.scale, 0.22, col, 1, 0.9 * e.scale, this.rng, this._up);
           this.addLight(this._v, col, 45 * e.scale, 0.07, 0);
           if (w?.kind === 'ballistic') {
-            this.spawnBurst(this._v, 14 * e.scale, 1.8, 0x6b6055, 0, 1.8 * e.scale);
+            this.spawnBurst(this._v, 14 * e.scale, 1.8, 0x6b6055, 0, 1.8 * e.scale, this.rng, this._up);
           }
           break;
         }
         case 'impact': {
           const big = e.scale > 1.4;
-          this.explosion(this._v, e.scale, big, shakeAttenuation);
+          const ownedByDeath = deathEvents.some((death) =>
+            surfaceDist(death.s, death.z, e.s, e.z) <= 8 + e.scale * 4);
+          if (ownedByDeath) break;
+          const explosive = e.weapon ? WEAPONS[e.weapon]?.damageType === 'explosive' : false;
+          this.addScar(e, big ? 2 : 1, explosive ? 0x221d18 : 0x292827, big ? 65 : 42);
+          if (explosive || big) this.spawnDebris(e, Math.min(10, 3 + Math.ceil(e.scale * 2)), big ? 2 : 1);
+          if (big) this.addSmokeEmitter(e, 2, 18 + e.scale * 3);
+          this.explosion(this._v, e.scale, big, shakeAttenuation, this._up);
           break;
         }
         case 'unitDied': {
-          this.explosion(this._v, Math.max(1.2, e.scale), true, shakeAttenuation);
+          const covered = recentImpacts.some((impact) => impact.strategic &&
+            surfaceDist(impact.s, impact.z, e.s, e.z) <= 8 + impact.scale * 4);
+          if (!covered) {
+            this.addScar(e, 3, 0x211b17, 72);
+            this.spawnDebris(e, Math.min(12, 5 + Math.ceil(e.scale * 3)), 3);
+            this.addSmokeEmitter(e, 3, 24);
+            this.explosion(this._v, Math.max(1.2, e.scale), true, shakeAttenuation, this._up);
+          }
           break;
         }
         case 'structureDied': {
-          this.explosion(this._v, Math.max(2.2, e.scale), true, shakeAttenuation);
+          const priority = e.scale >= 5 ? 5 : 4;
+          const covered = recentImpacts.some((impact) => impact.strategic &&
+            surfaceDist(impact.s, impact.z, e.s, e.z) <= 10 + impact.scale * 4);
+          if (!covered) {
+            this.addScar(e, priority, 0x171513, e.scale >= 5 ? 95 : 82);
+            this.spawnDebris(e, Math.min(18, 8 + Math.ceil(e.scale * 2)), priority);
+            this.addSmokeEmitter(e, priority, e.scale >= 5 ? 42 : 32);
+            this.explosion(this._v, Math.max(2.2, e.scale), true, shakeAttenuation, this._up);
+          }
           this.shake = Math.max(this.shake, Math.min(9, e.scale * 1.7) * shakeAttenuation);
           break;
         }
         case 'intercepted': {
-          this.spawnBurst(this._v, 18, 0.45, 0x9fe8ff, 1, 1.3);
+          this.spawnBurst(this._v, 18, 0.45, 0x9fe8ff, 1, 1.3, this.rng, this._up);
           this.addLight(this._v, 0x9fe8ff, 120, 0.12, 1);
           break;
         }
@@ -310,12 +515,94 @@ export class Effects {
 
   footfall(event: SimEvent, anchor: RenderAnchor, listenerS: number, listenerZ: number): void {
     anchor.toVector(event.s, event.h, event.z, this._v);
-    this.spawnBurst(this._v, 2.5 * event.scale, 0.8, 0x8f7960, 3, 0.65 * event.scale, this.dustRng);
+    anchor.upAt(event.s, this._up);
+    this.spawnBurst(this._v, 2.5 * event.scale, 0.8, 0x8f7960, 3, 0.65 * event.scale, this.dustRng, this._up);
     const attenuation = distanceAttenuation(surfaceDist(listenerS, listenerZ, event.s, event.z), 130);
     this.shake = Math.max(this.shake, event.scale * 0.18 * attenuation);
   }
 
-  private explosion(pos: THREE.Vector3, scale: number, big: boolean, shakeAttenuation: number): void {
+  private addScar(event: SimEvent, priority: number, color: number, life: number): void {
+    if (this.scarCap <= 0) return;
+    let slot = -1;
+    for (let index = 0; index < this.scarCap; index++) {
+      const scar = this.scars[index]!;
+      if (!scar.active) { slot = index; break; }
+      if (slot < 0 || scar.priority < this.scars[slot]!.priority ||
+          scar.priority === this.scars[slot]!.priority && scar.age > this.scars[slot]!.age) slot = index;
+    }
+    if (slot < 0 || this.scars[slot]!.active && this.scars[slot]!.priority > priority) return;
+    const scar = this.scars[slot]!;
+    scar.active = true;
+    scar.s = event.s;
+    scar.z = event.z;
+    scar.radius = Math.max(2.5, 3.5 + event.scale * 5.5);
+    scar.yaw = hashUnit(event.id, priority) * Math.PI * 2;
+    scar.age = 0;
+    scar.life = life;
+    scar.priority = priority;
+    scar.color = color;
+  }
+
+  private spawnDebris(event: SimEvent, count: number, priority: number): void {
+    if (this.debrisCap <= 0) return;
+    let created = 0;
+    while (created < count) {
+      let slot = -1;
+      for (let index = 0; index < this.debrisCap; index++) {
+        const shard = this.debris[index]!;
+        if (!shard.active) { slot = index; break; }
+        if (slot < 0 || shard.priority < this.debris[slot]!.priority ||
+            shard.priority === this.debris[slot]!.priority && shard.age > this.debris[slot]!.age) slot = index;
+      }
+      if (slot < 0 || this.debris[slot]!.active && this.debris[slot]!.priority > priority) break;
+      const shard = this.debris[slot]!;
+      const phase = hashUnit(event.id, created + 31) * Math.PI * 2;
+      const speed = 5 + event.scale * (4 + hashUnit(event.id, created + 71) * 5);
+      shard.active = true;
+      shard.s = event.s;
+      shard.z = event.z;
+      shard.h = Math.max(0.5, event.h + event.scale * 0.7);
+      shard.vs = Math.cos(phase) * speed;
+      shard.vz = Math.sin(phase) * speed;
+      shard.vh = 6 + event.scale * 4 + hashUnit(event.id, created + 101) * 8;
+      shard.yaw = phase;
+      shard.spin = (hashUnit(event.id, created + 131) * 2 - 1) * 7;
+      shard.scale = 0.35 + hashUnit(event.id, created + 151) * Math.min(2.2, 0.5 + event.scale * 0.35);
+      shard.age = 0;
+      shard.life = 2.2 + hashUnit(event.id, created + 181) * 2.2;
+      shard.priority = priority;
+      created++;
+    }
+  }
+
+  private addSmokeEmitter(event: SimEvent, priority: number, life: number): void {
+    if (this.smokeEmitterCap <= 0) return;
+    let slot = -1;
+    for (let index = 0; index < this.smokeEmitterCap; index++) {
+      const emitter = this.smokeEmitters[index]!;
+      if (!emitter.active) { slot = index; break; }
+      if (slot < 0 || emitter.priority < this.smokeEmitters[slot]!.priority ||
+          emitter.priority === this.smokeEmitters[slot]!.priority && emitter.age > this.smokeEmitters[slot]!.age) slot = index;
+    }
+    if (slot < 0 || this.smokeEmitters[slot]!.active && this.smokeEmitters[slot]!.priority > priority) return;
+    const emitter = this.smokeEmitters[slot]!;
+    emitter.active = true;
+    emitter.s = event.s;
+    emitter.z = event.z;
+    emitter.scale = Math.max(0.8, event.scale);
+    emitter.age = 0;
+    emitter.life = life;
+    emitter.nextEmission = 0;
+    emitter.priority = priority;
+  }
+
+  private explosion(
+    pos: THREE.Vector3,
+    scale: number,
+    big: boolean,
+    shakeAttenuation: number,
+    up: THREE.Vector3,
+  ): void {
     // Blast radius in metres. A small shell is a couple of metres across; a
     // fusion core going up is thirty.
     const r = 2.2 + scale * 5.0;
@@ -323,13 +610,13 @@ export class Effects {
     // Fireball, then smoke, then sparks. Layering three populations with
     // different lifetimes is what makes a blast read as an event rather than
     // as a single puff.
-    this.spawnBurst(pos, spread * 0.6, 0.5, 0xffb347, 1, r * 0.55);
-    this.spawnBurst(pos, spread * 0.8, 2.6 + scale, 0x4a4238, 0, r * 0.85);
-    this.spawnBurst(pos, spread * 1.5, 0.9, 0xffd9a0, 1, r * 0.3);
+    this.spawnBurst(pos, spread * 0.6, 0.5, 0xffb347, 1, r * 0.55, this.rng, up);
+    this.spawnBurst(pos, spread * 0.8, 2.6 + scale, 0x4a4238, 0, r * 0.85, this.rng, up);
+    this.spawnBurst(pos, spread * 1.5, 0.9, 0xffd9a0, 1, r * 0.3, this.rng, up);
     if (big) {
-      this.spawnBurst(pos, spread * 0.4, 6 + scale * 2, 0x2e2a26, 0, r * 1.3);
+      this.spawnBurst(pos, spread * 0.4, 6 + scale * 2, 0x2e2a26, 0, r * 1.3, this.rng, up);
     }
-    this.spawnParticle(pos, 0, 0.7 + scale * 0.08, 0xe8c7a1, 2, r * 1.8);
+    this.spawnParticle(pos, up, 0, 0.7 + scale * 0.08, 0xe8c7a1, 2, r * 1.8);
     // The flash itself: brief, bright, and physically a real light so that
     // nearby geometry is genuinely lit by the blast.
     this.addLight(pos, 0xffb066, 240 + scale * 340, 0.16 + scale * 0.05, big ? 3 : 2);
@@ -366,9 +653,10 @@ export class Effects {
     kind: number,
     size: number,
     rng = this.rng,
+    up = WORLD_UP,
   ): void {
     const n = Math.min(26, 7 + Math.floor(size * 2.2));
-    const c = new THREE.Color(color);
+    const c = this._color.setHex(color);
     for (let i = 0; i < n; i++) {
       const idx = this.puffHead;
       this.puffHead = (this.puffHead + 1) % this.particleCap;
@@ -377,13 +665,14 @@ export class Effects {
       this.puffPos[idx * 3 + 1] = pos.y;
       this.puffPos[idx * 3 + 2] = pos.z;
 
-      // Random direction, biased upward relative to the local frame.
+      // Random direction in the event's local tangent frame, biased upward.
       const a = rng.range(0, Math.PI * 2);
       const e = rng.range(-0.3, 1.0);
       const sp = speed * rng.range(0.35, 1.0);
-      this.puffVel[idx * 3] = Math.cos(a) * sp;
-      this.puffVel[idx * 3 + 1] = e * sp;
-      this.puffVel[idx * 3 + 2] = Math.sin(a) * sp;
+      this._tangent.crossVectors(AXIAL, up).normalize();
+      this.puffVel[idx * 3] = (this._tangent.x * Math.cos(a) + AXIAL.x * Math.sin(a) + up.x * e) * sp;
+      this.puffVel[idx * 3 + 1] = (this._tangent.y * Math.cos(a) + AXIAL.y * Math.sin(a) + up.y * e) * sp;
+      this.puffVel[idx * 3 + 2] = (this._tangent.z * Math.cos(a) + AXIAL.z * Math.sin(a) + up.z * e) * sp;
 
       this.puffData[idx * 4] = 0;
       this.puffData[idx * 4 + 1] = life * rng.range(0.7, 1.3);
@@ -399,6 +688,7 @@ export class Effects {
 
   private spawnParticle(
     pos: THREE.Vector3,
+    up: THREE.Vector3,
     speed: number,
     life: number,
     color: number,
@@ -410,14 +700,14 @@ export class Effects {
     this.puffPos[idx * 3] = pos.x;
     this.puffPos[idx * 3 + 1] = pos.y;
     this.puffPos[idx * 3 + 2] = pos.z;
-    this.puffVel[idx * 3] = 0;
-    this.puffVel[idx * 3 + 1] = speed;
-    this.puffVel[idx * 3 + 2] = 0;
+    this.puffVel[idx * 3] = up.x * speed;
+    this.puffVel[idx * 3 + 1] = up.y * speed;
+    this.puffVel[idx * 3 + 2] = up.z * speed;
     this.puffData[idx * 4] = 0;
     this.puffData[idx * 4 + 1] = life;
     this.puffData[idx * 4 + 2] = size;
     this.puffData[idx * 4 + 3] = kind;
-    const c = new THREE.Color(color);
+    const c = this._color.setHex(color);
     this.puffColor[idx * 3] = c.r;
     this.puffColor[idx * 3 + 1] = c.g;
     this.puffColor[idx * 3 + 2] = c.b;
@@ -442,6 +732,9 @@ export class Effects {
 
     this.updateTrails(dt, world, anchor, viewer);
     this.updateTracers(world, anchor, viewer);
+    this.updateScars(dt, world, anchor);
+    this.updateDebris(dt, world, anchor);
+    this.updateSmokeEmitters(dt, world, anchor);
     this.updateParticles(dt);
 
     for (let i = 0; i < this.lights.length; i++) {
@@ -470,9 +763,11 @@ export class Effects {
         t.projectileId = pr.id;
         t.count = 0;
         t.head = 0;
-        t.life = TRAIL_LIFE;
-        t.width = 1;
-        t.color.setHex(FACTION_COLOR[pr.faction]);
+        t.chord = pr.flightMode === 'chord';
+        t.maxLife = t.chord ? 18 : TRAIL_LIFE;
+        t.life = t.maxLife;
+        t.width = t.chord ? 2.4 : 1;
+        t.color.setHex(t.chord ? 0xfff3dc : FACTION_COLOR[pr.faction]);
       }
       // Append a sample.
       if (t.count > 0) {
@@ -480,7 +775,7 @@ export class Effects {
         const moved = Math.abs(deltaS(t.s[previous]!, pr.p.s)) +
           Math.abs(t.h[previous]! - pr.p.h) + Math.abs(t.z[previous]! - pr.p.z);
         if (moved < 0.04) {
-          t.life = TRAIL_LIFE;
+          t.life = t.maxLife;
           continue;
         }
       }
@@ -491,7 +786,7 @@ export class Effects {
       t.age[i] = 0;
       t.head = (t.head + 1) % MAX_TRAIL_POINTS;
       t.count = Math.min(t.count + 1, MAX_TRAIL_POINTS);
-      t.life = TRAIL_LIFE;
+      t.life = t.maxLife;
     }
 
     // Age out trails whose projectile is gone.
@@ -524,11 +819,12 @@ export class Effects {
         this.trailPos[v + 5] = this._v.z;
 
         // Fade along the trail's own age: the head is bright, the tail is smoke.
-        const a = Math.max(0, 1 - t.age[i0]! / TRAIL_LIFE);
+        const a = Math.max(0, 1 - t.age[i0]! / t.maxLife);
         const bright = a * a;
-        const r = t.color.r * bright + 0.20 * a;
-        const g = t.color.g * bright + 0.19 * a;
-        const b = t.color.b * bright + 0.18 * a;
+        const boost = t.chord ? 1.9 : 1;
+        const r = (t.color.r * bright + 0.20 * a) * boost;
+        const g = (t.color.g * bright + 0.19 * a) * boost;
+        const b = (t.color.b * bright + 0.18 * a) * boost;
         for (let c = 0; c < 2; c++) {
           this.trailCol[v + c * 3] = r;
           this.trailCol[v + c * 3 + 1] = g;
@@ -593,11 +889,11 @@ export class Effects {
       this.puffData[i * 4] = age;
 
       const kind = this.puffData[i * 4 + 3]!;
-      // Smoke slows and drifts up; sparks fall. Gravity is approximated as
-      // local -y, which is correct wherever the camera actually is, because
-      // the render frame is anchored to it.
+      // Initial velocity is emitted in the event's local ring frame. Do not add
+      // camera-anchor Y gravity afterward: distant local up can point elsewhere.
+      // Physical falling fragments use the ring-space debris pool below.
       const drag = kind < 0.5 ? 1.6 : kind < 1.5 ? 0.6 : kind < 2.5 ? 8 : 2.4;
-      const grav = kind < 0.5 ? 1.2 : kind < 1.5 ? -9.0 : kind < 2.5 ? 0 : 0.8;
+      const grav = 0;
       const k = Math.exp(-dt * drag);
       this.puffVel[i * 3] = this.puffVel[i * 3]! * k;
       this.puffVel[i * 3 + 1] = this.puffVel[i * 3 + 1]! * k + grav * dt;
@@ -615,6 +911,127 @@ export class Effects {
     this.puffs.geometry.attributes.position!.needsUpdate = true;
     this.puffs.geometry.attributes.aData!.needsUpdate = true;
     this.puffs.geometry.attributes.color!.needsUpdate = true;
+  }
+
+  private updateScars(dt: number, world: World, anchor: RenderAnchor): void {
+    let vertex = 0;
+    for (let index = 0; index < this.scarCap; index++) {
+      const scar = this.scars[index]!;
+      if (!scar.active) continue;
+      scar.age += dt;
+      if (scar.age >= scar.life) {
+        scar.active = false;
+        continue;
+      }
+      if (Math.abs(deltaS(anchor.s, scar.s)) > RING_CIRCUMFERENCE * 0.3) continue;
+      const fadeIn = Math.min(1, scar.age * 4);
+      const fadeOut = Math.min(1, (scar.life - scar.age) / 8);
+      const alpha = Math.min(fadeIn, fadeOut) * (scar.priority >= 4 ? 0.76 : 0.58);
+      this._color.setHex(scar.color);
+      const centerH = world.terrain.heightAt(scar.s, scar.z) + 0.08;
+      for (let segment = 0; segment < SCAR_SEGMENTS; segment++) {
+        const a0 = scar.yaw + (segment / SCAR_SEGMENTS) * Math.PI * 2;
+        const a1 = scar.yaw + ((segment + 1) / SCAR_SEGMENTS) * Math.PI * 2;
+        vertex = this.writeScarVertex(vertex, anchor, scar.s, centerH, scar.z, alpha);
+        const s0 = wrapS(scar.s + Math.cos(a0) * scar.radius);
+        const z0 = scar.z + Math.sin(a0) * scar.radius * 0.78;
+        vertex = this.writeScarVertex(vertex, anchor, s0, world.terrain.heightAt(s0, z0) + 0.09, z0, alpha * 0.12);
+        const s1 = wrapS(scar.s + Math.cos(a1) * scar.radius);
+        const z1 = scar.z + Math.sin(a1) * scar.radius * 0.78;
+        vertex = this.writeScarVertex(vertex, anchor, s1, world.terrain.heightAt(s1, z1) + 0.09, z1, alpha * 0.12);
+      }
+    }
+    this.scarMesh.geometry.setDrawRange(0, vertex);
+    this.scarMesh.geometry.attributes.position!.needsUpdate = true;
+    this.scarMesh.geometry.attributes.color!.needsUpdate = true;
+    this.scarMesh.geometry.attributes.aAlpha!.needsUpdate = true;
+  }
+
+  private writeScarVertex(
+    vertex: number,
+    anchor: RenderAnchor,
+    s: number,
+    h: number,
+    z: number,
+    alpha: number,
+  ): number {
+    anchor.toVector(s, h, z, this._v);
+    const offset = vertex * 3;
+    this.scarPos[offset] = this._v.x;
+    this.scarPos[offset + 1] = this._v.y;
+    this.scarPos[offset + 2] = this._v.z;
+    this.scarColor[offset] = this._color.r;
+    this.scarColor[offset + 1] = this._color.g;
+    this.scarColor[offset + 2] = this._color.b;
+    this.scarAlpha[vertex] = alpha;
+    return vertex + 1;
+  }
+
+  private updateDebris(dt: number, world: World, anchor: RenderAnchor): void {
+    this.debrisMesh.count = 0;
+    for (let index = 0; index < this.debrisCap; index++) {
+      const shard = this.debris[index]!;
+      if (!shard.active) continue;
+      shard.age += dt;
+      if (shard.age >= shard.life) {
+        shard.active = false;
+        continue;
+      }
+      shard.s = wrapS(shard.s + shard.vs * dt);
+      shard.z += shard.vz * dt;
+      shard.h += shard.vh * dt;
+      shard.vh -= 9.8 * dt;
+      shard.vs *= Math.exp(-dt * 0.6);
+      shard.vz *= Math.exp(-dt * 0.6);
+      const ground = world.terrain.heightAt(shard.s, shard.z) + 0.2;
+      if (shard.h < ground) {
+        shard.h = ground;
+        shard.vs *= 0.35;
+        shard.vz *= 0.35;
+        shard.vh = Math.abs(shard.vh) * 0.18;
+      }
+      if (Math.abs(deltaS(anchor.s, shard.s)) > RING_CIRCUMFERENCE * 0.3) continue;
+      anchor.toVector(shard.s, shard.h, shard.z, this._v);
+      anchor.orientation(shard.s, shard.yaw + shard.spin * shard.age, this._q);
+      this._scale.setScalar(shard.scale);
+      this._m.compose(this._v, this._q, this._scale);
+      this.debrisMesh.setMatrixAt(this.debrisMesh.count++, this._m);
+    }
+    if (this.debrisMesh.count > 0) this.debrisMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private updateSmokeEmitters(dt: number, world: World, anchor: RenderAnchor): void {
+    let liveParticles = this.liveParticleCount();
+    const immediateReserve = Math.max(16, Math.floor(this.particleCap * 0.25));
+    for (let index = 0; index < this.smokeEmitterCap; index++) {
+      const emitter = this.smokeEmitters[index]!;
+      if (!emitter.active) continue;
+      emitter.age += dt;
+      emitter.nextEmission -= dt;
+      if (emitter.age >= emitter.life) {
+        emitter.active = false;
+        continue;
+      }
+      if (emitter.nextEmission > 0 || Math.abs(deltaS(anchor.s, emitter.s)) > RING_CIRCUMFERENCE * 0.3) continue;
+      if (liveParticles >= this.particleCap - immediateReserve) {
+        emitter.nextEmission = 0.2;
+        continue;
+      }
+      const ground = world.terrain.heightAt(emitter.s, emitter.z);
+      anchor.toVector(emitter.s, ground + 0.8, emitter.z, this._v);
+      anchor.upAt(emitter.s, this._up);
+      this.spawnParticle(this._v, this._up, 1.2 + emitter.scale * 0.35, 5 + emitter.scale * 0.7, 0x373432, 0, 1.4 + emitter.scale * 0.65);
+      liveParticles++;
+      emitter.nextEmission = Math.max(0.24, 0.9 / Math.sqrt(emitter.scale));
+    }
+  }
+
+  private liveParticleCount(): number {
+    let live = 0;
+    for (let index = 0; index < this.particleCap; index++) {
+      if (this.puffData[index * 4 + 1]! > 0) live++;
+    }
+    return live;
   }
 
   private copyParticle(from: number, to: number): void {
@@ -672,6 +1089,11 @@ export class Effects {
     this.trailMesh.geometry.setDrawRange(0, 0);
     this.tracerMesh.geometry.setDrawRange(0, 0);
     this.puffs.geometry.setDrawRange(0, 0);
+    this.scarMesh.geometry.setDrawRange(0, 0);
+    this.debrisMesh.count = 0;
+    for (const scar of this.scars) scar.active = false;
+    for (const shard of this.debris) shard.active = false;
+    for (const emitter of this.smokeEmitters) emitter.active = false;
     for (let i = 0; i < this.lights.length; i++) {
       this.lights[i]!.intensity = 0;
       this.lightLife[i] = 0;
@@ -682,6 +1104,15 @@ export class Effects {
     this.puffs.geometry.attributes.aData!.needsUpdate = true;
   }
 
+  dispose(): void {
+    for (const object of [this.trailMesh, this.tracerMesh, this.puffs, this.scarMesh, this.debrisMesh]) {
+      const renderable = object as THREE.LineSegments | THREE.Points | THREE.Mesh | THREE.InstancedMesh;
+      renderable.geometry.dispose();
+      const materials = Array.isArray(renderable.material) ? renderable.material : [renderable.material];
+      for (const material of materials) material.dispose();
+    }
+  }
+
 }
 
 const TRACER_COLOR: Record<number, [number, number, number]> = {
@@ -689,7 +1120,18 @@ const TRACER_COLOR: Record<number, [number, number, number]> = {
   [Faction.Choir]: [0.6, 2.4, 3.0],
 };
 
+const AXIAL = new THREE.Vector3(0, 0, 1);
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+
 function distanceAttenuation(distance: number, range: number): number {
   const ratio = distance / range;
   return 1 / (1 + ratio * ratio);
+}
+
+function hashUnit(id: number, salt: number): number {
+  let value = (Math.imul(id, 0x9e3779b1) ^ Math.imul(salt, 0x85ebca6b)) >>> 0;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x7feb352d);
+  value ^= value >>> 15;
+  return (value >>> 0) / 0x1_0000_0000;
 }

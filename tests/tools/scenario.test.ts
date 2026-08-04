@@ -209,6 +209,29 @@ describe('browser scenario schema', () => {
     })).toThrow(/healthFraction/i);
   });
 
+  it('strictly validates bounded authoritative scenario actions', () => {
+    const withActions = {
+      ...scenario,
+      actions: [
+        { tick: 0, kind: 'apply-damage', target: 'front', amount: 200, damageType: 'explosive', sourceFaction: 'choir' },
+        { tick: 1, kind: 'fire-ballistic', source: 'front', weapon: 'siegeMortar', targetS: 500, targetZ: 0 },
+      ],
+    };
+    expect(parseScenario(withActions).actions).toEqual(withActions.actions);
+    expect(() => parseScenario({
+      ...withActions,
+      actions: [{ ...withActions.actions[0], target: 'missing' }],
+    })).toThrow(/target.*setup id/i);
+    expect(() => parseScenario({
+      ...withActions,
+      actions: [{ ...withActions.actions[1], tick: scenario.simulation.targetTick }],
+    })).toThrow(/tick.*before/i);
+    expect(() => parseScenario({
+      ...withActions,
+      actions: [{ ...withActions.actions[1], source: 'grid', weapon: 'chordShot' }],
+    })).toThrow(/source.*owns/i);
+  });
+
   it('applies canonical mech damage thresholds without damaging engineers', () => {
     const mech = { kind: 'vanguard', maxHp: 100, hp: 100, damageState: 0, speedMultiplier: 1 } as Unit;
     const engineer = { kind: 'engineer', maxHp: 100, hp: 100, damageState: 0, speedMultiplier: 1 } as Unit;

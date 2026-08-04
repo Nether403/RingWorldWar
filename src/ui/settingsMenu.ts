@@ -54,6 +54,8 @@ const CSS = `
   .rww-settings-field { grid-template-columns: 1fr; gap: 8px; }
   .rww-settings-keys dl { grid-template-columns: 1fr; }
 }
+@media (prefers-reduced-motion: reduce) { .rww-settings * { transition:none!important; animation:none!important; } }
+@media (forced-colors: active) { .rww-settings-card, .rww-settings button, .rww-settings select { border:1px solid CanvasText; } }
 `;
 
 const KEYBINDINGS: ReadonlyArray<readonly [string, string]> = [
@@ -222,7 +224,11 @@ export class SettingsMenu {
     if (!this.isOpen) return;
     this.root.hidden = true;
     this.onOpenChange(false);
-    this.previousFocus?.focus();
+    if (this.previousFocus?.isConnected) this.previousFocus.focus();
+    else {
+      this.renderer.gl.domElement.tabIndex = -1;
+      this.renderer.gl.domElement.focus();
+    }
     this.previousFocus = null;
   }
 
@@ -238,10 +244,15 @@ export class SettingsMenu {
 
   private trapFocus = (event: KeyboardEvent): void => {
     if (event.key !== 'Tab') return;
-    const controls = [this.quality, this.volume, this.save, this.load, this.resume];
-    const current = controls.indexOf(document.activeElement as HTMLInputElement);
+    const controls = [...this.root.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )].filter((control) => !control.hidden && control.offsetParent !== null);
+    if (controls.length === 0) return;
+    const current = controls.indexOf(document.activeElement as HTMLElement);
     const direction = event.shiftKey ? -1 : 1;
-    const next = (current + direction + controls.length) % controls.length;
+    const next = current < 0
+      ? event.shiftKey ? controls.length - 1 : 0
+      : (current + direction + controls.length) % controls.length;
     controls[next]!.focus();
     event.preventDefault();
   };

@@ -4,7 +4,7 @@ import type { CameraRig } from '../../src/render/cameraRig';
 import type { Renderer, QualityLevel } from '../../src/render/renderer';
 import { createWorldSnapshot } from '../../src/sim/serialize';
 import type { Unit } from '../../src/sim/world';
-import { UNITS } from '../../src/sim/data';
+import { Faction, UNITS } from '../../src/sim/data';
 
 interface BrowserScenario {
   worldSeed: number;
@@ -49,6 +49,10 @@ interface BrowserScenario {
     structures: Array<{ id: string; faction: 'compact' | 'choir' | 'neutral'; kind: Parameters<Game['world']['spawnStructure']>[1]; s: number; z: number; progress: number; yawRadians?: number; healthFraction?: number }>;
   };
   observationRegions: Array<{ id: string; kind: 'sky' | 'ground' | 'unit' | 'ui'; x: number; y: number; width: number; height: number }>;
+  actions?: Array<
+    | { tick: number; kind: 'apply-damage'; target: string; amount: number; damageType: 'kinetic' | 'explosive' | 'energy'; sourceFaction: 'compact' | 'choir' }
+    | { tick: number; kind: 'fire-ballistic'; source: string; weapon: string; targetS: number; targetZ: number }
+  >;
 }
 
 interface TestDriver {
@@ -138,6 +142,32 @@ export function applyBrowserScenario(scenario: BrowserScenario): Record<string, 
     scenario.simulation.visualTimeSeconds - scenario.simulation.targetTick * scenario.simulation.fixedTickSeconds,
   );
   while (rww.game.world.tick < scenario.simulation.targetTick) {
+    for (const action of scenario.actions ?? []) {
+      if (action.tick !== rww.game.world.tick) continue;
+      if (action.kind === 'apply-damage') {
+        const target = entities.get(action.target);
+        if (!target) throw new Error(`Scenario damage target not found: ${action.target}`);
+        rww.game.world.applyDamage(
+          target.id,
+          action.amount,
+          action.damageType,
+          action.sourceFaction === 'compact' ? 0 : 1,
+        );
+      } else {
+        const source = entities.get(action.source);
+        if (!source) throw new Error(`Scenario ballistic source not found: ${action.source}`);
+        const entity = rww.game.world.unitById(source.id) ?? rww.game.world.structureById(source.id);
+        if (!entity || entity.faction < 0) throw new Error(`Scenario ballistic source is invalid: ${action.source}`);
+        const fired = rww.game.world.fireBallisticAt(
+          source.id,
+          action.targetS,
+          action.targetZ,
+          entity.faction as Faction,
+          action.weapon,
+        );
+        if (!fired) throw new Error(`Scenario ballistic action failed: ${action.source}/${action.weapon}`);
+      }
+    }
     rww.game.stepSimulationExactlyOnce();
     const remaining = scenario.simulation.targetTick - rww.game.world.tick;
     rww.testDriver.presentFrame(

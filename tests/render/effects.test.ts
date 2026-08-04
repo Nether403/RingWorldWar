@@ -87,6 +87,89 @@ describe('Effects Phase 3A pools', () => {
     expect(exact.puffPos[1]).toBeCloseTo(expected.y, 4);
     expect(exact.puffPos[2]).toBeCloseTo(expected.z, 4);
   });
+
+  it('keeps scars, debris, and smoke emitters inside quality caps', () => {
+    const effects = new Effects(12);
+    effects.setAftermathCaps(2, 3, 1);
+    const anchor = new RenderAnchor();
+    effects.consume([
+      event('impact', 20, { scale: 2, weapon: 'batteryGun' }),
+      event('unitDied', 21, { scale: 1.5, entityKind: 'vanguard' }),
+      event('structureDied', 22, { scale: 4, entityKind: 'fabricator' }),
+    ], world(), anchor, Faction.Compact);
+    effects.update(0.1, world(), anchor, Faction.Compact);
+
+    expect(effects.aftermathMetrics.scars).toBeLessThanOrEqual(2);
+    expect(effects.aftermathMetrics.debris).toBeLessThanOrEqual(3);
+    expect(effects.aftermathMetrics.smokeEmitters).toBeLessThanOrEqual(1);
+    expect(effects.aftermathMetrics.scars).toBeGreaterThan(0);
+  });
+
+  it('prioritizes Chord aftermath and clears every transient pool on reset', () => {
+    const effects = new Effects(13);
+    const exact = effects as unknown as { scars: Array<{ active: boolean; priority: number }> };
+    effects.setAftermathCaps(1, 8, 2);
+    effects.consume([
+      event('impact', 30, { scale: 1, weapon: 'batteryGun' }),
+      event('impact', 31, { scale: 4.2, weapon: 'chordShot' }),
+    ], world(), new RenderAnchor(), Faction.Compact);
+
+    expect(exact.scars.find((scar) => scar.active)?.priority).toBe(5);
+    effects.resetTransientState();
+    expect(effects.aftermathMetrics).toEqual({ scars: 0, debris: 0, smokeEmitters: 0 });
+  });
+
+  it('preempts low-priority debris and coalesces lethal impact scars', () => {
+    const effects = new Effects(14);
+    const exact = effects as unknown as {
+      debris: Array<{ active: boolean; priority: number }>;
+    };
+    effects.setAftermathCaps(4, 3, 4);
+    const anchor = new RenderAnchor();
+    effects.consume([
+      event('impact', 40, { scale: 1.5, weapon: 'batteryGun', s: 50, z: 10 }),
+      event('unitDied', 41, { scale: 1.2, entityKind: 'vanguard', s: 50, z: 10 }),
+      event('impact', 42, { scale: 4.2, weapon: 'chordShot', s: 100, z: 10 }),
+    ], world(), anchor, Faction.Compact);
+
+    expect(exact.debris.some((shard) => shard.active && shard.priority === 5)).toBe(true);
+    effects.setAftermathCaps(4, 1, 4);
+    expect(exact.debris[0]!.priority).toBe(5);
+    expect(effects.aftermathMetrics.scars).toBe(2);
+  });
+
+  it('emits persistent smoke along local ring up rather than camera up', () => {
+    const effects = new Effects(15);
+    const exact = effects as unknown as { puffData: Float32Array; puffVel: Float32Array };
+    effects.setAftermathCaps(4, 4, 2);
+    const anchor = new RenderAnchor();
+    const s = Math.PI * 3_600 * 0.5;
+    effects.consume([event('structureDied', 50, { s, z: 0, scale: 3 })], world(), anchor, Faction.Compact);
+    effects.update(0.1, world(), anchor, Faction.Compact);
+    let last = -1;
+    for (let index = 0; index < exact.puffData.length / 4; index++) {
+      if (exact.puffData[index * 4 + 1]! > 0) last = index;
+    }
+    const up = new THREE.Vector3();
+    anchor.upAt(s, up);
+    const velocity = new THREE.Vector3(
+      exact.puffVel[last * 3]!, exact.puffVel[last * 3 + 1]!, exact.puffVel[last * 3 + 2]!,
+    );
+    expect(velocity.dot(up)).toBeGreaterThan(0);
+  });
+
+  it('promotes ordinary lethal impacts to the destroyed entity aftermath', () => {
+    const effects = new Effects(16);
+    const exact = effects as unknown as { scars: Array<{ active: boolean; priority: number }> };
+    effects.consume([
+      event('impact', 60, { s: 20, z: 5, scale: 1, weapon: 'batteryGun' }),
+      event('structureDied', 61, { s: 20, z: 5, scale: 5, entityKind: 'fusionCore' }),
+    ], world(), new RenderAnchor(), Faction.Compact);
+
+    const active = exact.scars.filter((scar) => scar.active);
+    expect(active).toHaveLength(1);
+    expect(active[0]!.priority).toBe(5);
+  });
 });
 
 function world(): World {
@@ -95,6 +178,7 @@ function world(): World {
     isEntityVisible: () => true,
     isVisible: () => true,
     isProjectileVisible: () => true,
+    terrain: { heightAt: () => 0 },
   } as unknown as World;
 }
 

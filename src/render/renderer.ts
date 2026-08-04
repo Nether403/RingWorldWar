@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 
 export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
+export const BASE_EXPOSURE = 1.15;
 
 export interface QualitySettings {
   pixelRatio: number;
@@ -30,6 +31,9 @@ export interface QualitySettings {
   dressingCap: number;
   /** Whether environmental dressing participates in the shadow pass. */
   dressingShadows: boolean;
+  scarCap: number;
+  debrisCap: number;
+  smokeEmitterCap: number;
   /** The stable direct renderer deliberately has no post-processing path. */
   postProcessingLevel: 'none';
 }
@@ -46,6 +50,9 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     dressingDistance: 1_400,
     dressingCap: 72,
     dressingShadows: false,
+    scarCap: 24,
+    debrisCap: 48,
+    smokeEmitterCap: 6,
     postProcessingLevel: 'none',
   },
   medium: {
@@ -59,6 +66,9 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     dressingDistance: 1_900,
     dressingCap: 112,
     dressingShadows: true,
+    scarCap: 48,
+    debrisCap: 96,
+    smokeEmitterCap: 12,
     postProcessingLevel: 'none',
   },
   high: {
@@ -72,6 +82,9 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     dressingDistance: 2_400,
     dressingCap: 192,
     dressingShadows: true,
+    scarCap: 72,
+    debrisCap: 160,
+    smokeEmitterCap: 20,
     postProcessingLevel: 'none',
   },
   ultra: {
@@ -85,6 +98,9 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     dressingDistance: 3_000,
     dressingCap: 256,
     dressingShadows: true,
+    scarCap: 96,
+    debrisCap: 256,
+    smokeEmitterCap: 32,
     postProcessingLevel: 'none',
   },
 };
@@ -130,7 +146,7 @@ export class Renderer {
     });
     this.gl.outputColorSpace = THREE.SRGBColorSpace;
     this.gl.toneMapping = THREE.ACESFilmicToneMapping;
-    this.gl.toneMappingExposure = 1.15;
+    this.gl.toneMappingExposure = BASE_EXPOSURE;
     this.gl.shadowMap.type = THREE.PCFShadowMap;
     this.scene.background = new THREE.Color('#0b1018');
 

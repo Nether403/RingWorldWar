@@ -163,6 +163,7 @@ export class Game {
     const events = this.presentationEvents.splice(0);
     this.effects.consume(events, this.world, this.anchor, PLAYER, this.rig.s, this.rig.z, true);
     this.entities.consumePresentation(events, time);
+    this.hud.consumePresentation(events);
     this.onPresentationEvents?.(events);
     this.entities.update(this.world, this.anchor, time, PLAYER, this.acc / SIM_DT);
     this.effects.update(dt, this.world, this.anchor, PLAYER, this.rig.camera);
@@ -179,6 +180,10 @@ export class Game {
       this.artilleryResult,
       this.rig.camera,
     );
+    // Drop dead entities before HUD rendering so selection never shows ghosts.
+    for (const id of [...this.selection]) {
+      if (!this.world.unitById(id) && !this.world.structureById(id)) this.selection.delete(id);
+    }
     this.hud.update(
       dt,
       this.world,
@@ -191,12 +196,8 @@ export class Game {
       this.mission?.hudModel() ?? null,
       this.mission?.debriefModel() ?? null,
       this.mission?.narrativeHudModel() ?? null,
+      this.directControlActive,
     );
-
-    // Drop dead entities from the selection so the panel does not show ghosts.
-    for (const id of [...this.selection]) {
-      if (!this.world.unitById(id) && !this.world.structureById(id)) this.selection.delete(id);
-    }
   }
 
   /** Advances the same fixed simulation/controller step used by update(). */
@@ -645,7 +646,7 @@ export class Game {
     const next = !ability.active;
     const changed = this.world.activateAbility(unit.id, next);
     if (changed) {
-      this.hud.alert(`${abilityName(ability.id)} ${next ? 'activated' : 'deactivated'}`);
+      this.hud.command(`${abilityName(ability.id)} ${next ? 'active' : 'stowed'}`);
       this.hud.invalidate();
       if (this.artillerySourceId === unit.id && this.cursor.valid) this.previewDirty = true;
     } else if (ability.cooldown > 0) {
@@ -729,7 +730,7 @@ export class Game {
 
   /** Right-click: move, attack, or assist, depending on what is under it. */
   issueOrder(s: number, z: number, attackMove: boolean): void {
-    if (this.world.status === 'completed') return;
+    if (this.world.status === 'completed' || this.directControlActive || this.hud.blocksGameplayInput) return;
     this.cancelArtilleryTarget();
     const targetId = this.pickEntity(s, z);
     const targetUnit = targetId ? this.world.unitById(targetId) : undefined;
@@ -773,6 +774,11 @@ export class Game {
       };
       u.buildTargetId = 0;
     });
+    if (members.length > 0) {
+      this.hud.command(hostile
+        ? `Focus fire — ${members.length} unit${members.length === 1 ? '' : 's'}`
+        : `${attackMove ? 'Attack move' : 'Move'} — ${members.length} unit${members.length === 1 ? '' : 's'}`);
+    }
   }
 
   /** Try to place the structure the player is holding. */
@@ -816,6 +822,7 @@ export class Game {
       }
     }
     this.hud.placing = null;
+    this.hud.command(`${STRUCTURES[kind].name} placed`);
     return true;
   }
 
@@ -829,6 +836,7 @@ export class Game {
     if (this.world.status === 'completed' || this.directControlActive) return;
     if (kind) this.cancelArtilleryTarget();
     this.hud.placing = kind;
+    this.hud.command(kind ? `Build mode — ${STRUCTURES[kind].name}` : 'Build mode cancelled');
   }
 
   cancelInteractions(): void {
@@ -900,6 +908,7 @@ export class Game {
     this.presentationEvents.length = 0;
     this.entities.resetTransientState();
     this.effects.resetTransientState();
+    this.hud.resetTransientState();
     this.onTransientReset?.();
   }
 
@@ -911,6 +920,7 @@ export class Game {
   }
 
   dispose(): void {
+    this.effects.dispose();
     this.hud.root.remove();
   }
 }

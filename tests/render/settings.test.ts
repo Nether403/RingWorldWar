@@ -27,6 +27,11 @@ describe('Settings', () => {
     expect(QUALITY.low.dressingCap).toBeLessThan(QUALITY.medium.dressingCap);
     expect(QUALITY.medium.dressingCap).toBeLessThan(QUALITY.high.dressingCap);
     expect(QUALITY.high.dressingCap).toBeLessThan(QUALITY.ultra.dressingCap);
+    expect(QUALITY.low.scarCap).toBeLessThan(QUALITY.medium.scarCap);
+    expect(QUALITY.medium.scarCap).toBeLessThan(QUALITY.high.scarCap);
+    expect(QUALITY.high.scarCap).toBeLessThan(QUALITY.ultra.scarCap);
+    expect(QUALITY.low.debrisCap).toBeLessThan(QUALITY.ultra.debrisCap);
+    expect(QUALITY.low.smokeEmitterCap).toBeLessThan(QUALITY.ultra.smokeEmitterCap);
     expect(Object.values(QUALITY).every((quality) => quality.postProcessingLevel === 'none')).toBe(true);
   });
 

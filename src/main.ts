@@ -11,7 +11,7 @@ import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
 import { Environment } from '@render/environment';
 import { InputController } from '@render/input';
-import { Renderer, type QualityLevel } from '@render/renderer';
+import { BASE_EXPOSURE, Renderer, type QualityLevel } from '@render/renderer';
 import { Settings } from '@render/settings';
 import { RingMesh } from '@render/ringMesh';
 import { BattlefieldDressing } from '@render/battlefieldDressing';
@@ -100,6 +100,7 @@ async function start(): Promise<void> {
     ringMesh.setQuality(renderer.quality);
     game.effects.setParticleCap(quality.particleCap);
     game.effects.setLightCap(quality.effectLightCap);
+    game.effects.setAftermathCaps(quality.scarCap, quality.debrisCap, quality.smokeEmitterCap);
     game.entities.setLowQuality(renderer.quality === 'low');
     dressing.setQuality(quality.dressingDistance, quality.dressingCap, quality.dressingShadows);
     environment.setLowQuality(renderer.quality === 'low');
@@ -118,13 +119,25 @@ async function start(): Promise<void> {
   const overlay = new DebugOverlay();
   let cancelCommands = (): void => {};
   const menu = new SettingsMenu(settings, renderer, (open) => {
-    input.setEnabled(!open);
+    input.setEnabled(!open && !game.hud.blocksGameplayInput);
+    game.hud.root.inert = open;
+    renderer.gl.domElement.inert = open || game.hud.blocksGameplayInput;
+    game.hud.root.setAttribute('aria-hidden', String(open));
     if (open) cancelCommands();
   }, (volume) => audio.setMasterVolume(volume));
+  game.hud.onBlockingOverlayChange = (blocked) => {
+    renderer.gl.domElement.inert = blocked || menu.isOpen;
+    input.setEnabled(!blocked && !menu.isOpen);
+  };
   menu.onSave = () => game.saveGame();
   menu.onLoad = () => game.loadGame();
 
-  cancelCommands = wireCommands(renderer.gl.domElement, game, rig, () => !menu.isOpen);
+  cancelCommands = wireCommands(
+    renderer.gl.domElement,
+    game,
+    rig,
+    () => !menu.isOpen && !game.hud.blocksGameplayInput,
+  );
   wireKeys(game, renderer, overlay, input, settings, menu);
 
   await boot.step(1.0, 'ready');
@@ -145,6 +158,7 @@ async function start(): Promise<void> {
     fixedVisualClock = false,
     advanceSimulation = true,
   ): void {
+    input.setEnabled(!menu.isOpen && !game.hud.blocksGameplayInput);
     input.setDirectMode(game.directControlActive);
     input.update(dt);
     if (advanceSimulation) game.updateDirectControl(input.moveForward, input.moveRight);
@@ -174,6 +188,7 @@ async function start(): Promise<void> {
     fog.density = environment.fogDensity;
     (renderer.scene.background as THREE.Color).copy(environment.spaceColor);
 
+    renderer.gl.toneMappingExposure = BASE_EXPOSURE + Math.min(0.38, game.effects.flash * 0.22);
     renderer.render(dt);
     overlay.update(dt, renderer, game, rig, environment);
 
@@ -420,6 +435,7 @@ function wireKeys(
   menu: SettingsMenu,
 ): void {
   window.addEventListener('keydown', (e) => {
+    if (game.hud.blocksGameplayInput) return;
     if (e.code === 'Escape') {
       input.consume(e.code);
       e.preventDefault();

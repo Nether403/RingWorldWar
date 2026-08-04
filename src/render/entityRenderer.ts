@@ -77,6 +77,11 @@ export class EntityRenderer {
   private readonly _m = new THREE.Matrix4();
   private readonly _scale = new THREE.Vector3(1, 1, 1);
   private readonly _basis = new THREE.Matrix4();
+  private readonly _terrainNormal = new THREE.Vector3();
+  private readonly _terrainQ = new THREE.Quaternion();
+  private readonly _terrainS = new THREE.Vector3();
+  private readonly _terrainZ = new THREE.Vector3();
+  private readonly _ringUp = new THREE.Vector3();
 
   /** Per-unit render state, keyed by unit id, so gait is continuous over time. */
   private feet = new Map<number, FootState>();
@@ -306,14 +311,31 @@ export class EntityRenderer {
       const ground = world.terrain.heightAt(wreck.s, wreck.z);
       anchor.toVector(wreck.s, ground + 0.8, wreck.z, this._v);
       anchor.orientation(wreck.s, wreck.yaw, this._q);
+      const normalStep = 4;
+      const sampleS = wreck.s + normalStep;
+      const sampleZ = wreck.z + normalStep;
+      anchor.toVector(sampleS, world.terrain.heightAt(sampleS, wreck.z) + 0.8, wreck.z, this._terrainS).sub(this._v);
+      anchor.toVector(wreck.s, world.terrain.heightAt(wreck.s, sampleZ) + 0.8, sampleZ, this._terrainZ).sub(this._v);
+      this._terrainNormal.crossVectors(this._terrainZ, this._terrainS).normalize();
+      anchor.upAt(wreck.s, this._ringUp);
+      this._terrainQ.setFromUnitVectors(this._ringUp, this._terrainNormal);
+      this._q.premultiply(this._terrainQ);
       this._basis.compose(this._v, this._q, ONE);
 
       const finalDecay = clampN(wreck.lifetime / Math.min(8, WRECK_LIFETIME), 0.16, 1);
-      _local.makeRotationZ(Math.PI * (0.42 + ((wreck.id * 37) % 17) / 170));
+      const wreckAge = Math.max(0, WRECK_LIFETIME - wreck.lifetime);
+      const fallDuration = 0.75;
+      const fallProgress = smoothstepN(0, fallDuration, wreckAge);
+      const targetFall = Math.PI * (0.42 + ((wreck.id * 37) % 17) / 170);
+      const settleAge = wreckAge - fallDuration;
+      const settle = settleAge >= 0 && settleAge < 1.2
+        ? Math.sin(settleAge * 17) * Math.exp(-settleAge * 5) * 0.055
+        : 0;
+      _local.makeRotationZ(targetFall * fallProgress + settle);
       _rot.makeRotationY(((wreck.id * 97) % 360) * (Math.PI / 180));
       _local.premultiply(_rot);
       _local.scale(this._scale.set(finalDecay, finalDecay, finalDecay));
-      _local.setPosition(0, -0.5 * (1 - finalDecay), 0);
+      _local.setPosition(0, -0.5 * (1 - finalDecay) - fallProgress * 0.25, 0);
       _tmp.multiplyMatrices(this._basis, _local);
       mesh.setMatrixAt(mesh.count++, _tmp);
     }
@@ -705,6 +727,11 @@ function angleWrap(a: number): number {
   if (x > Math.PI) x -= Math.PI * 2;
   else if (x < -Math.PI) x += Math.PI * 2;
   return x;
+}
+
+function smoothstepN(edge0: number, edge1: number, value: number): number {
+  const t = clampN((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
 }
 
 function angleLerp(from: number, to: number, alpha: number): number {

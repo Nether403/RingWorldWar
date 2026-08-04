@@ -22,7 +22,9 @@ This is the authoritative source for current delivery status and near-term seque
 | A Signal in the Spine story slice | Internal completion pass | Human play completed without bugs; Bulwark, Needle, narrative pacing, and the Last Rotation revelation are accepted in frozen baseline `a67ef74` |
 | Phase 3A signature battlefield | Internal completion pass | Procedural audio, mech weight, bounded VFX, battlefield dressing, and the signature battle passed human play and T480s Low qualification in frozen baseline `f599edf` |
 | Phase 3B ring atmosphere and calibration | Internal completion pass | Atmosphere, axial rim, terrain lighting, and production calibration passed human review in frozen baseline `0178d61` |
-| Phase 3C faction and structure identity | In progress | Faction-specific merged geometry, surface treatment, and per-instance damage are specified in `docs/phase-3c-faction-identity.md` |
+| Phase 3C faction and structure identity | Internal completion pass | Faction, class, structure, and damage readability passed human review in frozen baseline `31de325` |
+| Phase 3D battlefield memory | In progress | Bounded scars, debris, smoke, wreck staging, and Chord presentation are specified in `docs/phase-3d-battlefield-memory.md` |
+| Phase 3E tactical HUD | Planned | Responsive command hierarchy and presentation-only feedback follow the Phase 3D checkpoint in `docs/phase-3e-tactical-hud.md` |
 | Phase 2 overall | Qualification in progress | Gameplay cohorts pass, but performance qualification and human observation remain open |
 
 ## Immediate Sequence
@@ -39,7 +41,9 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 8. **Completed - story expansion validation:** Bulwark escort identity, Needle hunter readability, narrative pacing, and the Last Rotation revelation passed internal human play.
 9. **Completed - Phase 3A signature battlefield:** procedural mech weight, combat atmosphere, audio, and the busy signature battle passed human review and T480s qualification.
 10. **Completed - Phase 3B ring atmosphere and calibration:** axial space, ringward atmosphere, terrain lighting, and production PBR calibration passed human review.
-11. **Current - Phase 3C faction and structure identity:** make faction readable through silhouette, architecture, surface response, and independent damage while preserving class and gameplay authority.
+11. **Completed - Phase 3C faction and structure identity:** faction, class, structure, and damage readability passed human review.
+12. **Current - Phase 3D battlefield memory:** make observed combat leave bounded scars, debris, smoke, and strategic destruction presentation.
+13. **Next - Phase 3E tactical HUD:** calibrate the final command interface against the completed Phase 3D battlefield.
 
 ## Direction Decisions
 

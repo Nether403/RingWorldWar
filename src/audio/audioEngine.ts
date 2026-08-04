@@ -9,6 +9,8 @@ export type AudioCueKind =
   | 'kinetic-shot'
   | 'energy-shot'
   | 'ballistic-launch'
+  | 'chord-launch'
+  | 'chord-impact'
   | 'impact'
   | 'destruction'
   | 'intercept'
@@ -25,6 +27,7 @@ export interface AudioCue {
   delaySeconds: number;
   lowpassHz: number;
   durationSeconds: number;
+  priority: number;
 }
 
 export interface AudioFrame {
@@ -180,6 +183,14 @@ function cueForEvent(seed: number, event: SimEvent, frame: AudioFrame): AudioCue
   const variation = 0.92 + hashUnit(seed, event.id, event.kind.length) * 0.16;
   const scale = Math.max(0.2, event.scale || 1);
 
+  if (event.weapon === 'chordShot') {
+    if (event.kind === 'weaponFired') return cue('chord-launch', spatial, 1, 38 * variation, 1.6);
+    if (event.kind === 'impact') {
+      if (event.scale <= 0.7) return null;
+      return cue('chord-impact', spatial, 1, 26 * variation, 3.2);
+    }
+  }
+
   switch (event.kind) {
     case 'weaponFired': {
       const weapon = event.weapon ? WEAPONS[event.weapon] : undefined;
@@ -225,6 +236,7 @@ function cue(
     delaySeconds: spatial.delaySeconds,
     lowpassHz: spatial.lowpassHz,
     durationSeconds,
+    priority: cuePriority(kind),
   };
 }
 
@@ -245,6 +257,8 @@ function clamp(value: number, low: number, high: number): number {
 }
 
 function cuePriority(kind: AudioCueKind): number {
+  if (kind === 'chord-impact') return 7;
+  if (kind === 'chord-launch') return 6;
   if (kind === 'destruction') return 5;
   if (kind === 'impact' || kind === 'capture') return 4;
   if (kind === 'intercept' || kind === 'warning') return 3;
