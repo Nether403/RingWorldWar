@@ -115,6 +115,9 @@ async function start(): Promise<void> {
   renderer.scene.fog = fog;
   ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
 
+  await boot.step(0.94, 'prewarming combat shaders');
+  await renderer.prewarmActiveQuality();
+
   const input = new InputController(renderer.gl.domElement, rig);
   const overlay = new DebugOverlay();
   let cancelCommands = (): void => {};
@@ -249,9 +252,7 @@ async function start(): Promise<void> {
         animationFrame = requestAnimationFrame(frame);
       },
       setAiEnabled: (enabled: boolean): void => game.setAiEnabled(enabled),
-      setBenchmarkVariant: (
-        variant: 'default' | 'no-shadows' | 'low-terrain' | 'no-terrain-shadows',
-      ): void => {
+      setBenchmarkVariant: (variant: string): void => {
         applyRenderQuality();
         renderer.gl.shadowMap.enabled = renderer.currentSettings.shadows;
         environment.keyLight.castShadow = true;
@@ -261,6 +262,11 @@ async function start(): Promise<void> {
             ? ringMesh.mesh.material
             : [ringMesh.mesh.material];
           for (const material of materials) material.needsUpdate = true;
+        }
+        game.markers.object.visible = true;
+        for (const name of ['effects:trails', 'effects:tracers', 'effects:puffs', 'effects:scars']) {
+          const object = game.effects.object.getObjectByName(name);
+          if (object) object.visible = true;
         }
         if (variant === 'no-shadows') {
           renderer.gl.shadowMap.enabled = false;
@@ -274,6 +280,13 @@ async function start(): Promise<void> {
             ? ringMesh.mesh.material
             : [ringMesh.mesh.material];
           for (const material of materials) material.needsUpdate = true;
+        } else if (variant === 'no-transparent-effects') {
+          for (const name of ['effects:trails', 'effects:tracers', 'effects:puffs', 'effects:scars']) {
+            const object = game.effects.object.getObjectByName(name);
+            if (object) object.visible = false;
+          }
+        } else if (variant === 'no-markers') {
+          game.markers.object.visible = false;
         }
       },
       stepWorldTo: (targetTick: number): void => {

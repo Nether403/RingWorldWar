@@ -1,6 +1,6 @@
 # Phase 4C Renderer Profile
 
-**Status:** quality characterization complete; production shader prewarm and long-session stability remain open.
+**Status:** Phase 4C and 4C-2 complete; long-session heap/resource stability moves to Phase 4D.
 
 ## Method
 
@@ -50,3 +50,27 @@ downgrade, so the diagnostic override is not retained as product behavior.
   4C/4D evidence.
 
 Tracked data: `validation/evidence/phase-4c-t480s-quality-2026-08-05.json`.
+
+## Phase 4C-2 Attribution
+
+Production now prewarms the active quality after scene, lights, fog, terrain,
+effects, entities, and dressing are configured, while the boot overlay remains
+visible. The final source-current Low run measured 848.4 ms, produced 17 programs,
+and showed zero programs missed by startup and zero late combat programs.
+
+The Low heavy-combat upload inventory measured 1,254,048 bytes/frame median:
+
+- Transparent effects account for approximately 572,064 bytes/frame.
+- Markers account for approximately 230,400 bytes/frame.
+- Remaining entity/other buffers account for approximately 451,584 bytes/frame.
+
+Diagnostic removal of effects or markers reduced upload bytes but did not produce
+a repeatable GPU or delivered-frame improvement. No update-range complexity is
+retained.
+
+HUD p95 measured 0.9-1.7 ms, dominated by the minimap at 0.8-1.4 ms; selection
+remained near 0.1 ms. The visual-only hidden-HUD diagnostic correctly left HUD
+CPU work running, so it does not authorize a cadence conclusion. No HUD cadence
+change is retained without a separate state-preserving CPU experiment.
+
+Tracked attribution: `validation/evidence/phase-4c2-attribution-2026-08-05.json`.

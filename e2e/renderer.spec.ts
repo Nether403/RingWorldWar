@@ -79,6 +79,26 @@ async function lowerCanvasVariance(page: Page): Promise<number> {
   });
 }
 
+test('prewarms the active shader topology before playable frames', async ({ page }) => {
+  await page.goto('/?seed=501&quality=low');
+  await page.waitForFunction(() => Boolean(window.RWW?.renderer.prewarmMetrics));
+  const result = await page.evaluate(() => {
+    const renderer = window.RWW!.renderer;
+    const baseline = renderer.gl.info.programs?.length ?? 0;
+    for (let index = 0; index < 4; index++) renderer.render(1 / 60);
+    return {
+      metrics: renderer.prewarmMetrics,
+      baseline,
+      final: renderer.gl.info.programs?.length ?? 0,
+    };
+  });
+
+  expect(result.metrics).not.toBeNull();
+  expect(result.metrics!.programsAfterShadowWarm).toBeGreaterThan(0);
+  expect(result.metrics!.programsAfterShadowWarm).toBeGreaterThanOrEqual(result.metrics!.programsBefore);
+  expect(result.final).toBe(result.baseline);
+});
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/?seed=20260731&quality=high');
   await page.waitForFunction(() => Boolean(window.RWW));

@@ -164,6 +164,7 @@ export class Effects {
         fog: true,
       }),
     );
+    this.trailMesh.name = 'effects:trails';
     this.trailMesh.frustumCulled = false;
     this.object.add(this.trailMesh);
 
@@ -202,6 +203,7 @@ export class Effects {
         fog: false,
       }),
     );
+    this.tracerMesh.name = 'effects:tracers';
     this.tracerMesh.frustumCulled = false;
     this.object.add(this.tracerMesh);
 
@@ -270,6 +272,7 @@ export class Effects {
         vertexColors: true,
       }),
     );
+    this.puffs.name = 'effects:puffs';
     this.puffs.frustumCulled = false;
     this.object.add(this.puffs);
 

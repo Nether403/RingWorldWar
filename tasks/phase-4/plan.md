@@ -31,10 +31,11 @@
 ## 4C Renderer
 
 - [x] Profile GPU/CPU frame components for Low, Medium, High, and Ultra on the T480s reference GPU.
-- [ ] Complete dynamic-upload, transparent-overdraw, shader-prewarm, smoke, and HUD attribution.
+- [x] Complete dynamic-upload, transparent-effects, active-quality shader-prewarm, and HUD attribution.
 - [x] Isolate the full procedural PBR terrain path as the dominant Intel UHD 620 GPU cost.
-- [ ] Prewarm combat permutations.
-- [ ] Add only profile-justified LOD/batching changes.
+- [x] Prewarm active-quality forward and generated shadow programs before the playable frame.
+- [x] Conclude that no LOD/batching, upload-range, or transparent product change is justified.
+- [ ] Revisit minimap cadence only if Phase 4D profiling shows HUD CPU pressure in long sessions.
 
 ## 4D Hardening
 

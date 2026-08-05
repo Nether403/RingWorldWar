@@ -1,0 +1,74 @@
+{
+  "schema": "rww.tracked-performance-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-05",
+  "status": "attribution-complete",
+  "scenario": "heavy-combat",
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "defaultLow": {
+    "startupPrewarmMilliseconds": 848.4,
+    "programsBefore": 0,
+    "programsAfterPrewarm": 17,
+    "latePrograms": 0,
+    "startupMissedPrograms": 0,
+    "hudP95Milliseconds": 0.9,
+    "hudMinimapP95Milliseconds": 0.8,
+    "hudSelectionP95Milliseconds": 0.1,
+    "presentationP95Milliseconds": 2.2,
+    "uploadMedianBytesPerFrame": 1254048,
+    "uploadP95BytesPerFrame": 1270432,
+    "gpuMedianMilliseconds": 5.79,
+    "sourceTrackedPatchSha256": "f89bdc078c6d7ad5441f34cdcfb203e77e8edb49afc2a62c9201a67386303e95",
+    "receipt": "output/runs/20260805T170436.288Z-26348-73a2a6a2/receipt.json",
+    "receiptSha256": "7f215d78a66622d1a88304b07b25f8f1c6748a259d32614da25845858919b925",
+    "reportSha256": "df347c772c9f37f86b95adde36e80298ff106be7df0a2c9f114677145bf5d808"
+  },
+  "diagnostics": [
+    {
+      "variant": "no-transparent-effects",
+      "uploadMedianBytesPerFrame": 681984,
+      "uploadDeltaBytesPerFrame": -572064,
+      "gpuMedianMilliseconds": 6.652,
+      "sourceTrackedPatchSha256": "9c66392f85c39b228e081146760a7c3a340b9da4ebe6b83cdced6b7bd8bfd7f6",
+      "receipt": "output/runs/20260805T162858.012Z-5172-b3109c75/receipt.json",
+      "receiptSha256": "47af3692927bacba7fd5ff4a914f2d5a4a63b0eb800856d83647fa57157f9f0a",
+      "reportSha256": "f27265bc330aa082f223c67a38218c017de98b562d56788c0edb52bc3af2f4bd"
+    },
+    {
+      "variant": "no-markers",
+      "uploadMedianBytesPerFrame": 1023648,
+      "uploadDeltaBytesPerFrame": -230400,
+      "gpuMedianMilliseconds": 5.212,
+      "sourceTrackedPatchSha256": "9c66392f85c39b228e081146760a7c3a340b9da4ebe6b83cdced6b7bd8bfd7f6",
+      "receipt": "output/runs/20260805T163055.616Z-25668-86e7ed5b/receipt.json",
+      "receiptSha256": "ded48156697b4445f758843bcd14f2b71760b038ae0c47030356fa12a68ce0a4",
+      "reportSha256": "7581b19a2f497d66cc221dd9636bdd0b096d1f096f4bb5566e499183129d42cb"
+    }
+  ],
+  "code": {
+    "sourceBaseSha": "aeb5566ab47945230caf25edcba05bb00cf11991",
+    "dirty": true,
+    "untrackedSourceManifestSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "untrackedSourceCount": 0,
+    "executableSourceManifestSha256": "f56670558c830daa4b8bb999048706e974bd09ed92d9853af9c86346ae563969",
+    "executableSourceManifest": [
+      { "path": ".gitignore", "sha256": "7567154c0ff462fa841786342bf8775f52eb9d9e8bf14c01d518f4fbd12e2870" },
+      { "path": "e2e/renderer.spec.ts", "sha256": "eaf70c50375811bd943d7075015f88e0a5c3b1430a14b97e1c638a8f17677229" },
+      { "path": "e2e/support/scenario-driver.ts", "sha256": "709e4a0f417b947ebd3bbf709d1cdd7399ae47bee8ad791dd00a61a11bf0b3bd" },
+      { "path": "src/main.ts", "sha256": "9e5659b89f6a5b185c4532db110b76c9120cf65cd3995e2971fd0387b4313c59" },
+      { "path": "src/render/effects.ts", "sha256": "1ca4f4e273c14167181e5b88a68c0c83750ba74e3f37dd8160bd7c40d6960e48" },
+      { "path": "src/render/renderer.ts", "sha256": "e098b537ac71b8f37cac53ef1d642f4824650083117d459d71614986388e43ef" },
+      { "path": "tests/tools/rww.test.ts", "sha256": "31f7e33292892017c47a8f24312f3e0b9446896413797502198dd97ebcd30669" },
+      { "path": "tests/tools/scenario.test.ts", "sha256": "775f446312d964b6c448e9b2d2dad4d3f3950c40c93b4a1efc332f3234740757" },
+      { "path": "tools/rww.mjs", "sha256": "4f21f9f6bb9e5b166de6cf42606d6682e3b761de151180261d7d94c04f1362d0" },
+      { "path": "tools/rww/args.mjs", "sha256": "cdd95ed82f655c134002a998017b93b7eb2c1a4126567aaffd00dce6967cb1ab" },
+      { "path": "tools/rww/browser-metrics.mjs", "sha256": "537b7b49d0819edacf29ada3979d129bc728f697f3781358a9cba1701ecac84a" },
+      { "path": "tools/rww/browser-scenario.mjs", "sha256": "684719cc6dec3016fe11c5f04bf7f27ce37a4179e5f31374f87cc1efaf3ce487" },
+      { "path": "tools/rww/commands.mjs", "sha256": "a809cd86b749b53ba26f55e60dbad6174174d22efbdc1151bfcc2a11ff92abe8" },
+      { "path": "tools/rww/doctor.mjs", "sha256": "d81bb49932610900c2bf3e6c19b39ae1c76127e638769b6124b034a267a8bd11" },
+      { "path": "validation/hardware/t480s-low.json", "sha256": "9fb8e1ef5b80d111ee39bde2cae85f779984347cba4461c705a5e7e16b9eea1c" }
+    ],
+    "caveat": "Each entry records its tracked-patch identity. Differences are benchmark instrumentation and cleanup hardening; product render behavior is identical except for the retained prewarm in the final default run."
+  },
+  "decision": "Retain active-quality production shader prewarm. Do not retain upload-range, transparency, marker, terrain, shadow, LOD, or batching changes. HUD attribution identifies the minimap as the dominant HUD subphase, but no HUD cadence change is retained without a dedicated state-preserving CPU experiment."
+}

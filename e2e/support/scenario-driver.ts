@@ -59,11 +59,16 @@ interface TestDriver {
   stopLoop(): void;
   resumeLoop(): void;
   setAiEnabled(enabled: boolean): void;
-  setBenchmarkVariant(variant: 'default' | 'no-shadows' | 'low-terrain' | 'no-terrain-shadows'): void;
+  setBenchmarkVariant(variant: string): void;
   stepWorldTo(tick: number): void;
   setCamera(s: number, z: number, yaw: number, zoom: number): void;
   renderFrame(dt: number, visualTime: number): void;
   presentFrame(dt: number, visualTime: number): void;
+}
+
+interface TimerQueryExtension {
+  TIME_ELAPSED_EXT: number;
+  GPU_DISJOINT_EXT: number;
 }
 
 interface RwwWindow {
@@ -320,30 +325,91 @@ export function captureScenarioFrame(scenario: BrowserScenario): {
 export async function benchmarkScenario(
   warmupSeconds: number,
   sampleSeconds: number,
-  variant: 'default' | 'no-shadows' | 'low-terrain' | 'no-terrain-shadows' = 'default',
+  variant = 'default',
 ): Promise<Record<string, unknown>> {
   const rww = requiredRww();
+  const maximumSamples = 50_000;
   // Performance qualification measures active gameplay, not a deliberately
   // paused story briefing. Visual and human-play flows still preserve it.
   if (rww.game.narrativeHudModel?.blocking) rww.game.acknowledgeNarrative();
+  const startupPrewarm = rww.renderer.prewarmMetrics;
   rww.testDriver.setBenchmarkVariant(variant);
-  // Quality/variant changes can create new shader permutations. Compile them
-  // before the time-based warmup so a single long first frame cannot consume
-  // the complete warmup and contaminate the measured window.
-  rww.testDriver.presentFrame(1 / 60, rww.game.world.time);
-  rww.testDriver.presentFrame(1 / 60, rww.game.world.time + 1 / 60);
+  const benchmarkPrewarm = await rww.renderer.prewarmActiveQuality();
+  const programsAtStart = rww.renderer.gl.info.programs?.length ?? 0;
+  let maximumPrograms = programsAtStart;
   const intervals: number[] = [];
   const render: number[] = [];
   const simulation: number[] = [];
   const fullFrame: number[] = [];
   const gpuTimerMilliseconds: number[] = [];
+  const cpuPhases = {
+    presentation: [] as number[],
+    entities: [] as number[],
+    effects: [] as number[],
+    markers: [] as number[],
+    hud: [] as number[],
+    hudMinimap: [] as number[],
+    hudSelection: [] as number[],
+  };
+  let collectCpuPhases = false;
+  const restoreCpuWrappers: Array<() => void> = [];
+  const wrapCpuPhase = (target: object, method: string, samples: number[]): void => {
+    const record = target as Record<string, unknown>;
+    const descriptor = Object.getOwnPropertyDescriptor(target, method);
+    const original = record[method];
+    if (typeof original !== 'function') throw new Error(`Missing benchmark phase ${method}`);
+    record[method] = function timedPhase(this: unknown, ...args: unknown[]): unknown {
+      const phaseStarted = collectCpuPhases ? performance.now() : 0;
+      try {
+        return (original as (...values: unknown[]) => unknown).apply(this, args);
+      } finally {
+        if (collectCpuPhases) samples.push(performance.now() - phaseStarted);
+      }
+    };
+    restoreCpuWrappers.push(() => {
+      if (descriptor) Object.defineProperty(target, method, descriptor);
+      else delete record[method];
+    });
+  };
+  try {
+    wrapCpuPhase(rww.game, 'updatePresentation', cpuPhases.presentation);
+    wrapCpuPhase(rww.game.entities, 'update', cpuPhases.entities);
+    wrapCpuPhase(rww.game.effects, 'update', cpuPhases.effects);
+    wrapCpuPhase(rww.game.markers, 'update', cpuPhases.markers);
+    wrapCpuPhase(rww.game.hud, 'update', cpuPhases.hud);
+    wrapCpuPhase(rww.game.hud, 'drawMinimap', cpuPhases.hudMinimap);
+    wrapCpuPhase(rww.game.hud, 'drawSelection', cpuPhases.hudSelection);
+  } catch (error) {
+    for (const restore of restoreCpuWrappers.reverse()) {
+      try { restore(); } catch { /* Continue rollback. */ }
+    }
+    throw error;
+  }
   let contextLosses = 0;
-  rww.renderer.gl.domElement.addEventListener('webglcontextlost', () => { contextLosses++; });
-  const gl = rww.renderer.gl.getContext() as WebGL2RenderingContext;
-  const timerQuery = gl.getExtension('EXT_disjoint_timer_query_webgl2') as {
-    TIME_ELAPSED_EXT: number;
-    GPU_DISJOINT_EXT: number;
-  } | null;
+  const onContextLost = (): void => { contextLosses++; };
+  let listenerInstalled = false;
+  let glSetup: WebGL2RenderingContext | null = null;
+  let uploadProfilerSetup: ReturnType<typeof installUploadProfiler> | null = null;
+  let timerQuerySetup: TimerQueryExtension | null = null;
+  try {
+    rww.renderer.gl.domElement.addEventListener('webglcontextlost', onContextLost);
+    listenerInstalled = true;
+    glSetup = rww.renderer.gl.getContext() as WebGL2RenderingContext;
+    uploadProfilerSetup = installUploadProfiler(glSetup);
+    timerQuerySetup = glSetup.getExtension('EXT_disjoint_timer_query_webgl2') as TimerQueryExtension | null;
+  } catch (error) {
+    for (const restore of restoreCpuWrappers.reverse()) {
+      try { restore(); } catch { /* Continue rollback. */ }
+    }
+    try { uploadProfilerSetup?.restore(); } catch { /* Continue rollback. */ }
+    if (listenerInstalled) {
+      try { rww.renderer.gl.domElement.removeEventListener('webglcontextlost', onContextLost); } catch { /* Ignore. */ }
+    }
+    throw error;
+  }
+  const gl = glSetup!;
+  const uploadProfiler = uploadProfilerSetup!;
+  const timerQuery = timerQuerySetup;
   const timerQuerySupported = timerQuery !== null;
   const pendingQueries: Array<{ query: WebGLQuery; measured: boolean }> = [];
   const gpuQueryStats = {
@@ -381,6 +447,7 @@ export async function benchmarkScenario(
   const sampleEnd = warmupEnd + sampleSeconds * 1000;
   let previous = started;
   let visualTime = rww.game.world.time;
+  let sampleLimitReached = false;
   try {
     await new Promise<void>((resolve, reject) => {
       const frame = (now: number): void => {
@@ -403,22 +470,28 @@ export async function benchmarkScenario(
             }
           }
           const frameStart = performance.now();
+          collectCpuPhases = measured;
+          if (measured) uploadProfiler.beginFrame();
           try {
             rww.testDriver.renderFrame(dt, visualTime);
           } finally {
+            collectCpuPhases = false;
+            if (measured) uploadProfiler.endFrame();
             if (query && timerQuery) {
               gl.endQuery(timerQuery.TIME_ELAPSED_EXT);
               pendingQueries.push({ query, measured });
             }
           }
           const elapsed = performance.now() - frameStart;
+          maximumPrograms = Math.max(maximumPrograms, rww.renderer.gl.info.programs?.length ?? 0);
           if (measured) {
             intervals.push(interval);
             render.push(rww.renderer.frameMs);
             simulation.push(rww.game.simStepMs);
             fullFrame.push(elapsed);
+            if (intervals.length >= maximumSamples) sampleLimitReached = true;
           }
-          if (now >= sampleEnd) resolve();
+          if (now >= sampleEnd || sampleLimitReached) resolve();
           else requestAnimationFrame(frame);
         } catch (error) {
           reject(error);
@@ -445,14 +518,38 @@ export async function benchmarkScenario(
       });
     }
   } finally {
-    for (const pending of pendingQueries) gl.deleteQuery(pending.query);
+    collectCpuPhases = false;
+    for (const restore of restoreCpuWrappers.reverse()) {
+      try { restore(); } catch { /* Best-effort cleanup must not block later restorations. */ }
+    }
+    try { uploadProfiler.restore(); } catch { /* Continue cleanup. */ }
+    if (listenerInstalled) {
+      try { rww.renderer.gl.domElement.removeEventListener('webglcontextlost', onContextLost); } catch { /* Continue. */ }
+    }
+    for (const pending of pendingQueries) {
+      try { gl.deleteQuery(pending.query); } catch { /* Context may already be lost. */ }
+    }
     pendingQueries.length = 0;
   }
   const info = rww.renderer.gl.info;
+  const programsAtEnd = info.programs?.length ?? 0;
   return {
-    intervals, render, simulation, fullFrame, contextLosses, timerQuerySupported,
+    intervals, render, simulation, fullFrame, contextLosses, timerQuerySupported, sampleLimitReached,
     gpuTimerMilliseconds,
     gpuQueryStats,
+    cpuPhases,
+    uploads: uploadProfiler.report(),
+    shaderPrograms: {
+      startupPrewarm,
+      benchmarkPrewarm,
+      startupMissedPrograms: startupPrewarm
+        ? Math.max(0, benchmarkPrewarm.programsAfterShadowWarm - startupPrewarm.programsAfterShadowWarm)
+        : null,
+      programsAtStart,
+      maximumPrograms,
+      programsAtEnd,
+      latePrograms: maximumPrograms - programsAtStart,
+    },
     resources: {
       drawCalls: info.render.calls, triangles: info.render.triangles,
       lines: info.render.lines, points: info.render.points,
@@ -460,6 +557,106 @@ export async function benchmarkScenario(
       programs: info.programs?.length ?? null,
     },
   };
+}
+
+function installUploadProfiler(gl: WebGL2RenderingContext): {
+  beginFrame(): void;
+  endFrame(): void;
+  report(): Record<string, unknown>;
+  restore(): void;
+} {
+  const totals = {
+    bufferDataCalls: 0,
+    bufferDataBytes: 0,
+    bufferSubDataCalls: 0,
+    bufferSubDataBytes: 0,
+    unknownByteCalls: 0,
+  };
+  const bytesPerFrame: number[] = [];
+  const restores: Array<() => void> = [];
+  let collecting = false;
+  let frameStartBytes = 0;
+  let supported = true;
+  const install = (
+    name: 'bufferData' | 'bufferSubData',
+    sourceIndex: number,
+    sourceOffsetIndex: number,
+  ): void => {
+    const record = gl as unknown as Record<string, unknown>;
+    const original = record[name];
+    if (typeof original !== 'function') throw new Error(`WebGL2 ${name} is unavailable`);
+    const descriptor = Object.getOwnPropertyDescriptor(gl, name);
+    const wrapped = function wrappedUpload(this: WebGL2RenderingContext, ...args: unknown[]): unknown {
+      if (collecting) {
+        const bytes = uploadByteLength(args, sourceIndex, sourceOffsetIndex);
+        if (name === 'bufferData') {
+          totals.bufferDataCalls++;
+          if (bytes === null) totals.unknownByteCalls++;
+          else totals.bufferDataBytes += bytes;
+        } else {
+          totals.bufferSubDataCalls++;
+          if (bytes === null) totals.unknownByteCalls++;
+          else totals.bufferSubDataBytes += bytes;
+        }
+      }
+      return Reflect.apply(original as (...values: unknown[]) => unknown, this, args);
+    };
+    Object.defineProperty(gl, name, { configurable: true, writable: true, value: wrapped });
+    restores.push(() => {
+      if (descriptor) Object.defineProperty(gl, name, descriptor);
+      else delete record[name];
+    });
+  };
+  try {
+    install('bufferData', 1, 3);
+    install('bufferSubData', 2, 3);
+  } catch {
+    supported = false;
+    for (const restore of restores.reverse()) restore();
+    restores.length = 0;
+  }
+  return {
+    beginFrame(): void {
+      if (!supported) return;
+      frameStartBytes = totals.bufferDataBytes + totals.bufferSubDataBytes;
+      collecting = true;
+    },
+    endFrame(): void {
+      if (!supported) return;
+      collecting = false;
+      bytesPerFrame.push(totals.bufferDataBytes + totals.bufferSubDataBytes - frameStartBytes);
+    },
+    report(): Record<string, unknown> {
+      return {
+        supported,
+        ...totals,
+        totalBytes: totals.bufferDataBytes + totals.bufferSubDataBytes,
+        measuredFrames: bytesPerFrame.length,
+        bytesPerFrame,
+      };
+    },
+    restore(): void {
+      collecting = false;
+      for (const restore of restores.reverse()) restore();
+      restores.length = 0;
+    },
+  };
+}
+
+export function uploadByteLength(args: unknown[], sourceIndex: number, sourceOffsetIndex: number): number | null {
+  const source = args[sourceIndex];
+  if (typeof source === 'number') return Number.isFinite(source) && source >= 0 ? source : null;
+  if (!(source instanceof ArrayBuffer) && !ArrayBuffer.isView(source)) return null;
+  const byteLength = source.byteLength;
+  const elementSize = ArrayBuffer.isView(source)
+    ? (source as unknown as { BYTES_PER_ELEMENT?: number }).BYTES_PER_ELEMENT ?? 1
+    : 1;
+  const totalElements = byteLength / elementSize;
+  const sourceLengthIndex = sourceOffsetIndex + 1;
+  const offset = typeof args[sourceOffsetIndex] === 'number' ? args[sourceOffsetIndex] : 0;
+  const requested = typeof args[sourceLengthIndex] === 'number' ? args[sourceLengthIndex] : totalElements - offset;
+  if (!Number.isFinite(offset) || !Number.isFinite(requested) || offset < 0 || requested < 0) return null;
+  return Math.max(0, Math.min(requested, totalElements - offset)) * elementSize;
 }
 
 function requiredRww(): RwwWindow {

@@ -3,7 +3,7 @@ import { basename, dirname, relative, resolve } from 'node:path';
 import { probeSystem, parseTarget, buildDoctorReport } from './doctor.mjs';
 import { probeBrowser } from './browser.mjs';
 import { benchmarkBrowserScenario, captureVisualScenario, openBrowserScenario, readJsonFile } from './browser-scenario.mjs';
-import { evaluateBrowserBudget, summarizeFrameMetrics } from './browser-metrics.mjs';
+import { evaluateBrowserBudget, summarizeDistributions, summarizeFrameMetrics } from './browser-metrics.mjs';
 import { parseScenario, resolveScenarioPath } from './scenario.mjs';
 import { compareVisualSignatures, computeVisualSignature } from './visual-signature.mjs';
 import { sha256File, sha256Json } from './hash.mjs';
@@ -590,12 +590,31 @@ async function executeBrowserPerf(parsed, cwd) {
     expected: parsed.quality,
     status: measured.frame.state.quality === parsed.quality ? 'pass' : 'fail',
   });
+  invariantChecks.push(maximumInvariant(
+    'shader-program-growth',
+    measured.benchmark.shaderPrograms.latePrograms,
+    0,
+  ));
+  invariantChecks.push({
+    id: 'sample-window-complete',
+    actual: measured.benchmark.sampleLimitReached,
+    expected: false,
+    status: measured.benchmark.sampleLimitReached ? 'fail' : 'pass',
+  });
+  if (parsed.variant === 'default') {
+    invariantChecks.push(maximumInvariant(
+      'startup-prewarm-missed-programs',
+      measured.benchmark.shaderPrograms.startupMissedPrograms ?? Number.POSITIVE_INFINITY,
+      0,
+    ));
+  }
   const browserErrors = [...measured.consoleErrors, ...measured.pageErrors];
   const hardwareFailure = process.platform === 'win32' && measured.browser.softwareRenderer;
   const classification = browserErrors.length > 0 || hardwareFailure
     ? classifyExit('runtime')
     : verdict.status === 'fail' || invariantChecks.some((check) => check.status === 'fail')
       ? classifyExit('gate') : classifyExit('success');
+  const { bytesPerFrame, ...uploadTotals } = measured.benchmark.uploads;
   const report = {
     schema: 'rww.browser-performance', version: 1,
     status: classification.exitCode === 0 ? verdict.status : 'fail',
@@ -607,6 +626,12 @@ async function executeBrowserPerf(parsed, cwd) {
     viewport: benchmarkScenario.viewport,
     warmupSeconds: scenario.benchmark.warmupSeconds, sampleSeconds: parsed.seconds,
     metrics,
+    cpuPhases: summarizeDistributions(measured.benchmark.cpuPhases),
+    uploads: {
+      ...uploadTotals,
+      bytesPerFrame: summarizeDistributions({ bytes: bytesPerFrame }).bytes,
+      bytesPerSecond: parsed.seconds > 0 ? uploadTotals.totalBytes / parsed.seconds : null,
+    },
     resources: measured.benchmark.resources,
     gpuTimer: {
       supported: measured.benchmark.timerQuerySupported,
@@ -619,6 +644,7 @@ async function executeBrowserPerf(parsed, cwd) {
         : null,
       queryStats: measured.benchmark.gpuQueryStats,
     },
+    shaderPrograms: measured.benchmark.shaderPrograms,
     contextLosses: measured.benchmark.contextLosses,
     blackFrame: invariantChecks.some((check) => check.id === 'frame-luminance' && check.status === 'fail'),
     invariants: invariantChecks,

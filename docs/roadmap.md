@@ -47,7 +47,8 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 13. **Completed - Phase 3E tactical HUD:** final command hierarchy and controls reference passed combined human review.
 14. **Completed - Phase 4A measurement foundation:** source-current hardware, browser, wall, phase, and detail baselines are recorded provisionally.
 15. **Completed - Phase 4B simulation:** Requirement 17.5 passed on the protected reference runner without changing accepted gameplay semantics.
-16. **Current - Phase 4C renderer and GPU:** profile quality tiers and make only evidence-backed renderer changes.
+16. **Completed - Phase 4C renderer and GPU:** quality tiers, GPU timing, terrain attribution, active-quality prewarm, uploads, transparency, and HUD costs are characterized.
+17. **Current - Phase 4D hardening:** memory, startup, disposal, long-session heap stability, and context recovery.
 
 ## Direction Decisions
 

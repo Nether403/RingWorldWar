@@ -112,6 +112,14 @@ function snapRatio(raw: number, cap: number): number {
   return Math.max(0.5, Math.min(snapped, cap));
 }
 
+export interface ShaderPrewarmMetrics {
+  durationMilliseconds: number;
+  parallelCompileSupported: boolean;
+  programsBefore: number;
+  programsAfterForwardWarm: number;
+  programsAfterShadowWarm: number;
+}
+
 export class Renderer {
   readonly gl: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -128,6 +136,7 @@ export class Renderer {
   private governorCooldown = 8;
   autoQuality = true;
   onQualityChange: ((settings: QualitySettings) => void) | null = null;
+  prewarmMetrics: ShaderPrewarmMetrics | null = null;
 
   constructor(container: HTMLElement, camera: THREE.PerspectiveCamera, quality: QualityLevel = 'high') {
     this.camera = camera;
@@ -182,6 +191,27 @@ export class Renderer {
     this.gl.setSize(safeWidth, safeHeight, false);
     this.gl.domElement.style.width = '100%';
     this.gl.domElement.style.height = '100%';
+  }
+
+  async prewarmActiveQuality(): Promise<ShaderPrewarmMetrics> {
+    const started = performance.now();
+    const programsBefore = this.gl.info.programs?.length ?? 0;
+    const parallelCompileSupported = this.gl.getContext().getExtension('KHR_parallel_shader_compile') !== null;
+    await this.gl.compileAsync(this.scene, this.camera);
+    const programsAfterForwardWarm = this.gl.info.programs?.length ?? 0;
+    // Three creates generated shadow-depth programs during the real shadow pass,
+    // not during compileAsync. The boot overlay still covers this direct render.
+    this.gl.setRenderTarget(null);
+    this.gl.render(this.scene, this.camera);
+    const programsAfterShadowWarm = this.gl.info.programs?.length ?? 0;
+    this.prewarmMetrics = {
+      durationMilliseconds: performance.now() - started,
+      parallelCompileSupported,
+      programsBefore,
+      programsAfterForwardWarm,
+      programsAfterShadowWarm,
+    };
+    return this.prewarmMetrics;
   }
 
   render(dt: number): void {

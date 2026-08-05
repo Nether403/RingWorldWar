@@ -6,7 +6,7 @@ import { parseScenario, resolveScenarioPath } from '../../tools/rww/scenario.mjs
 import { computeVisualSignature } from '../../tools/rww/visual-signature.mjs';
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
 import { evaluateBrowserBudget, percentile, summarizeFrameMetrics } from '../../tools/rww/browser-metrics.mjs';
-import { applyScenarioHealth, validateScenarioUnitState } from '../../e2e/support/scenario-driver';
+import { applyScenarioHealth, uploadByteLength, validateScenarioUnitState } from '../../e2e/support/scenario-driver';
 import type { Unit } from '../../src/sim/world';
 
 const scenario = {
@@ -329,6 +329,13 @@ describe('browser performance math', () => {
     );
     expect(metrics.gpuMilliseconds).toEqual({ median: 12, p95: 12.9, p99: 12.98 });
     expect(metrics.gpuSamples).toBe(3);
+  });
+
+  it('counts WebGL allocation and typed-array upload slices in bytes', () => {
+    expect(uploadByteLength([0, 256, 0], 1, 3)).toBe(256);
+    expect(uploadByteLength([0, 0, new Float32Array(10)], 2, 3)).toBe(40);
+    expect(uploadByteLength([0, 0, new Int16Array(10), 2, 3], 2, 3)).toBe(6);
+    expect(uploadByteLength([0, 0, null], 2, 3)).toBeNull();
   });
 
   it('evaluates candidate hard and advisory budgets without changing doctor semantics', () => {

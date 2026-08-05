@@ -42,6 +42,10 @@ export function evaluateBrowserBudget(metrics, budget) {
   return { id: budget.id, classification: budget.classification, status: failures.length === 0 ? 'pass' : hard ? 'fail' : 'warn', failures };
 }
 
+export function summarizeDistributions(groups) {
+  return Object.fromEntries(Object.entries(groups).map(([name, values]) => [name, distribution(values)]));
+}
+
 function distribution(values) {
   return { median: round(percentile(values, 0.5)), p95: round(percentile(values, 0.95)), p99: round(percentile(values, 0.99)) };
 }

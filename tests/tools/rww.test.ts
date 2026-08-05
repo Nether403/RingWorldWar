@@ -74,6 +74,12 @@ describe('RWW CLI argument parsing', () => {
     expect(parseCliArgs(['perf', 'browser-heavy', '--variant', 'no-terrain-shadows'])).toMatchObject({
       variant: 'no-terrain-shadows',
     });
+    expect(parseCliArgs(['perf', 'browser-heavy', '--variant', 'no-transparent-effects'])).toMatchObject({
+      variant: 'no-transparent-effects',
+    });
+    expect(parseCliArgs(['perf', 'browser-heavy', '--variant', 'no-markers'])).toMatchObject({
+      variant: 'no-markers',
+    });
     expect(() => parseCliArgs(['perf', 'browser-heavy', '--variant', 'blank-scene'])).toThrow(/variant/i);
   });
 

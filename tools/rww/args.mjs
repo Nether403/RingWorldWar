@@ -179,8 +179,11 @@ function parseBrowserPerf(args) {
         result.quality = value;
       }
       else if (arg === '--variant') {
-        if (!['default', 'no-shadows', 'low-terrain', 'no-terrain-shadows'].includes(value)) {
-          throw new UsageError('variant must be default, no-shadows, low-terrain, or no-terrain-shadows');
+        if (![
+          'default', 'no-shadows', 'low-terrain', 'no-terrain-shadows',
+          'no-transparent-effects', 'no-markers',
+        ].includes(value)) {
+          throw new UsageError('variant is not supported');
         }
         result.variant = value;
       }

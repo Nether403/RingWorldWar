@@ -1,6 +1,6 @@
 # Phase 4 - Performance and Hardening
 
-**Status:** Phase 4C quality profiling complete; shader prewarm and long-session stability are current.
+**Status:** Phase 4C complete; Phase 4D memory, startup, and recovery is current.
 
 **Frozen product baseline:** `a0c72a25f66548bec38df21e3996f9c1abaa1074`
 

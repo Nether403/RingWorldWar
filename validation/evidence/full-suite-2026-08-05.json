@@ -15,7 +15,7 @@
       "results": {
         "testFilesPassed": 38,
         "testFilesSkipped": 1,
-        "testsPassed": 316,
+        "testsPassed": 317,
         "testsSkipped": 1,
         "classification": "serialized"
       }
@@ -28,17 +28,17 @@
     {
       "command": "npx playwright test e2e/scenario.spec.ts e2e/renderer.spec.ts --workers=1",
       "exitCode": 0,
-      "results": { "browser": "Chromium", "testsPassed": 6, "testsFailed": 0, "duration": "1.6m" }
+      "results": { "browser": "Chromium", "testsPassed": 7, "testsFailed": 0, "duration": "1.2m" }
     }
   ],
   "code": {
     "sourceBaseSha": "f088cfb81768249febea973390d37739eadd2558",
     "branch": "master",
     "dirty": true,
-    "executableSourceManifestSha256": "2b8d8581a11fc3624d747aa218510ce7d36cca0bef7651b784cd04b4e7df39ec",
+    "executableSourceManifestSha256": "f56670558c830daa4b8bb999048706e974bd09ed92d9853af9c86346ae563969",
     "untrackedSourceExclusions": ["validation/evidence/**"],
     "hiddenTrackedEntries": [],
     "gitVersion": "git version 2.55.0.windows.3",
-    "caveat": "Dirty executable source is content-addressed and matches all six Phase 4C browser receipts. Subsequent changes are limited to tracked evidence and documentation."
+    "caveat": "The executable-source aggregate identifies the final Phase 4C-2 implementation verified by this suite. Earlier Phase 4C characterization receipts retain their own recorded source identities."
   }
 }
