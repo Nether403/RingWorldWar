@@ -344,3 +344,22 @@ contention spikes while preserving the canonical SHA-256 result across all five
 runs. Receipt: `output/runs/20260804T225902.771Z-25968-91cc7d6e/receipt.json`.
 Local calibration is therefore inconclusive; only protected dedicated-runner
 qualification can pass or reject the 15-second candidate policy.
+
+## Protected Requirement 17.5 Qualification
+
+GitHub run `30990813691` passed on clean commit `5427c3f`:
+
+- Protected runner: `t480s-headless-01`, AC power, High Performance plan.
+- Source: clean before and after; no tracked, untracked, or hidden-index changes.
+- Determinism timeline hash: `6bbc10ac09b7cb6f21bcdba907d4dc57ef8134d6383cabe9d534d171e061f5db`.
+- Event transcript hash: `5704436e3a85e1845a4f7534efda52d4f671f0fa705de04a8dcc664591361b66`.
+- Five measured MatchResult hashes matched the approved SHA-256 baseline.
+- Excluded warmup: 10,647.610 ms.
+- Measured runs: 9,524.731 / 9,433.305 / 9,369.218 / 9,281.221 /
+  9,295.008 ms.
+- Warm median: 9,369.218 ms against the 15,000 ms budget.
+- GitHub run: `https://github.com/Nether403/RingWorldWar/actions/runs/30990813691`.
+- Tracked evidence: `validation/evidence/headless-qualification-2026-08-05.json`.
+
+Decision: Requirement 17.5 is passed without retaining any solver or gameplay
+semantics experiment.

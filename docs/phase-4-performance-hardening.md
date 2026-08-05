@@ -1,6 +1,6 @@
 # Phase 4 - Performance and Hardening
 
-**Status:** Phase 4B candidate policy defined; clean pinned-runner qualification remains open.
+**Status:** Phase 4B passed; Phase 4C renderer/GPU profiling is current.
 
 **Frozen product baseline:** `a0c72a25f66548bec38df21e3996f9c1abaa1074`
 

@@ -1,6 +1,6 @@
 # Current Roadmap And Status
 
-**Status date:** 2026-08-04
+**Status date:** 2026-08-05
 
 This is the authoritative source for current delivery status and near-term sequencing. `tasks/plan.md` and `tasks/todo.md` preserve earlier planning history; unchecked or future-looking items there do not override this document.
 
@@ -11,7 +11,7 @@ This is the authoritative source for current delivery status and near-term seque
 | Gate 1 technical playable slice | Passed | Automated and technical receipt in `docs/gate-1.md` |
 | Phase 2 systems implementation | Delivered | AI tiers, weapons, abilities, faction modifiers, save/load, quality settings, and headless orchestration are summarized in `tasks/phase-2-systems-depth/execution-report.md` |
 | Gate 2 gameplay cohorts | Passed | Veteran mirror, Veteran vs Recruit, and Commander vs Veteran cohorts all pass the configured gameplay gates in `docs/core-match-validation-results.md` |
-| Requirement 17.5 | Protected workflow pending runner | The canonical-solver gate is a 15-second warm median; `.github/workflows/headless-qualification.yml` is ready, but the protected `t480s-headless-01` runner must be registered before final qualification |
+| Requirement 17.5 | Passed | Protected run `30990813691` passed at a 9.369-second warm median with clean stable source and matching timeline/result hashes |
 | Human playtesting | Internal pass | One follow-up internal observation passed the four first-player UX checks; the broader five-player cohort remains open |
 | Validation CLI and visual scenario tooling | Completed | Direct `doctor`, `run`, `visual`, `play`, and `perf` workflows are documented in `docs/cli.md` |
 | T480s 720p Low rendering gate | Completed | The candidate hard gate passes with evidence in `docs/t480s-low-performance.md` |
@@ -26,14 +26,14 @@ This is the authoritative source for current delivery status and near-term seque
 | Phase 3D battlefield memory | Internal completion pass | Scars, debris, smoke, wreck staging, and strategic Chord presentation passed combined human review in baseline `01261e8` |
 | Phase 3E tactical HUD | Internal completion pass | Command hierarchy, feedback, accessibility, compact layouts, and controls reference passed combined review in baseline `a0c72a2` |
 | Phase 4 performance and hardening | In progress | Measurement, Requirement 17.5, renderer, memory/startup, device, and CI sequencing is defined in `docs/phase-4-performance-hardening.md` |
-| Phase 2 overall | Qualification in progress | Gameplay cohorts pass, but performance qualification and human observation remain open |
+| Phase 2 overall | Technical qualification passed | Gameplay cohorts and Requirement 17.5 pass; broader human observation remains open |
 
 ## Immediate Sequence
 
 Work proceeds in this order. Later steps must not be pulled forward when they depend on evidence from an earlier step.
 
 1. **Completed - CLI and visual scenario tooling:** direct reproducible validation, visual capture, play, and profiling workflows are available.
-2. **Completed - T480s Low rendering gate:** the measured 720p Low candidate hard gate passes. Requirement 17.5 remains separately open at an exact-solver local median of approximately 11.9-12.0 seconds.
+2. **Completed - T480s Low rendering gate:** the measured 720p Low candidate hard gate passes.
 3. **Completed - directional artillery prototype:** the antispinward long-range territorial question is implemented and technically validated.
 4. **Completed - first internal USP observation:** the tester understood sensor coverage versus LOS, blocked previews, minimap commands, and direction-dependent artillery velocity.
 5. **Completed - First Contact tutorial alpha:** deterministic onboarding passed one tester-reported internal completion; broader copy validation remains open.
@@ -46,7 +46,8 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 12. **Completed - Phase 3D battlefield memory:** observed combat leaves bounded scars, debris, smoke, wrecks, and strategic Chord presentation.
 13. **Completed - Phase 3E tactical HUD:** final command hierarchy and controls reference passed combined human review.
 14. **Completed - Phase 4A measurement foundation:** source-current hardware, browser, wall, phase, and detail baselines are recorded provisionally.
-15. **Current - Phase 4B simulation:** attribute late ballistic work, test measured optimizations, and resolve Requirement 17.5 without accepting a balance regression.
+15. **Completed - Phase 4B simulation:** Requirement 17.5 passed on the protected reference runner without changing accepted gameplay semantics.
+16. **Current - Phase 4C renderer and GPU:** profile quality tiers and make only evidence-backed renderer changes.
 
 ## Direction Decisions
 
@@ -62,7 +63,6 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 
 ## Open Exit Evidence
 
-- A repeatable Requirement 17.5 result on the named target or stable pinned CI hardware.
 - A broader recorded first-time-player cohort with match outcomes, durations, points of confusion, artillery-direction comprehension, and unprompted observations.
 - A go, rebalance, or re-scope decision based on that human evidence.
 

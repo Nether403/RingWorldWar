@@ -1,0 +1,62 @@
+{
+  "schema": "rww.tracked-performance-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-05T08:53:19.220Z",
+  "status": "pass",
+  "requirement": "17.5",
+  "githubRun": {
+    "id": "30990813691",
+    "url": "https://github.com/Nether403/RingWorldWar/actions/runs/30990813691",
+    "workflow": ".github/workflows/headless-qualification.yml",
+    "ref": "refs/heads/master",
+    "refProtected": true
+  },
+  "runner": {
+    "id": "t480s-headless-01",
+    "dedicated": true,
+    "acPower": true,
+    "powerPolicy": "fixed-performance",
+    "immutableWorkspace": true,
+    "os": "Windows 11 Pro 10.0.26220 x64",
+    "cpu": "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz",
+    "logicalCpus": 8,
+    "ramBytes": 25600958464,
+    "node": "v26.6.0"
+  },
+  "determinism": {
+    "timelineHash": "6bbc10ac09b7cb6f21bcdba907d4dc57ef8134d6383cabe9d534d171e061f5db",
+    "eventTranscriptHash": "5704436e3a85e1845a4f7534efda52d4f671f0fa705de04a8dcc664591361b66",
+    "resultHash": "6cbce1c53391f33b78949037500c429fc1b59b2c74ee051ed9cebce001fac9c0",
+    "timelinePassed": true,
+    "allMeasuredResultsMatch": true,
+    "resultPassed": true
+  },
+  "measurement": {
+    "terrainGenerationMilliseconds": 1127.6906,
+    "warmupSimulationMilliseconds": 10647.6098,
+    "simulationMilliseconds": [9524.7306, 9433.3049, 9369.2177, 9281.2206, 9295.0078],
+    "medianSimulationMilliseconds": 9369.2177,
+    "maximumMedianMilliseconds": 15000,
+    "medianBudgetPassed": true,
+    "resultTicks": 50890,
+    "winner": "Choir",
+    "endReason": "Your Bastion was destroyed"
+  },
+  "artifacts": {
+    "sourceReceipt": "output/runs/20260805T085319.220Z-15444-628b0348/receipt.json",
+    "sourceReceiptSha256": "19cb6d01263c8a57157c8795caa82fd6e89eec71baf415496093068080791599",
+    "performanceReportSha256": "f0ad1a4c1f8414f58ac92f24d69cee8d4b63c85c9a72b253fdcc326dbd656ce5",
+    "determinismReportSha256": "44db48383e7b861d784cea670f74b9f2cdc36af1368e12a24fbe04e55395b082"
+  },
+  "code": {
+    "sha": "5427c3fbefb2b788eb5d97a35d6ad6b709dcfd94",
+    "sourceBaseSha": "5427c3fbefb2b788eb5d97a35d6ad6b709dcfd94",
+    "branch": "master",
+    "dirty": false,
+    "sourceStable": true,
+    "trackedPatchSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untrackedSourceManifestSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "untrackedSourceCount": 0,
+    "hiddenTrackedEntries": []
+  }
+}

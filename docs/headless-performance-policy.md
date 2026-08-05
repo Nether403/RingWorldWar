@@ -1,6 +1,6 @@
 # Headless Performance Policy
 
-**Status:** candidate qualification contract; not yet a passed CI gate.
+**Status:** passed on the protected reference runner at commit `5427c3f`.
 
 ## Purpose
 
@@ -97,8 +97,9 @@ canonical deterministic and gameplay cohorts pass.
 
 ## Current Evidence
 
-Two executable local samples produced 14,021.446 ms and 16,115.299 ms warm
-medians. Their content-addressed summary is
-`validation/evidence/headless-40m-candidate-2026-08-04.json`. The disagreement is
-classified as calibration-inconclusive. It does not close Requirement 17.5
-because both samples used dirty source on a non-dedicated developer machine.
+The protected workflow passed on 2026-08-05 with a 9,369.218 ms warm median,
+matching timeline/event/result hashes, and stable clean source. GitHub run:
+`https://github.com/Nether403/RingWorldWar/actions/runs/30990813691`.
+Tracked evidence: `validation/evidence/headless-qualification-2026-08-05.json`.
+Earlier dirty, non-dedicated calibration remains preserved separately as
+inconclusive evidence.
