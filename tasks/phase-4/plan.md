@@ -30,8 +30,9 @@
 
 ## 4C Renderer
 
-- [ ] Profile GPU/CPU frame components by quality.
-- [ ] Audit geometry, draw, dynamic upload, shader, smoke, and HUD costs.
+- [x] Profile GPU/CPU frame components for Low, Medium, High, and Ultra on the T480s reference GPU.
+- [ ] Complete dynamic-upload, transparent-overdraw, shader-prewarm, smoke, and HUD attribution.
+- [x] Isolate the full procedural PBR terrain path as the dominant Intel UHD 620 GPU cost.
 - [ ] Prewarm combat permutations.
 - [ ] Add only profile-justified LOD/batching changes.
 

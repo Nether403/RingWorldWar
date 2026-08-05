@@ -108,12 +108,12 @@ export async function captureVisualScenario(cwd, scenario, screenshotPath) {
   });
 }
 
-export async function benchmarkBrowserScenario(cwd, scenario, warmupSeconds, sampleSeconds) {
+export async function benchmarkBrowserScenario(cwd, scenario, warmupSeconds, sampleSeconds, variant = 'default') {
   return withBrowserScenario(cwd, scenario, async ({ page }) => {
-    const benchmark = await page.evaluate(async ([warmup, sample]) => {
+    const benchmark = await page.evaluate(async ([warmup, sample, benchmarkVariant]) => {
       const driver = await import('/e2e/support/scenario-driver.ts');
-      return driver.benchmarkScenario(warmup, sample);
-    }, [warmupSeconds, sampleSeconds]);
+      return driver.benchmarkScenario(warmup, sample, benchmarkVariant);
+    }, [warmupSeconds, sampleSeconds, variant]);
     const frame = await page.evaluate(async (value) => {
       const driver = await import('/e2e/support/scenario-driver.ts');
       return driver.captureScenarioFrame(value);

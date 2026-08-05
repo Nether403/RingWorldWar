@@ -43,6 +43,30 @@
       "maximumP95FrameMilliseconds": 33.3,
       "classification": "advisory",
       "measuredBy": "future representative visual benchmark"
+    },
+    {
+      "id": "720p-medium-characterization",
+      "resolution": [1280, 720],
+      "quality": "medium",
+      "targetFps": 30,
+      "classification": "advisory",
+      "measuredBy": "Phase 4C heavy-combat characterization"
+    },
+    {
+      "id": "720p-high-characterization",
+      "resolution": [1280, 720],
+      "quality": "high",
+      "targetFps": 30,
+      "classification": "advisory",
+      "measuredBy": "Phase 4C heavy-combat characterization"
+    },
+    {
+      "id": "720p-ultra-characterization",
+      "resolution": [1280, 720],
+      "quality": "ultra",
+      "targetFps": 30,
+      "classification": "advisory",
+      "measuredBy": "Phase 4C heavy-combat characterization"
     }
   ]
 }

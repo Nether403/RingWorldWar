@@ -323,6 +323,14 @@ describe('browser performance math', () => {
     });
   });
 
+  it('summarizes asynchronous GPU timer samples separately from CPU timing', () => {
+    const metrics = summarizeFrameMetrics(
+      [16, 17, 18], 5, [4, 5, 6], [1, 2, 3], [8, 9, 10], [11, 12, 13],
+    );
+    expect(metrics.gpuMilliseconds).toEqual({ median: 12, p95: 12.9, p99: 12.98 });
+    expect(metrics.gpuSamples).toBe(3);
+  });
+
   it('evaluates candidate hard and advisory budgets without changing doctor semantics', () => {
     const metrics = summarizeFrameMetrics([16, 17, 20, 35], 5);
     expect(evaluateBrowserBudget(metrics, {

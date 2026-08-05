@@ -1,8 +1,8 @@
 {
   "schema": "rww.full-suite-evidence",
   "version": 1,
-  "capturedAt": "2026-08-05T02:03:39+02:00",
-  "status": "pass-serialized-after-contention-retry",
+  "capturedAt": "2026-08-05T17:20:43+02:00",
+  "status": "pass",
   "commands": [
     {
       "command": "npm run lint",
@@ -15,27 +15,30 @@
       "results": {
         "testFilesPassed": 38,
         "testFilesSkipped": 1,
-        "testsPassed": 312,
+        "testsPassed": 316,
         "testsSkipped": 1,
-        "classification": "serialized retry after parallel machine-contention timeouts"
+        "classification": "serialized"
       }
     },
     {
       "command": "npm run build",
       "exitCode": 0,
       "results": { "typecheck": "pass", "build": "pass", "modulesTransformed": 51 }
+    },
+    {
+      "command": "npx playwright test e2e/scenario.spec.ts e2e/renderer.spec.ts --workers=1",
+      "exitCode": 0,
+      "results": { "browser": "Chromium", "testsPassed": 6, "testsFailed": 0, "duration": "1.6m" }
     }
   ],
   "code": {
-    "sourceBaseSha": "a0c72a25f66548bec38df21e3996f9c1abaa1074",
+    "sourceBaseSha": "f088cfb81768249febea973390d37739eadd2558",
     "branch": "master",
     "dirty": true,
-    "trackedPatchSha256": "bf70d2a072c434d56990745ca1b435e338e92ef69f461ebc672132df7c9dc2d5",
-    "untrackedSourceManifestSha256": "cf5cc822a8b652218c829b4a285a170ece802dc007117193132caa16cc3701ff",
-    "untrackedSourceCount": 6,
+    "executableSourceManifestSha256": "2b8d8581a11fc3624d747aa218510ce7d36cca0bef7651b784cd04b4e7df39ec",
     "untrackedSourceExclusions": ["validation/evidence/**"],
     "hiddenTrackedEntries": [],
     "gitVersion": "git version 2.55.0.windows.3",
-    "caveat": "Dirty source is content-addressed. The ordinary parallel suite encountered system-contention timeouts; the unchanged source passed with one worker. Browser E2E was not rerun for this tooling-and-documentation change."
+    "caveat": "Dirty executable source is content-addressed and matches all six Phase 4C browser receipts. Subsequent changes are limited to tracked evidence and documentation."
   }
 }

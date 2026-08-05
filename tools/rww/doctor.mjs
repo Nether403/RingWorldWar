@@ -36,12 +36,45 @@ export function parseTarget(input) {
   }
   validateOptionalPositive(input.privateGpu?.minimumDedicatedMemoryGiB, 'privateGpu.minimumDedicatedMemoryGiB');
   if (input.frameBudgets !== undefined && !Array.isArray(input.frameBudgets)) throw new Error('frameBudgets must be an array');
+  const budgetIds = new Set();
   for (const [index, budget] of (input.frameBudgets ?? []).entries()) {
     if (budget === null || typeof budget !== 'object' || typeof budget.id !== 'string' || budget.id.length === 0) {
       throw new Error(`frameBudgets[${index}].id is required`);
     }
+    if (budgetIds.has(budget.id)) throw new Error(`frameBudgets[${index}].id is duplicated`);
+    budgetIds.add(budget.id);
+    if (!['low', 'medium', 'high', 'ultra'].includes(budget.quality)) {
+      throw new Error(`frameBudgets[${index}].quality is invalid`);
+    }
+    if (!['candidate-hard', 'advisory'].includes(budget.classification)) {
+      throw new Error(`frameBudgets[${index}].classification is invalid`);
+    }
+    if (
+      !Array.isArray(budget.resolution)
+      || budget.resolution.length !== 2
+      || !budget.resolution.every((value) => Number.isSafeInteger(value) && value > 0 && value <= 8192)
+    ) throw new Error(`frameBudgets[${index}].resolution is invalid`);
+    validateBudgetNumber(budget.targetFps, `frameBudgets[${index}].targetFps`, 240);
+    validateOptionalBudgetNumber(
+      budget.maximumP95FrameMilliseconds,
+      `frameBudgets[${index}].maximumP95FrameMilliseconds`,
+    );
+    validateOptionalBudgetNumber(
+      budget.maximumP99FrameMilliseconds,
+      `frameBudgets[${index}].maximumP99FrameMilliseconds`,
+    );
   }
   return structuredClone(input);
+}
+
+function validateBudgetNumber(value, label, maximum = 10_000) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > maximum) {
+    throw new Error(`${label} must be a positive finite number at most ${maximum}`);
+  }
+}
+
+function validateOptionalBudgetNumber(value, label) {
+  if (value !== undefined) validateBudgetNumber(value, label);
 }
 
 export function buildDoctorReport({ system, browser = { status: 'not-requested' }, target = null }) {

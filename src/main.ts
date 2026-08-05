@@ -11,7 +11,7 @@ import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
 import { Environment } from '@render/environment';
 import { InputController } from '@render/input';
-import { BASE_EXPOSURE, Renderer, type QualityLevel } from '@render/renderer';
+import { BASE_EXPOSURE, QUALITY, Renderer, type QualityLevel } from '@render/renderer';
 import { Settings } from '@render/settings';
 import { RingMesh } from '@render/ringMesh';
 import { BattlefieldDressing } from '@render/battlefieldDressing';
@@ -249,6 +249,33 @@ async function start(): Promise<void> {
         animationFrame = requestAnimationFrame(frame);
       },
       setAiEnabled: (enabled: boolean): void => game.setAiEnabled(enabled),
+      setBenchmarkVariant: (
+        variant: 'default' | 'no-shadows' | 'low-terrain' | 'no-terrain-shadows',
+      ): void => {
+        applyRenderQuality();
+        renderer.gl.shadowMap.enabled = renderer.currentSettings.shadows;
+        environment.keyLight.castShadow = true;
+        if (!ringMesh.mesh.receiveShadow) {
+          ringMesh.mesh.receiveShadow = true;
+          const materials = Array.isArray(ringMesh.mesh.material)
+            ? ringMesh.mesh.material
+            : [ringMesh.mesh.material];
+          for (const material of materials) material.needsUpdate = true;
+        }
+        if (variant === 'no-shadows') {
+          renderer.gl.shadowMap.enabled = false;
+          environment.keyLight.castShadow = false;
+        } else if (variant === 'low-terrain') {
+          ringMesh.uniforms.uDetailFade.value = QUALITY.low.detailFade;
+          ringMesh.setQuality('low');
+        } else if (variant === 'no-terrain-shadows') {
+          ringMesh.mesh.receiveShadow = false;
+          const materials = Array.isArray(ringMesh.mesh.material)
+            ? ringMesh.mesh.material
+            : [ringMesh.mesh.material];
+          for (const material of materials) material.needsUpdate = true;
+        }
+      },
       stepWorldTo: (targetTick: number): void => {
         if (!Number.isSafeInteger(targetTick) || targetTick < game.world.tick) {
           throw new Error(`Invalid target tick ${targetTick}`);

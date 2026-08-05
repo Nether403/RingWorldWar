@@ -44,7 +44,8 @@ export function normalizeCommand(parsed) {
   if (parsed.profile === 'browser-heavy') {
     return [
       'perf', 'browser-heavy', '--scenario', parsed.scenario,
-      '--target', normalizePath(parsed.target), '--seconds', String(parsed.seconds),
+      '--target', normalizePath(parsed.target), '--quality', parsed.quality,
+      '--variant', parsed.variant, '--seconds', String(parsed.seconds),
       ...(parsed.json ? ['--json'] : []),
     ];
   }
@@ -162,7 +163,7 @@ function parsePerf(args) {
 function parseBrowserPerf(args) {
   const result = {
     command: 'perf', profile: 'browser-heavy', scenario: 'heavy-combat',
-    target: 'validation/hardware/t480s-low.json', seconds: 30, json: false,
+    target: 'validation/hardware/t480s-low.json', quality: 'low', variant: 'default', seconds: 30, json: false,
   };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
@@ -171,7 +172,19 @@ function parseBrowserPerf(args) {
       const value = optionValue(args, ++index, arg);
       if (arg === '--scenario') result.scenario = value;
       else if (arg === '--target') result.target = normalizePath(value);
-      else if (arg === '--seconds') result.seconds = positiveInteger(value, 'seconds');
+      else if (arg === '--quality') {
+        if (!['low', 'medium', 'high', 'ultra'].includes(value)) {
+          throw new UsageError('quality must be low, medium, high, or ultra');
+        }
+        result.quality = value;
+      }
+      else if (arg === '--variant') {
+        if (!['default', 'no-shadows', 'low-terrain', 'no-terrain-shadows'].includes(value)) {
+          throw new UsageError('variant must be default, no-shadows, low-terrain, or no-terrain-shadows');
+        }
+        result.variant = value;
+      }
+      else if (arg === '--seconds') result.seconds = boundedPositiveInteger(value, 'seconds', 600);
       else throw new UsageError(`Unknown browser-heavy option: ${arg}`);
     }
   }

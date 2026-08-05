@@ -17,6 +17,8 @@ npm run rww -- perf browser-heavy --scenario signature-lance --target validation
 npm run rww -- play directional-artillery
 npm run rww -- play directional-artillery --headless --seconds 2
 npm run rww -- perf browser-heavy --scenario heavy-combat --target validation/hardware/t480s-low.json --seconds 30
+npm run rww -- perf browser-heavy --scenario heavy-combat --target validation/hardware/t480s-low.json --quality high --seconds 30
+npm run rww -- perf browser-heavy --scenario heavy-combat --target validation/hardware/t480s-low.json --quality ultra --seconds 30
 npm run rww -- perf browser-heavy --seconds 5 --json
 ```
 
@@ -60,7 +62,17 @@ the accepted signature and measured tolerances in the scenario, then run
 tracked evidence retain source, renderer, scenario, artifact, and signature
 hashes.
 
-`perf browser-heavy` always uses Low quality and disables adaptive quality. On Windows Chromium is launched through ANGLE D3D11 with GPU rasterization enabled; a detected software renderer is an infrastructure failure. The command uses the selected target's candidate Low resolution, warms up for the scenario-defined interval, and samples real RAF intervals for `--seconds`. It reports median/p95/p99 frame intervals, long frames per minute, render/simulation/full-frame distributions, renderer resources, context loss, a coarse black-frame check, optional timer-query availability, and the candidate target verdict. `EXT_disjoint_timer_query_webgl2` is advisory and never required.
+`perf browser-heavy` defaults to Low quality and disables adaptive quality. On Windows Chromium is launched through ANGLE D3D11 with GPU rasterization enabled; a detected software renderer is an infrastructure failure. The command uses the selected target's matching quality budget and resolution, warms up for the scenario-defined interval, and samples real RAF intervals for `--seconds`. It reports median/p95/p99 frame intervals, long frames per minute, render/simulation/full-frame distributions, renderer resources, context loss, a coarse black-frame check, optional timer-query availability, and the candidate target verdict. `EXT_disjoint_timer_query_webgl2` is advisory and never required.
+`--quality low|medium|high|ultra` overrides the scenario quality only for that performance
+run and always disables adaptive quality. The selected hardware target must have
+a budget entry for the requested tier. Low retains the T480s hard gate; the
+tracked 720p High and Ultra entries are advisory characterization targets until
+Phase 4C establishes evidence-backed budgets. Reports and receipts record both
+the scenario-declared and effective quality.
+`--variant no-shadows|low-terrain` is a Phase 4C diagnostic override available
+only through the dev scenario driver. It records the variant in the receipt and
+must not be treated as a shippable visual setting; normal gameplay uses
+`--variant default`.
 
 The T480s frame-budget remains `not-measured` in `doctor`. Only `perf browser-heavy --target validation/hardware/t480s-low.json` evaluates that budget.
 

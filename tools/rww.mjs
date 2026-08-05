@@ -11,7 +11,7 @@ Usage:
   npm run rww -- visual <scenario> [--compare]
   npm run rww -- play <scenario> [--seconds N] [--headless]
   npm run rww -- perf headless-40m [--terrain standard|flat] [--warmup-runs N] [--runs N] [--ticks N] [--max-median-ms N] [--require-clean] [--qualify]
-  npm run rww -- perf browser-heavy [--scenario <name>] [--target <target.json>] [--seconds N] [--json]
+  npm run rww -- perf browser-heavy [--scenario <name>] [--target <target.json>] [--quality low|medium|high|ultra] [--variant default|no-shadows|low-terrain|no-terrain-shadows] [--seconds N] [--json]
 
 Exit codes: 0 success, 2 usage/config, 3 deterministic/gate failure, 4 infrastructure/runtime failure.
 `;

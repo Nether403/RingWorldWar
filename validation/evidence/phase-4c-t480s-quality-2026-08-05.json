@@ -1,0 +1,135 @@
+{
+  "schema": "rww.tracked-performance-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-05",
+  "status": "characterization-complete",
+  "scenario": {
+    "id": "heavy-combat",
+    "sha256": "fc28d6ea84b4c4c6a5c435514d517d4aedc542e54bb97e882221a58ff2a86025"
+  },
+  "target": {
+    "id": "t480s-low-candidate",
+    "sha256": "9fb8e1ef5b80d111ee39bde2cae85f779984347cba4461c705a5e7e16b9eea1c"
+  },
+  "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "renderer": "ANGLE Intel UHD Graphics 620 D3D11",
+  "profiles": [
+    {
+      "quality": "low",
+      "variant": "default",
+      "frameMedianMs": 16.7,
+      "gpuMedianMs": 5.756,
+      "gpuP95Ms": 7.674,
+      "fullFrameMedianMs": 4.6,
+      "drawCalls": 66,
+      "triangles": 117199,
+      "programs": 16,
+      "gpuTimerComplete": true,
+      "receipt": "output/runs/20260805T145307.223Z-14496-21c5fdc0/receipt.json",
+      "receiptSha256": "f03302c9cd31d8c1716bc2091ce0d6dc4b8ce76a7e0bbe50596d9f99fed52c41",
+      "reportSha256": "a9c25ec073c6b06e1503ade6f7d60681c1a450e92a4d39e08340fac37823701a"
+    },
+    {
+      "quality": "medium",
+      "variant": "default",
+      "frameMedianMs": 50.0,
+      "gpuMedianMs": 49.186,
+      "gpuP95Ms": 59.097,
+      "fullFrameMedianMs": 5.9,
+      "drawCalls": 111,
+      "triangles": 426774,
+      "programs": 18,
+      "gpuTimerComplete": true,
+      "receipt": "output/runs/20260805T145444.044Z-24328-734988c3/receipt.json",
+      "receiptSha256": "e54a3d4fe0c09a277aa081fb6ea79ae0b101a5a4450358c8b47c5134c3d57b00",
+      "reportSha256": "1ebf20819254f1fd9f93a4cf589b8965be9d3b8dafac777b455f7249f42b0f6e"
+    },
+    {
+      "quality": "high",
+      "variant": "default",
+      "frameMedianMs": 66.7,
+      "gpuMedianMs": 60.259,
+      "gpuP95Ms": 69.268,
+      "fullFrameMedianMs": 5.15,
+      "drawCalls": 111,
+      "triangles": 427558,
+      "programs": 18,
+      "gpuTimerComplete": true,
+      "receipt": "output/runs/20260805T145607.194Z-3900-2b829565/receipt.json",
+      "receiptSha256": "8cda16935d1f817d658183087e72d37a3fac8824ed6821d870ab1c5aca4c246f",
+      "reportSha256": "b7490b2bd9985c9719ba9a4fe658741d807efe2c626a924e9852b5050d65bd66"
+    },
+    {
+      "quality": "ultra",
+      "variant": "default",
+      "frameMedianMs": 66.7,
+      "gpuMedianMs": 67.22,
+      "gpuP95Ms": 73.232,
+      "fullFrameMedianMs": 7.4,
+      "drawCalls": 111,
+      "triangles": 428134,
+      "programs": 18,
+      "gpuTimerComplete": true,
+      "receipt": "output/runs/20260805T145746.237Z-19792-6c64c5d4/receipt.json",
+      "receiptSha256": "efa2dd306872ed9aef66faff180a9b8de08c47e6aa64ad24df971775ecd19b44",
+      "reportSha256": "ff2a5c7f87f70ac7328efc6d4ff226eeac7cf6946eaaf7591ef66b581cde1e1a"
+    }
+  ],
+  "diagnostics": [
+    {
+      "quality": "medium",
+      "variant": "no-shadows",
+      "gpuMedianMs": 44.508,
+      "drawCalls": 71,
+      "triangles": 381943,
+      "gpuTimerComplete": true,
+      "receipt": "output/runs/20260805T145923.656Z-15356-853d5cbd/receipt.json",
+      "receiptSha256": "fb7906bb52853dcc181d1e47dd71bab0c9aa524d7e2232b2efff445fc88150f6",
+      "reportSha256": "4a4658ab01c20f1a7b47ed79b0da0fd2c87473e9a3ae9b0269e069b1885bcf3b"
+    },
+    {
+      "quality": "medium",
+      "variant": "low-terrain",
+      "gpuMedianMs": 8.136,
+      "drawCalls": 111,
+      "triangles": 164630,
+      "gpuTimerComplete": true,
+      "receipt": "output/runs/20260805T150101.521Z-4808-7026ae8e/receipt.json",
+      "receiptSha256": "a8482d9267fd24eda1cc57173f52c6f58125b6fb47a700ee0645715a729d0a02",
+      "reportSha256": "7727a0098192ca939382f60b2ac039a914e30e30ec27af63d256a68d4f38fe57"
+    }
+  ],
+  "code": {
+    "sourceBaseSha": "f088cfb81768249febea973390d37739eadd2558",
+    "dirty": true,
+    "receiptTrackedPatchSha256": "d8ffa89c402c969fd1f7bab8ed3b3284ace8926d154a34af024f2e52eeb25681",
+    "receiptUntrackedSourceManifestSha256": "e7fa21b3a688412038d6a57b74245da363b8b3d0a0f96de3216aa388b7bc25b2",
+    "executableSourceManifestSha256": "2b8d8581a11fc3624d747aa218510ce7d36cca0bef7651b784cd04b4e7df39ec",
+    "executableSourceManifest": [
+      { "path": ".gitignore", "sha256": "7567154c0ff462fa841786342bf8775f52eb9d9e8bf14c01d518f4fbd12e2870" },
+      { "path": "e2e/support/scenario-driver.ts", "sha256": "75bb10258e14eb8ea5fd47c2d0eacfa8b0cede0090399154c5be89dfbd6812ba" },
+      { "path": "src/main.ts", "sha256": "fb2a2f98449f095ee844d9b7cfa8fe550578b67f4f1be3e6868cd59a62cc8985" },
+      { "path": "tests/tools/rww.test.ts", "sha256": "596aeb34c2818fee7b668bdee404981bf8d6469d9eb5f7d0231102ed9f5b3fb3" },
+      { "path": "tests/tools/scenario.test.ts", "sha256": "28afb60f3cebecc6ccf9597b3e5770ac0193adc0956c1837ce750ab8f2cec285" },
+      { "path": "tools/rww.mjs", "sha256": "6026fc5039ac4b2def3bdc564f8b02108aa2280f0e65996e7b2409ce26e6b434" },
+      { "path": "tools/rww/args.mjs", "sha256": "b800363dcb5868f046ac82f34dac0b93009b924bdffbdf5ddfc8c18814a1dcf9" },
+      { "path": "tools/rww/browser-metrics.mjs", "sha256": "54878e40f4be22f70afacc5f5df05a5a9a83fac2973f5d3340f59209ef0bf841" },
+      { "path": "tools/rww/browser-scenario.mjs", "sha256": "684719cc6dec3016fe11c5f04bf7f27ce37a4179e5f31374f87cc1efaf3ce487" },
+      { "path": "tools/rww/commands.mjs", "sha256": "6bf6d2b1cc57b8f09951b737ab2329f21b9ae9cc9f09ad32fdf3c91f4063288e" },
+      { "path": "tools/rww/doctor.mjs", "sha256": "d81bb49932610900c2bf3e6c19b39ae1c76127e638769b6124b034a267a8bd11" },
+      { "path": "validation/hardware/t480s-low.json", "sha256": "9fb8e1ef5b80d111ee39bde2cae85f779984347cba4461c705a5e7e16b9eea1c" }
+    ],
+    "caveat": "All six receipts share the recorded dirty Git identity. The durable executable manifest excludes post-capture documentation and evidence to avoid self-reference."
+  },
+  "postCaptureDrift": {
+    "classification": "documentation-and-evidence-only",
+    "files": [
+      "docs/phase-4c-renderer-profile.md",
+      "docs/phase-4-performance-hardening.md",
+      "tasks/phase-4/plan.md",
+      "validation/evidence/full-suite-2026-08-05.json",
+      "validation/evidence/phase-4c-t480s-quality-2026-08-05.json"
+    ]
+  },
+  "conclusion": "The Intel UHD 620 bottleneck is the full procedural PBR terrain path. Disabling shadows reduces Medium GPU time only from 49.186 to 44.508 ms, while substituting the Low terrain path reduces it to 8.136 ms. High and Ultra add further GPU cost but remain advisory tiers on this hardware. Low remains the T480s production target; no visual downgrade was retained."
+}

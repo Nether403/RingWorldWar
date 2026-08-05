@@ -7,7 +7,14 @@ export function percentile(values, quantile) {
   return sorted[lower] + (sorted[Math.min(lower + 1, sorted.length - 1)] - sorted[lower]) * fraction;
 }
 
-export function summarizeFrameMetrics(intervals, sampleSeconds, render = [], simulation = [], fullFrame = []) {
+export function summarizeFrameMetrics(
+  intervals,
+  sampleSeconds,
+  render = [],
+  simulation = [],
+  fullFrame = [],
+  gpu = [],
+) {
   const over100 = intervals.filter((value) => value > 100).length;
   return {
     samples: intervals.length,
@@ -20,6 +27,8 @@ export function summarizeFrameMetrics(intervals, sampleSeconds, render = [], sim
     renderMilliseconds: distribution(render),
     simulationMilliseconds: distribution(simulation),
     fullFrameMilliseconds: distribution(fullFrame),
+    gpuMilliseconds: distribution(gpu),
+    gpuSamples: gpu.length,
   };
 }
 

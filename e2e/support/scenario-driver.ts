@@ -59,6 +59,7 @@ interface TestDriver {
   stopLoop(): void;
   resumeLoop(): void;
   setAiEnabled(enabled: boolean): void;
+  setBenchmarkVariant(variant: 'default' | 'no-shadows' | 'low-terrain' | 'no-terrain-shadows'): void;
   stepWorldTo(tick: number): void;
   setCamera(s: number, z: number, yaw: number, zoom: number): void;
   renderFrame(dt: number, visualTime: number): void;
@@ -316,48 +317,142 @@ export function captureScenarioFrame(scenario: BrowserScenario): {
   };
 }
 
-export async function benchmarkScenario(warmupSeconds: number, sampleSeconds: number): Promise<Record<string, unknown>> {
+export async function benchmarkScenario(
+  warmupSeconds: number,
+  sampleSeconds: number,
+  variant: 'default' | 'no-shadows' | 'low-terrain' | 'no-terrain-shadows' = 'default',
+): Promise<Record<string, unknown>> {
   const rww = requiredRww();
   // Performance qualification measures active gameplay, not a deliberately
   // paused story briefing. Visual and human-play flows still preserve it.
   if (rww.game.narrativeHudModel?.blocking) rww.game.acknowledgeNarrative();
+  rww.testDriver.setBenchmarkVariant(variant);
+  // Quality/variant changes can create new shader permutations. Compile them
+  // before the time-based warmup so a single long first frame cannot consume
+  // the complete warmup and contaminate the measured window.
+  rww.testDriver.presentFrame(1 / 60, rww.game.world.time);
+  rww.testDriver.presentFrame(1 / 60, rww.game.world.time + 1 / 60);
   const intervals: number[] = [];
   const render: number[] = [];
   const simulation: number[] = [];
   const fullFrame: number[] = [];
+  const gpuTimerMilliseconds: number[] = [];
   let contextLosses = 0;
   rww.renderer.gl.domElement.addEventListener('webglcontextlost', () => { contextLosses++; });
-  const gl = rww.renderer.gl.getContext();
-  const timerQuerySupported = Boolean(gl.getExtension('EXT_disjoint_timer_query_webgl2'));
+  const gl = rww.renderer.gl.getContext() as WebGL2RenderingContext;
+  const timerQuery = gl.getExtension('EXT_disjoint_timer_query_webgl2') as {
+    TIME_ELAPSED_EXT: number;
+    GPU_DISJOINT_EXT: number;
+  } | null;
+  const timerQuerySupported = timerQuery !== null;
+  const pendingQueries: Array<{ query: WebGLQuery; measured: boolean }> = [];
+  const gpuQueryStats = {
+    started: 0,
+    measuredStarted: 0,
+    measuredResolved: 0,
+    measuredSkipped: 0,
+    measuredDisjoint: 0,
+    measuredDrainTimeout: 0,
+  };
+  const pollGpuQueries = (): void => {
+    if (!timerQuery) return;
+    if (gl.getParameter(timerQuery.GPU_DISJOINT_EXT)) {
+      for (const pending of pendingQueries) {
+        if (pending.measured) gpuQueryStats.measuredDisjoint++;
+        gl.deleteQuery(pending.query);
+      }
+      pendingQueries.length = 0;
+      return;
+    }
+    while (pendingQueries.length > 0) {
+      const pending = pendingQueries[0]!;
+      if (!gl.getQueryParameter(pending.query, gl.QUERY_RESULT_AVAILABLE)) break;
+      const nanoseconds = gl.getQueryParameter(pending.query, gl.QUERY_RESULT) as number;
+      pendingQueries.shift();
+      gl.deleteQuery(pending.query);
+      if (pending.measured && Number.isFinite(nanoseconds)) {
+        gpuTimerMilliseconds.push(nanoseconds / 1_000_000);
+        gpuQueryStats.measuredResolved++;
+      }
+    }
+  };
   const started = performance.now();
   const warmupEnd = started + warmupSeconds * 1000;
   const sampleEnd = warmupEnd + sampleSeconds * 1000;
   let previous = started;
   let visualTime = rww.game.world.time;
-  await new Promise<void>((resolve) => {
-    const frame = (now: number): void => {
-      const interval = now - previous;
-      previous = now;
-      const dt = Math.min(interval / 1000, 0.1);
-      visualTime += dt;
-      const frameStart = performance.now();
-      rww.testDriver.renderFrame(dt, visualTime);
-      const elapsed = performance.now() - frameStart;
-      if (now >= warmupEnd) {
-        intervals.push(interval);
-        render.push(rww.renderer.frameMs);
-        simulation.push(rww.game.simStepMs);
-        fullFrame.push(elapsed);
-      }
-      if (now >= sampleEnd) resolve();
-      else requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const frame = (now: number): void => {
+        try {
+          const interval = now - previous;
+          previous = now;
+          const dt = Math.min(interval / 1000, 0.1);
+          visualTime += dt;
+          pollGpuQueries();
+          const measured = now >= warmupEnd;
+          let query: WebGLQuery | null = null;
+          if (timerQuery) {
+            if (pendingQueries.length < 8) query = gl.createQuery();
+            if (query) {
+              gpuQueryStats.started++;
+              if (measured) gpuQueryStats.measuredStarted++;
+              gl.beginQuery(timerQuery.TIME_ELAPSED_EXT, query);
+            } else if (measured) {
+              gpuQueryStats.measuredSkipped++;
+            }
+          }
+          const frameStart = performance.now();
+          try {
+            rww.testDriver.renderFrame(dt, visualTime);
+          } finally {
+            if (query && timerQuery) {
+              gl.endQuery(timerQuery.TIME_ELAPSED_EXT);
+              pendingQueries.push({ query, measured });
+            }
+          }
+          const elapsed = performance.now() - frameStart;
+          if (measured) {
+            intervals.push(interval);
+            render.push(rww.renderer.frameMs);
+            simulation.push(rww.game.simStepMs);
+            fullFrame.push(elapsed);
+          }
+          if (now >= sampleEnd) resolve();
+          else requestAnimationFrame(frame);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      requestAnimationFrame(frame);
+    });
+    if (timerQuery && pendingQueries.length > 0) {
+      const drainDeadline = performance.now() + 2_000;
+      await new Promise<void>((resolve, reject) => {
+        const drain = (): void => {
+          try {
+            pollGpuQueries();
+            if (pendingQueries.length === 0) resolve();
+            else if (performance.now() >= drainDeadline) {
+              gpuQueryStats.measuredDrainTimeout += pendingQueries.filter((pending) => pending.measured).length;
+              resolve();
+            } else requestAnimationFrame(drain);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        requestAnimationFrame(drain);
+      });
+    }
+  } finally {
+    for (const pending of pendingQueries) gl.deleteQuery(pending.query);
+    pendingQueries.length = 0;
+  }
   const info = rww.renderer.gl.info;
   return {
     intervals, render, simulation, fullFrame, contextLosses, timerQuerySupported,
-    gpuTimerMilliseconds: null,
+    gpuTimerMilliseconds,
+    gpuQueryStats,
     resources: {
       drawCalls: info.render.calls, triangles: info.render.triangles,
       lines: info.render.lines, points: info.render.points,

@@ -535,23 +535,28 @@ async function executeBrowserPerf(parsed, cwd) {
   const scenario = await loadScenario(scenarioPath);
   const targetPath = resolve(cwd, parsed.target);
   const target = await loadTarget(targetPath);
-  const budget = selectBrowserBudget(target);
+  const budget = selectBrowserBudget(target, parsed.quality);
   const benchmarkScenario = {
     ...scenario,
-    quality: 'low',
+    quality: parsed.quality,
     viewport: { ...scenario.viewport, width: budget.resolution[0], height: budget.resolution[1] },
   };
   let measured;
   try {
     measured = await benchmarkBrowserScenario(
-      cwd, benchmarkScenario, scenario.benchmark.warmupSeconds, parsed.seconds,
+      cwd, benchmarkScenario, scenario.benchmark.warmupSeconds, parsed.seconds, parsed.variant,
     );
   } catch (error) {
     const classification = classifyExit('runtime');
     const safeError = sanitizeSecrets(error instanceof Error ? error.message : String(error));
     const finalized = await finalize({
       cwd, parsed, started, runId, classification,
-      deterministic: { scenario: scenarioIdentity(cwd, scenarioPath, scenario, await sha256File(scenarioPath)) },
+      deterministic: {
+        scenario: scenarioIdentity(cwd, scenarioPath, scenario, await sha256File(scenarioPath)),
+        scenarioDeclaredQuality: scenario.quality,
+        quality: parsed.quality,
+        variant: parsed.variant,
+      },
       environmental: { error: safeError },
     });
     if (parsed.json) process.stdout.write(`${JSON.stringify({ status: 'error', error: safeError, receiptPath: relative(cwd, finalized.receiptPath).replaceAll('\\', '/') }, null, 2)}\n`);
@@ -561,8 +566,17 @@ async function executeBrowserPerf(parsed, cwd) {
   const metrics = summarizeFrameMetrics(
     measured.benchmark.intervals, parsed.seconds, measured.benchmark.render,
     measured.benchmark.simulation, measured.benchmark.fullFrame,
+    measured.benchmark.gpuTimerMilliseconds,
   );
-  const verdict = evaluateBrowserBudget(metrics, budget);
+  const budgetVerdict = evaluateBrowserBudget(metrics, budget);
+  const verdict = parsed.variant === 'default'
+    ? budgetVerdict
+    : {
+        id: budgetVerdict.id,
+        classification: 'diagnostic',
+        status: 'diagnostic',
+        failures: budgetVerdict.failures,
+      };
   const frameSignature = computeVisualSignature(
     Uint8Array.from(measured.frame.pixels), measured.frame.width, measured.frame.height,
     scenario.observationRegions,
@@ -570,6 +584,12 @@ async function executeBrowserPerf(parsed, cwd) {
   const invariantChecks = visualInvariantChecks(
     frameSignature, measured.frame.state, scenario.invariants, measured.benchmark.contextLosses,
   );
+  invariantChecks.push({
+    id: 'quality-selected',
+    actual: measured.frame.state.quality,
+    expected: parsed.quality,
+    status: measured.frame.state.quality === parsed.quality ? 'pass' : 'fail',
+  });
   const browserErrors = [...measured.consoleErrors, ...measured.pageErrors];
   const hardwareFailure = process.platform === 'win32' && measured.browser.softwareRenderer;
   const classification = browserErrors.length > 0 || hardwareFailure
@@ -581,11 +601,24 @@ async function executeBrowserPerf(parsed, cwd) {
     status: classification.exitCode === 0 ? verdict.status : 'fail',
     scenario: scenarioIdentity(cwd, scenarioPath, scenario, await sha256File(scenarioPath)),
     target: { id: target.id, path: relative(cwd, targetPath).replaceAll('\\', '/'), sha256: await sha256File(targetPath), budget: budget.id },
-    quality: 'low', viewport: benchmarkScenario.viewport,
+    scenarioDeclaredQuality: scenario.quality,
+    quality: parsed.quality,
+    variant: parsed.variant,
+    viewport: benchmarkScenario.viewport,
     warmupSeconds: scenario.benchmark.warmupSeconds, sampleSeconds: parsed.seconds,
     metrics,
     resources: measured.benchmark.resources,
-    gpuTimer: { supported: measured.benchmark.timerQuerySupported, milliseconds: measured.benchmark.gpuTimerMilliseconds },
+    gpuTimer: {
+      supported: measured.benchmark.timerQuerySupported,
+      samples: metrics.gpuSamples,
+      complete: measured.benchmark.timerQuerySupported
+        ? measured.benchmark.gpuQueryStats.measuredStarted === measured.benchmark.gpuQueryStats.measuredResolved
+          && measured.benchmark.gpuQueryStats.measuredSkipped === 0
+          && measured.benchmark.gpuQueryStats.measuredDisjoint === 0
+          && measured.benchmark.gpuQueryStats.measuredDrainTimeout === 0
+        : null,
+      queryStats: measured.benchmark.gpuQueryStats,
+    },
     contextLosses: measured.benchmark.contextLosses,
     blackFrame: invariantChecks.some((check) => check.id === 'frame-luminance' && check.status === 'fail'),
     invariants: invariantChecks,
@@ -602,6 +635,9 @@ async function executeBrowserPerf(parsed, cwd) {
     cwd, parsed, started, runId, classification,
     deterministic: {
       scenario: safeReport.scenario,
+      scenarioDeclaredQuality: scenario.quality,
+      quality: parsed.quality,
+      variant: parsed.variant,
       target: safeReport.target,
       verdict,
       invariants: invariantChecks,
@@ -863,16 +899,17 @@ function maximumInvariant(id, actual, maximum) {
   return { id, actual, maximum, status: actual <= maximum ? 'pass' : 'fail' };
 }
 
-function selectBrowserBudget(target) {
-  const budget = target.frameBudgets?.find((item) => item.quality === 'low' && item.classification === 'candidate-hard')
-    ?? target.frameBudgets?.find((item) => item.quality === 'low');
-  if (!budget) throw new UsageError(`Target ${target.id} has no Low-quality browser frame budget`);
+export function selectBrowserBudget(target, quality) {
+  const budget = target.frameBudgets?.find((item) => item.quality === quality && item.classification === 'candidate-hard')
+    ?? target.frameBudgets?.find((item) => item.quality === quality);
+  if (!budget) throw new UsageError(`Target ${target.id} has no ${quality}-quality browser frame budget`);
   if (!Array.isArray(budget.resolution) || budget.resolution.length !== 2) throw new UsageError(`Target budget ${budget.id} has no valid resolution`);
   return budget;
 }
 
 function printBrowserPerf(report) {
   process.stdout.write(`RWW perf browser-heavy: ${report.status}\n`);
+  process.stdout.write(`Quality: ${report.quality} (scenario declares ${report.scenarioDeclaredQuality}); variant ${report.variant}\n`);
   process.stdout.write(`Renderer: ${report.renderer.renderer}\n`);
   process.stdout.write(`Frames: median ${report.metrics.medianFrameMilliseconds}ms; p95 ${report.metrics.p95FrameMilliseconds}ms; p99 ${report.metrics.p99FrameMilliseconds}ms\n`);
   process.stdout.write(`>100ms: ${report.metrics.over100MillisecondsCount} (${report.metrics.over100MillisecondsPerMinute}/min); calls ${report.resources.drawCalls}; triangles ${report.resources.triangles}\n`);

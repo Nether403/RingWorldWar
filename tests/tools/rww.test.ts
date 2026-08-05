@@ -19,7 +19,7 @@ import { EventEmitter } from 'node:events';
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
 import { collectGit, runChild } from '../../tools/rww/process.mjs';
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
-import { parseHeadlessDeterminismReport, parseHeadlessPerformanceReport, referenceRunnerFailures, writeSanitizedErrorArtifact } from '../../tools/rww/commands.mjs';
+import { parseHeadlessDeterminismReport, parseHeadlessPerformanceReport, referenceRunnerFailures, selectBrowserBudget, writeSanitizedErrorArtifact } from '../../tools/rww/commands.mjs';
 
 describe('RWW CLI argument parsing', () => {
   it('parses and normalizes doctor options in a stable order', () => {
@@ -60,8 +60,48 @@ describe('RWW CLI argument parsing', () => {
     });
     expect(parseCliArgs(['perf', 'browser-heavy', '--seconds', '5', '--json'])).toEqual({
       command: 'perf', profile: 'browser-heavy', scenario: 'heavy-combat',
-      target: 'validation/hardware/t480s-low.json', seconds: 5, json: true,
+      target: 'validation/hardware/t480s-low.json', quality: 'low', variant: 'default', seconds: 5, json: true,
     });
+  });
+
+  it('parses benchmark-only renderer variants', () => {
+    expect(parseCliArgs(['perf', 'browser-heavy', '--variant', 'no-shadows'])).toMatchObject({
+      variant: 'no-shadows',
+    });
+    const parsed = parseCliArgs(['perf', 'browser-heavy', '--variant', 'low-terrain']);
+    expect(parsed).toMatchObject({ variant: 'low-terrain' });
+    expect(normalizeCommand(parsed)).toContain('low-terrain');
+    expect(parseCliArgs(['perf', 'browser-heavy', '--variant', 'no-terrain-shadows'])).toMatchObject({
+      variant: 'no-terrain-shadows',
+    });
+    expect(() => parseCliArgs(['perf', 'browser-heavy', '--variant', 'blank-scene'])).toThrow(/variant/i);
+  });
+
+  it('parses and normalizes browser performance quality', () => {
+    const parsed = parseCliArgs(['perf', 'browser-heavy', '--quality', 'ultra', '--seconds', '10']);
+    expect(parsed).toMatchObject({ quality: 'ultra', seconds: 10 });
+    expect(normalizeCommand(parsed)).toContain('ultra');
+    expect(parseCliArgs(['perf', 'browser-heavy', '--quality', 'high'])).toMatchObject({ quality: 'high' });
+    expect(parseCliArgs(['perf', 'browser-heavy', '--quality', 'medium'])).toMatchObject({ quality: 'medium' });
+    expect(() => parseCliArgs(['perf', 'browser-heavy', '--quality', 'cinematic'])).toThrow(/quality/i);
+    expect(() => parseCliArgs(['perf', 'browser-heavy', '--seconds', '601'])).toThrow(/seconds/i);
+  });
+
+  it('selects a budget matching the requested quality', () => {
+    const target = {
+      id: 'quality-target',
+      frameBudgets: [
+        { id: 'low-hard', quality: 'low', classification: 'candidate-hard', resolution: [1280, 720] },
+        { id: 'medium-advisory', quality: 'medium', classification: 'advisory', resolution: [1280, 720] },
+        { id: 'high-advisory', quality: 'high', classification: 'advisory', resolution: [1280, 720] },
+        { id: 'ultra-advisory', quality: 'ultra', classification: 'advisory', resolution: [1280, 720] },
+      ],
+    };
+    expect(selectBrowserBudget(target, 'low').id).toBe('low-hard');
+    expect(selectBrowserBudget(target, 'medium').id).toBe('medium-advisory');
+    expect(selectBrowserBudget(target, 'high').id).toBe('high-advisory');
+    expect(selectBrowserBudget(target, 'ultra').id).toBe('ultra-advisory');
+    expect(() => selectBrowserBudget(target, 'cinematic')).toThrow(/cinematic/i);
   });
 
   it('parses and normalizes the headless qualification policy', () => {
@@ -495,12 +535,19 @@ describe('RWW doctor targets', () => {
       minimumLimits: { maxTextureSize: 4096 },
     },
     privateGpu: { minimumDedicatedMemoryGiB: 1 },
-    frameBudgets: [{ id: '720p-low', resolution: [1280, 720], quality: 'low', targetFps: 30 }],
+    frameBudgets: [{
+      id: '720p-low', resolution: [1280, 720], quality: 'low',
+      targetFps: 30, classification: 'advisory',
+    }],
   };
 
   it('parses a versioned target and rejects unsupported versions', () => {
     expect(parseTarget(targetInput).id).toBe('fake-low');
     expect(() => parseTarget({ ...targetInput, version: 2 })).toThrow(/version/i);
+    expect(() => parseTarget({
+      ...targetInput,
+      frameBudgets: [{ id: 'broken', resolution: [1280, 720], quality: 'low', classification: 'candidate-hard' }],
+    })).toThrow(/targetFps/i);
   });
 
   it('builds a stable JSON report from injected process and browser data', () => {
