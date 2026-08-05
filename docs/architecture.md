@@ -142,8 +142,8 @@ UI / DOM                 1.0 ms
 These are contracts, not aspirations. A stats overlay (`F3`) shows per-phase timings live, and a CI perf scene fails the build on regression beyond a tolerance.
 
 ### 4.4 Memory & GC
-- **Zero allocation in the hot loop.** Pooled vectors/quaternions, pooled particles, pooled event objects, preallocated typed arrays. GC pauses read as stutter, and stutter is the #1 tell of a browser game.
-- Object pools for projectiles, decals, lights, audio voices, UI world-space markers.
+- **No unbounded hot-loop growth.** Render vectors/quaternions, particles, effects, lights, and world-space marker buffers are pooled or preallocated. Simulation entities and events allocate at authoritative creation points, then deterministic cleanup and bounded presentation queues release them.
+- ID-keyed simulation indexes use maps rather than sparse arrays, ballistic/navigation caches have explicit limits, and renderer/session owners expose complete disposal paths.
 - `SharedArrayBuffer` (where cross-origin isolation is available) to move sim state to a worker thread without copying.
 
 ### 4.5 Threading

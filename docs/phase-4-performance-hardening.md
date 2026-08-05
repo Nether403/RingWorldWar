@@ -1,6 +1,6 @@
 # Phase 4 - Performance and Hardening
 
-**Status:** Phase 4C complete; Phase 4D memory, startup, and recovery is current.
+**Status:** Phase 4D complete; Phase 4E device and browser qualification is current.
 
 **Frozen product baseline:** `a0c72a25f66548bec38df21e3996f9c1abaa1074`
 
@@ -53,6 +53,15 @@ and must never enter source, receipts, logs, prompts, or artifacts.
 - Complete render-owner disposal and repeated-session construction tests.
 - Reach under 15 seconds to first playable frame on minimum hardware.
 - Add WebGL context-loss detection and recovery qualification.
+
+Completed on 2026-08-05. The source-current T480s/UHD 620 Low run reached
+first playable in 2.029 seconds during the full browser suite and 3.775 seconds
+in an isolated run. A forced-GC 6,000-tick accelerated soak held heap and WebGL
+resource counts flat. Render owners and whole sessions now have explicit
+teardown, presentation starvation is bounded, ID lookup storage does not scale
+with projectile IDs, and forced context loss pauses and restores the same match.
+See `docs/phase-4d-hardening.md` and
+`validation/evidence/phase-4d-hardening-2026-08-05.json`.
 
 ### 4E - Device and Browser Matrix
 

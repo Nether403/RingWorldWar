@@ -33,17 +33,26 @@ export class InputController {
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', this.onBlur);
 
     el.addEventListener('pointermove', this.onPointerMove);
     el.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointerup', this.onPointerUp);
-    el.addEventListener('pointerleave', () => {
-      this.pointerInside = false;
-    });
+    el.addEventListener('pointerleave', this.onPointerLeave);
     el.addEventListener('wheel', this.onWheel, { passive: false });
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('contextmenu', this.onContextMenu);
   }
+
+  private onBlur = (): void => {
+    this.keys.clear();
+    this.rotating = false;
+  };
+
+  private onPointerLeave = (): void => {
+    this.pointerInside = false;
+  };
+
+  private onContextMenu = (event: Event): void => event.preventDefault();
 
   private onKeyDown = (e: KeyboardEvent): void => {
     if (!this.enabled) return;
@@ -154,6 +163,15 @@ export class InputController {
   dispose(): void {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onBlur);
     window.removeEventListener('pointerup', this.onPointerUp);
+    this.el.removeEventListener('pointermove', this.onPointerMove);
+    this.el.removeEventListener('pointerdown', this.onPointerDown);
+    this.el.removeEventListener('pointerleave', this.onPointerLeave);
+    this.el.removeEventListener('wheel', this.onWheel);
+    this.el.removeEventListener('contextmenu', this.onContextMenu);
+    this.keys.clear();
+    this.enabled = false;
+    this.rotating = false;
   }
 }

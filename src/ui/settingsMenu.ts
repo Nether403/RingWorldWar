@@ -76,6 +76,7 @@ const KEYBINDINGS: ReadonlyArray<readonly [string, string]> = [
 
 export class SettingsMenu {
   readonly root: HTMLDivElement;
+  private readonly style: HTMLStyleElement;
   private readonly quality: HTMLSelectElement;
   private readonly volume: HTMLInputElement;
   private readonly volumeOutput: HTMLOutputElement;
@@ -94,9 +95,9 @@ export class SettingsMenu {
     private readonly onOpenChange: (open: boolean) => void,
     private readonly onMasterVolumeChange: (volume: number) => void = () => {},
   ) {
-    const style = document.createElement('style');
-    style.textContent = CSS;
-    document.head.appendChild(style);
+    this.style = document.createElement('style');
+    this.style.textContent = CSS;
+    document.head.appendChild(this.style);
 
     this.root = document.createElement('div');
     this.root.className = 'rww-settings';
@@ -257,6 +258,15 @@ export class SettingsMenu {
     controls[next]!.focus();
     event.preventDefault();
   };
+
+  dispose(): void {
+    this.root.removeEventListener('keydown', this.trapFocus);
+    this.root.remove();
+    this.style.remove();
+    this.previousFocus = null;
+    this.onSave = null;
+    this.onLoad = null;
+  }
 }
 
 function field(labelText: string, control: HTMLElement, labelFor = control.id): HTMLDivElement {

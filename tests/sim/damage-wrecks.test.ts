@@ -45,6 +45,46 @@ describe('damage states and wrecks', () => {
     for (let i = 0; i < WRECK_LIFETIME * 30; i++) world.step();
     expect(decaying.alive).toBe(false);
   });
+
+  it('releases removed entities from the derived lookup index during compaction', () => {
+    const world = emptyWorld();
+    const unit = world.spawnUnit(Faction.Compact, 'engineer', 0, 0);
+    const structure = world.spawnStructure(Faction.Compact, 'solarArray', 100, 0, 1);
+    const mech = world.spawnUnit(Faction.Compact, 'wisp', 200, 0);
+
+    world.applyDamage(unit.id, 100_000, 'explosive', Faction.Choir);
+    world.applyDamage(structure.id, 100_000, 'explosive', Faction.Choir);
+    world.applyDamage(mech.id, 100_000, 'explosive', Faction.Choir);
+    const wreck = world.wreckages[0]!;
+    world.applyDamage(wreck.id, 100_000, 'kinetic', Faction.Choir);
+
+    for (let tick = 0; tick < 30; tick++) world.step();
+
+    const entitiesById = (world as unknown as {
+      entitiesById: Array<unknown | undefined> | Map<number, unknown>;
+    }).entitiesById;
+    const lookup = (id: number): unknown => Array.isArray(entitiesById)
+      ? entitiesById[id]
+      : entitiesById.get(id);
+    expect(lookup(unit.id)).toBeUndefined();
+    expect(lookup(structure.id)).toBeUndefined();
+    expect(lookup(mech.id)).toBeUndefined();
+    expect(lookup(wreck.id)).toBeUndefined();
+    expect(Array.isArray(entitiesById) ? entitiesById.filter(Boolean).length : entitiesById.size).toBe(0);
+  });
+
+  it('does not allocate lookup slots for projectile ids that contain no entity', () => {
+    const world = emptyWorld();
+    (world as unknown as { nextId: number }).nextId = 1_000_000;
+
+    world.spawnUnit(Faction.Compact, 'engineer', 0, 0);
+
+    const index = (world as unknown as {
+      entitiesById: Array<unknown | undefined> | Map<number, unknown>;
+    }).entitiesById;
+    const allocatedEntries = Array.isArray(index) ? index.length : index.size;
+    expect(allocatedEntries).toBe(1);
+  });
 });
 
 function emptyWorld(): World {

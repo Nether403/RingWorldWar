@@ -36,6 +36,7 @@ import {
 } from '@sim/data';
 import type { SimEvent, World } from '@sim/world';
 import type { RenderAnchor } from './anchor';
+import { disposeObject } from './disposeObject';
 
 const MECH_CLASSES: MechClass[] = ['vanguard', 'longbow', 'wisp', 'aegis', 'bulwark', 'needle'];
 const PART_NAMES = ['pelvis', 'torso', 'upperLeg', 'lowerLeg', 'foot'] as const;
@@ -420,6 +421,27 @@ export class EntityRenderer {
       );
       this.drawUnitState(u, anchor, ground, time, s, z, yaw);
     }
+  }
+
+  dispose(): void {
+    disposeObject(this.object);
+    this.onFootfall = null;
+    this.rigs.clear();
+    this.factionRigs.clear();
+    this.structureModels.clear();
+    this.mats.length = 0;
+    this.cloakMats.length = 0;
+    this.mechMeshes.clear();
+    this.structMeshes.clear();
+    this.cloakMeshes.clear();
+    this.wreckMeshes.clear();
+    this.abilityMeshes.clear();
+    this.damageMeshes.clear();
+    this.presentationMeshes.length = 0;
+    this.engineerMeshes.length = 0;
+    this.counts.clear();
+    this.feet.clear();
+    this.recoil.clear();
   }
 
   private drawUnitState(

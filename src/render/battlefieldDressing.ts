@@ -4,6 +4,7 @@ import { deltaS } from '@core/ringMath';
 import { Rng } from '@core/rng';
 import type { Terrain } from '@gen/terrain';
 import type { RenderAnchor } from './anchor';
+import { disposeObject } from './disposeObject';
 
 const DRESSING_COUNT = 320;
 const MAX_VISIBLE = 256;
@@ -124,10 +125,7 @@ export class BattlefieldDressing {
   }
 
   dispose(): void {
-    for (const mesh of [this.slabs, this.pipes]) {
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
-    }
+    disposeObject(this.object);
   }
 }
 

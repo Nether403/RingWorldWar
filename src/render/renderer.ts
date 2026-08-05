@@ -146,13 +146,18 @@ export class Renderer {
     const canvas = document.createElement('canvas');
     container.appendChild(canvas);
 
-    this.gl = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      powerPreference: 'high-performance',
-      stencil: false,
-      depth: true,
-    });
+    try {
+      this.gl = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        powerPreference: 'high-performance',
+        stencil: false,
+        depth: true,
+      });
+    } catch (error) {
+      canvas.remove();
+      throw error;
+    }
     this.gl.outputColorSpace = THREE.SRGBColorSpace;
     this.gl.toneMapping = THREE.ACESFilmicToneMapping;
     this.gl.toneMappingExposure = BASE_EXPOSURE;
@@ -193,11 +198,12 @@ export class Renderer {
     this.gl.domElement.style.height = '100%';
   }
 
-  async prewarmActiveQuality(): Promise<ShaderPrewarmMetrics> {
+  async prewarmActiveQuality(asyncCompile = true): Promise<ShaderPrewarmMetrics> {
     const started = performance.now();
     const programsBefore = this.gl.info.programs?.length ?? 0;
     const parallelCompileSupported = this.gl.getContext().getExtension('KHR_parallel_shader_compile') !== null;
-    await this.gl.compileAsync(this.scene, this.camera);
+    if (asyncCompile) await this.gl.compileAsync(this.scene, this.camera);
+    else this.gl.compile(this.scene, this.camera);
     const programsAfterForwardWarm = this.gl.info.programs?.length ?? 0;
     // Three creates generated shadow-depth programs during the real shadow pass,
     // not during compileAsync. The boot overlay still covers this direct render.
@@ -249,6 +255,10 @@ export class Renderer {
   }
 
   dispose(): void {
+    this.onQualityChange = null;
+    this.scene.clear();
     this.gl.dispose();
+    this.gl.forceContextLoss();
+    this.gl.domElement.remove();
   }
 }

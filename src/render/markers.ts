@@ -17,6 +17,7 @@ import { FACTION_COLOR, Faction, STRUCTURES, UNITS, type StructureKind } from '@
 import { DEPOSIT_PLACEMENT_RADIUS, type BallisticFireResult, type World } from '@sim/world';
 import type { TrajectorySample } from '@sim/ballistics';
 import type { RenderAnchor } from './anchor';
+import { disposeObject } from './disposeObject';
 
 const MAX_RING_SEGMENTS = 3600;
 const MAX_BAR_QUADS = 400;
@@ -383,5 +384,9 @@ export class Markers {
     this.bars.geometry.attributes.color!.needsUpdate = true;
     void RING_CIRCUMFERENCE;
     void FACTION_COLOR;
+  }
+
+  dispose(): void {
+    disposeObject(this.object);
   }
 }

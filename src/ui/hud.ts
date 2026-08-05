@@ -257,6 +257,7 @@ const ABILITY_LABEL: Record<AbilityId, string> = {
 
 export class Hud {
   readonly root: HTMLDivElement;
+  private readonly style: HTMLStyleElement;
   /** Structure kind the player is currently placing, if any. */
   placing: StructureKind | null = null;
   /** Set when the player clicks Restart. */
@@ -319,9 +320,9 @@ export class Hud {
   }
 
   constructor() {
-    const style = document.createElement('style');
-    style.textContent = CSS;
-    document.head.appendChild(style);
+    this.style = document.createElement('style');
+    this.style.textContent = CSS;
+    document.head.appendChild(this.style);
 
     this.root = el('div', 'rww-root');
 
@@ -1376,6 +1377,27 @@ export class Hud {
     this.endEl.setAttribute('aria-labelledby', h.id);
     this.endEl.setAttribute('aria-describedby', p.id);
     this.activateModal(this.endEl, b);
+  }
+
+  dispose(): void {
+    this.root.remove();
+    this.style.remove();
+    this.endEl = null;
+    this.narrativeEl = null;
+    this.previousModalFocus = null;
+    this.recentEvents.length = 0;
+    this.resourceNodes.clear();
+    this.onMinimapPointer = null;
+    this.onMinimapPrimary = null;
+    this.onMinimapSecondary = null;
+    this.onMinimapMove = null;
+    this.onMinimapCancel = null;
+    this.onMinimapCamera = null;
+    this.onArtilleryTarget = null;
+    this.onAbilityToggle = null;
+    this.onBuildRequest = null;
+    this.onNarrativeAcknowledge = null;
+    this.onBlockingOverlayChange = null;
   }
 }
 

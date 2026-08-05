@@ -44,7 +44,59 @@ const boot = {
   },
 };
 
+interface StartupMetrics {
+  startedAt: number;
+  firstPlayableAt: number | null;
+  durationMilliseconds: number | null;
+  shaderPrewarmMilliseconds: number | null;
+}
+
+class CleanupStack {
+  private callbacks: Array<() => void> = [];
+  isDisposed = false;
+
+  defer(callback: () => void): void {
+    if (this.isDisposed) {
+      callback();
+      return;
+    }
+    this.callbacks.push(callback);
+  }
+
+  dispose(): void {
+    if (this.isDisposed) return;
+    this.isDisposed = true;
+    for (let index = this.callbacks.length - 1; index >= 0; index--) {
+      try {
+        this.callbacks[index]!();
+      } catch (error) {
+        // Complete the remaining teardown even when one owner is defective.
+        // eslint-disable-next-line no-console
+        console.error('Session teardown failed', error);
+      }
+    }
+    this.callbacks.length = 0;
+  }
+}
+
 async function start(): Promise<void> {
+  const cleanup = new CleanupStack();
+  const navigation = performance.getEntriesByType('navigation')[0];
+  const startup: StartupMetrics = {
+    startedAt: navigation?.startTime ?? 0,
+    firstPlayableAt: null,
+    durationMilliseconds: null,
+    shaderPrewarmMilliseconds: null,
+  };
+  try {
+    await startSession(cleanup, startup);
+  } catch (error) {
+    cleanup.dispose();
+    throw error;
+  }
+}
+
+async function startSession(cleanup: CleanupStack, startup: StartupMetrics): Promise<void> {
   const container = document.getElementById('app')!;
   const params = new URLSearchParams(location.search);
   const scenarioDriverEnabled = import.meta.env.DEV && params.get('scenarioDriver') === '1';
@@ -58,11 +110,14 @@ async function start(): Promise<void> {
   anchor.set(0, 0);
 
   const renderer = new Renderer(container, rig.camera, settings.quality);
+  cleanup.defer(() => renderer.dispose());
   renderer.autoQuality = settings.adaptiveQuality;
 
   await boot.step(0.3, 'generating terrain');
   const game = new Game(seed, anchor, rig);
+  cleanup.defer(() => game.dispose());
   const audio = new ProceduralAudio(seed, createWebAudioBackend);
+  cleanup.defer(() => audio.dispose());
   audio.setMasterVolume(settings.volume);
   game.onPresentationEvents = (events) => audio.consume(events, {
     world: game.world,
@@ -76,12 +131,15 @@ async function start(): Promise<void> {
 
   await boot.step(0.62, 'tessellating the floor');
   const ringMesh = new RingMesh(game.terrain, renderer.quality);
+  cleanup.defer(() => ringMesh.dispose());
   renderer.scene.add(ringMesh.object);
   const dressing = new BattlefieldDressing(seed);
+  cleanup.defer(() => dressing.dispose());
   renderer.scene.add(dressing.object);
 
   await boot.step(0.86, 'igniting the solar filament');
   const environment = new Environment(seed);
+  cleanup.defer(() => environment.dispose());
   renderer.scene.add(environment.group);
   environment.buildEnvironment(renderer.gl, renderer.scene);
   const applyRenderQuality = (): void => {
@@ -116,18 +174,21 @@ async function start(): Promise<void> {
   ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
 
   await boot.step(0.94, 'prewarming combat shaders');
-  await renderer.prewarmActiveQuality();
+  startup.shaderPrewarmMilliseconds = (await renderer.prewarmActiveQuality()).durationMilliseconds;
 
   const input = new InputController(renderer.gl.domElement, rig);
+  cleanup.defer(() => input.dispose());
   const overlay = new DebugOverlay();
-  let cancelCommands = (): void => {};
+  cleanup.defer(() => overlay.dispose());
+  let commandWiring: CommandWiring | null = null;
   const menu = new SettingsMenu(settings, renderer, (open) => {
     input.setEnabled(!open && !game.hud.blocksGameplayInput);
     game.hud.root.inert = open;
     renderer.gl.domElement.inert = open || game.hud.blocksGameplayInput;
     game.hud.root.setAttribute('aria-hidden', String(open));
-    if (open) cancelCommands();
+    if (open) commandWiring?.cancel();
   }, (volume) => audio.setMasterVolume(volume));
+  cleanup.defer(() => menu.dispose());
   game.hud.onBlockingOverlayChange = (blocked) => {
     renderer.gl.domElement.inert = blocked || menu.isOpen;
     input.setEnabled(!blocked && !menu.isOpen);
@@ -135,16 +196,17 @@ async function start(): Promise<void> {
   menu.onSave = () => game.saveGame();
   menu.onLoad = () => game.loadGame();
 
-  cancelCommands = wireCommands(
+  commandWiring = wireCommands(
     renderer.gl.domElement,
     game,
     rig,
     () => !menu.isOpen && !game.hud.blocksGameplayInput,
   );
-  wireKeys(game, renderer, overlay, input, settings, menu);
+  cleanup.defer(() => commandWiring?.dispose());
+  cleanup.defer(wireKeys(game, renderer, overlay, input, settings, menu));
 
   await boot.step(1.0, 'ready');
-  armAudioUnlock(window, audio);
+  cleanup.defer(armAudioUnlock(window, audio));
   boot.hide();
   if (!scenarioDriverEnabled) game.hud.alert('Select an engineer — build extractors, then a Fabricator');
 
@@ -154,6 +216,12 @@ async function start(): Promise<void> {
   let animationFrame = 0;
   // Scenario initialization must own tick zero, even if its module import is delayed.
   let loopStopped = scenarioDriverEnabled;
+  const markFirstPlayable = (): void => {
+    if (startup.firstPlayableAt !== null) return;
+    startup.firstPlayableAt = performance.now();
+    startup.durationMilliseconds = startup.firstPlayableAt - startup.startedAt;
+    performance.mark('rww-first-playable');
+  };
 
   function renderFrame(
     dt: number,
@@ -194,6 +262,7 @@ async function start(): Promise<void> {
     renderer.gl.toneMappingExposure = BASE_EXPOSURE + Math.min(0.38, game.effects.flash * 0.22);
     renderer.render(dt);
     overlay.update(dt, renderer, game, rig, environment);
+    markFirstPlayable();
 
     if (game.hud.restartRequested) location.reload();
   }
@@ -208,6 +277,90 @@ async function start(): Promise<void> {
     renderFrame(dt, time);
   }
 
+  cleanup.defer(() => {
+    loopStopped = true;
+    cancelAnimationFrame(animationFrame);
+  });
+
+  let resumeAfterContextRestore = false;
+  let recoveryGeneration = 0;
+  let recoveryTimer = 0;
+  let recoveryOverlay: HTMLDivElement | null = null;
+  const showRecovery = (failed = false): void => {
+    recoveryOverlay ??= document.createElement('div');
+    recoveryOverlay.dataset.rwwContextRecovery = '';
+    recoveryOverlay.setAttribute('role', failed ? 'alert' : 'status');
+    recoveryOverlay.setAttribute('aria-live', 'assertive');
+    recoveryOverlay.style.cssText = [
+      'position:fixed', 'inset:0', 'z-index:120', 'display:grid', 'place-items:center',
+      'background:rgba(3,6,10,.94)', 'color:#dbe3ec',
+      "font:600 13px/1.5 'Rajdhani','Segoe UI',sans-serif", 'letter-spacing:.14em',
+      'text-transform:uppercase', 'text-align:center', 'padding:24px',
+    ].join(';');
+    recoveryOverlay.replaceChildren();
+    const message = document.createElement('p');
+    message.textContent = failed
+      ? 'Graphics recovery stalled. Your match remains in memory.'
+      : 'Graphics device reset detected. Rebuilding the battlefield.';
+    recoveryOverlay.appendChild(message);
+    if (failed) {
+      const reload = document.createElement('button');
+      reload.type = 'button';
+      reload.textContent = 'Reload game';
+      reload.style.cssText = 'padding:10px 18px;color:#f0a052;background:#101720;border:1px solid #f0821e;cursor:pointer';
+      reload.addEventListener('click', () => location.reload(), { once: true });
+      recoveryOverlay.appendChild(reload);
+    }
+    if (!recoveryOverlay.isConnected) document.body.appendChild(recoveryOverlay);
+  };
+  const clearRecoveryTimer = (): void => {
+    if (recoveryTimer) window.clearTimeout(recoveryTimer);
+    recoveryTimer = 0;
+  };
+  const onContextLost = (event: Event): void => {
+    event.preventDefault();
+    recoveryGeneration++;
+    resumeAfterContextRestore ||= !loopStopped;
+    loopStopped = true;
+    cancelAnimationFrame(animationFrame);
+    input.setEnabled(false);
+    showRecovery();
+    clearRecoveryTimer();
+    recoveryTimer = window.setTimeout(() => showRecovery(true), 10_000);
+  };
+  const onContextRestored = (): void => {
+    const generation = recoveryGeneration;
+    void (async () => {
+      try {
+        applyRenderQuality();
+        environment.buildEnvironment(renderer.gl, renderer.scene);
+        await renderer.prewarmActiveQuality(false);
+        if (cleanup.isDisposed || generation !== recoveryGeneration) return;
+        clearRecoveryTimer();
+        recoveryOverlay?.remove();
+        recoveryOverlay = null;
+        input.setEnabled(!menu.isOpen && !game.hud.blocksGameplayInput);
+        if (resumeAfterContextRestore) {
+          loopStopped = false;
+          last = performance.now();
+          animationFrame = requestAnimationFrame(frame);
+        }
+        resumeAfterContextRestore = false;
+      } catch {
+        if (!cleanup.isDisposed && generation === recoveryGeneration) showRecovery(true);
+      }
+    })();
+  };
+  renderer.gl.domElement.addEventListener('webglcontextlost', onContextLost);
+  renderer.gl.domElement.addEventListener('webglcontextrestored', onContextRestored);
+  cleanup.defer(() => {
+    clearRecoveryTimer();
+    renderer.gl.domElement.removeEventListener('webglcontextlost', onContextLost);
+    renderer.gl.domElement.removeEventListener('webglcontextrestored', onContextRestored);
+    recoveryOverlay?.remove();
+    recoveryOverlay = null;
+  });
+
   // Exposed for debugging and for the screenshot tool to interrogate.
   const exposed: Record<string, unknown> = {
     game,
@@ -220,6 +373,8 @@ async function start(): Promise<void> {
     environment,
     ringMesh,
     dressing,
+    startup: () => ({ ...startup }),
+    dispose: () => cleanup.dispose(),
     probe: () => ({
       camPos: rig.camera.position.toArray(),
       camUp: rig.camera.up.toArray(),
@@ -318,29 +473,46 @@ async function start(): Promise<void> {
   }
   if (import.meta.env.DEV) {
     (window as unknown as { RWW: unknown }).RWW = exposed;
+    cleanup.defer(() => {
+      const target = window as unknown as { RWW?: unknown };
+      if (target.RWW === exposed) delete target.RWW;
+    });
   } else {
     const probe = exposed.probe as () => Record<string, unknown>;
     (window as unknown as { RWWDiagnostics: unknown }).RWWDiagnostics = Object.freeze(probe());
+    cleanup.defer(() => {
+      delete (window as unknown as { RWWDiagnostics?: unknown }).RWWDiagnostics;
+    });
   }
 
   ringMesh.syncToAnchor(anchor);
   frame();
 
-  window.addEventListener('resize', () =>
-    renderer.resize(container.clientWidth, container.clientHeight),
-  );
+  const onResize = (): void => renderer.resize(container.clientWidth, container.clientHeight);
+  window.addEventListener('resize', onResize);
+  cleanup.defer(() => window.removeEventListener('resize', onResize));
+  const onPageHide = (event: PageTransitionEvent): void => {
+    if (!event.persisted) cleanup.dispose();
+  };
+  window.addEventListener('pagehide', onPageHide);
+  cleanup.defer(() => window.removeEventListener('pagehide', onPageHide));
 }
 
 /**
  * Mouse commands. Left selects (click or drag box), right issues orders, and
  * while a structure is held the left button places it instead.
  */
+export interface CommandWiring {
+  cancel(): void;
+  dispose(): void;
+}
+
 export function wireCommands(
   canvas: HTMLElement,
   game: Game,
   rig: CameraRig,
   gameplayInputEnabled: () => boolean,
-): () => void {
+): CommandWiring {
   let dragging = false;
   let dragStart: { s: number; z: number } | null = null;
   let downX = 0;
@@ -368,7 +540,7 @@ export function wireCommands(
     };
   };
 
-  canvas.addEventListener('pointermove', (e) => {
+  const onPointerMove = (e: PointerEvent): void => {
     if (!gameplayInputEnabled()) {
       clearDrag();
       return;
@@ -387,9 +559,9 @@ export function wireCommands(
         game.hud.showSelectionRectangle(downX, downY, e.clientX, e.clientY);
       }
     }
-  });
+  };
 
-  canvas.addEventListener('pointerdown', (e) => {
+  const onPointerDown = (e: PointerEvent): void => {
     if (!gameplayInputEnabled()) return;
     activePointer = e.pointerId;
     suppressCommand = e.button === 2 && e.shiftKey;
@@ -404,9 +576,9 @@ export function wireCommands(
         dragStart = hit;
       }
     }
-  });
+  };
 
-  window.addEventListener('pointerup', (e) => {
+  const onPointerUp = (e: PointerEvent): void => {
     if (!gameplayInputEnabled()) {
       clearDrag();
       return;
@@ -454,16 +626,33 @@ export function wireCommands(
       game.selectAt(hit.s, hit.z, e.shiftKey);
     }
     clearDrag();
-  });
+  };
 
+  const onContextMenu = (event: Event): void => {
+    event.preventDefault();
+    clearDrag();
+  };
+
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', clearDrag);
   window.addEventListener('blur', clearDrag);
   canvas.addEventListener('lostpointercapture', clearDrag);
-  canvas.addEventListener('contextmenu', (event) => {
-    event.preventDefault();
-    clearDrag();
-  });
-  return clearDrag;
+  canvas.addEventListener('contextmenu', onContextMenu);
+  return {
+    cancel: clearDrag,
+    dispose: () => {
+      clearDrag();
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', clearDrag);
+      window.removeEventListener('blur', clearDrag);
+      canvas.removeEventListener('lostpointercapture', clearDrag);
+      canvas.removeEventListener('contextmenu', onContextMenu);
+    },
+  };
 }
 
 function wireKeys(
@@ -473,8 +662,8 @@ function wireKeys(
   input: InputController,
   settings: Settings,
   menu: SettingsMenu,
-): void {
-  window.addEventListener('keydown', (e) => {
+): () => void {
+  const onKeyDown = (e: KeyboardEvent): void => {
     if (game.hud.blocksGameplayInput) return;
     if (e.code === 'F1' && !menu.isOpen) {
       input.consume(e.code);
@@ -576,7 +765,9 @@ function wireKeys(
       settings.apply(renderer);
       overlay.flash(`adaptive quality: ${renderer.autoQuality ? 'on' : 'off'}`);
     }
-  });
+  };
+  window.addEventListener('keydown', onKeyDown);
+  return () => window.removeEventListener('keydown', onKeyDown);
 }
 
 function checkWebGL2(): boolean {

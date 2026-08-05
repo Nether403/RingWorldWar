@@ -105,6 +105,14 @@ export class RingMesh {
       -anchor.z,
     );
   }
+
+  dispose(): void {
+    for (const geometry of this.geometries.values()) geometry.dispose();
+    for (const material of this.materials.values()) material.dispose();
+    this.geometries.clear();
+    this.materials.clear();
+    this.object.clear();
+  }
 }
 
 /**

@@ -43,6 +43,7 @@ import type { NarrativeHudModel } from './tutorial/narrative';
 
 export const PLAYER: Faction = Faction.Compact;
 export const SAVE_SLOT_KEY = 'ring-world-war/save-slot';
+const MAX_PENDING_PRESENTATION_EVENTS = 4_096;
 
 export interface SaveActionResult {
   ok: boolean;
@@ -215,6 +216,9 @@ export class Game {
     this.mission?.advanceTick(this.world, events);
     for (const event of events) {
       if (isPresentationEventVisible(event, this.world, PLAYER)) this.presentationEvents.push(event);
+    }
+    if (this.presentationEvents.length > MAX_PENDING_PRESENTATION_EVENTS) {
+      this.presentationEvents.splice(0, this.presentationEvents.length - MAX_PENDING_PRESENTATION_EVENTS);
     }
     return elapsed;
   }
@@ -920,8 +924,16 @@ export class Game {
   }
 
   dispose(): void {
+    this.onPresentationEvents = null;
+    this.onTransientReset = null;
+    this.entities.onFootfall = null;
+    this.entities.dispose();
     this.effects.dispose();
-    this.hud.root.remove();
+    this.markers.dispose();
+    this.hud.dispose();
+    this.presentationEvents.length = 0;
+    this.selection.clear();
+    this.controlGroups.clear();
   }
 }
 

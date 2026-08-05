@@ -19,6 +19,7 @@ import { Rng } from '@core/rng';
 import { FACTION_COLOR, Faction, WEAPONS } from '@sim/data';
 import type { SimEvent, World } from '@sim/world';
 import type { RenderAnchor } from './anchor';
+import { disposeObject } from './disposeObject';
 import { combatPresentationKind, isPresentationEventEligible, isPresentationEventInRange } from './presentationEvents';
 
 const MAX_TRAIL_POINTS = 90;
@@ -1108,12 +1109,7 @@ export class Effects {
   }
 
   dispose(): void {
-    for (const object of [this.trailMesh, this.tracerMesh, this.puffs, this.scarMesh, this.debrisMesh]) {
-      const renderable = object as THREE.LineSegments | THREE.Points | THREE.Mesh | THREE.InstancedMesh;
-      renderable.geometry.dispose();
-      const materials = Array.isArray(renderable.material) ? renderable.material : [renderable.material];
-      for (const material of materials) material.dispose();
-    }
+    disposeObject(this.object);
   }
 
 }

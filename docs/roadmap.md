@@ -48,7 +48,8 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 14. **Completed - Phase 4A measurement foundation:** source-current hardware, browser, wall, phase, and detail baselines are recorded provisionally.
 15. **Completed - Phase 4B simulation:** Requirement 17.5 passed on the protected reference runner without changing accepted gameplay semantics.
 16. **Completed - Phase 4C renderer and GPU:** quality tiers, GPU timing, terrain attribution, active-quality prewarm, uploads, transparency, and HUD costs are characterized.
-17. **Current - Phase 4D hardening:** memory, startup, disposal, long-session heap stability, and context recovery.
+17. **Completed - Phase 4D hardening:** bounded caches, complete session disposal, startup, accelerated heap/resource stability, and WebGL recovery are qualified on the T480s reference machine.
+18. **Current - Phase 4E device and browser matrix:** qualify available renderer classes and browsers without weakening the accepted T480s Low gate.
 
 ## Direction Decisions
 

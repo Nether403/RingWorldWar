@@ -397,9 +397,9 @@ export class World {
   private readonly emptyNearby: readonly number[] = [];
   private bucketGeneration = 0;
   private bucketsDirty = true;
-  private readonly entityBucketById: number[] = [];
+  private readonly entityBucketById = new Map<number, number>();
   /** Derived O(1) lookup index. Stable arrays remain authoritative and serialized. */
-  private entitiesById: Array<IndexedEntity | undefined> = [];
+  private readonly entitiesById = new Map<number, IndexedEntity>();
   private readonly navDirection: NavDirection = { ds: 0, dz: 0, reachable: false };
   private readonly ballisticPlanningWork: TrajectoryWork = {
     trajectoryEvaluations: 0,
@@ -521,7 +521,7 @@ export class World {
       speedMultiplier: 1,
     };
     this.units.push(u);
-    this.entitiesById[u.id] = u;
+    this.entitiesById.set(u.id, u);
     this.bucketsDirty = true;
     this.clearVisibilityCache();
     if (def.cost.command) this.players[faction].commandUsed += def.cost.command;
@@ -561,7 +561,7 @@ export class World {
       capture: 0,
     };
     this.structures.push(st);
-    this.entitiesById[st.id] = st;
+    this.entitiesById.set(st.id, st);
     this.bucketsDirty = true;
     this.clearVisibilityCache();
     if (faction >= 0 && progress >= 1) this.players[faction as Faction].unlocked.add(kind);
@@ -582,7 +582,7 @@ export class World {
   // -------------------------------------------------------------------------
 
   unitById(id: number): Unit | undefined {
-    const entity = this.entitiesById[id];
+    const entity = this.entitiesById.get(id);
     return entity?.alive && 'order' in entity ? entity : undefined;
   }
 
@@ -591,12 +591,12 @@ export class World {
   }
 
   structureById(id: number): Structure | undefined {
-    const entity = this.entitiesById[id];
+    const entity = this.entitiesById.get(id);
     return entity?.alive && 'progress' in entity ? entity : undefined;
   }
 
   wreckById(id: number): Wreck | undefined {
-    const entity = this.entitiesById[id];
+    const entity = this.entitiesById.get(id);
     return entity?.alive && !('order' in entity) && !('progress' in entity) ? entity : undefined;
   }
 
@@ -670,7 +670,7 @@ export class World {
       }
       if (arr.length === 0) this.usedBuckets.push(index);
       arr.push(id);
-      this.entityBucketById[id] = index;
+      this.entityBucketById.set(id, index);
     };
     for (const u of this.units) if (u.alive) add(u.s, u.z, u.id);
     for (const s of this.structures) if (s.alive) add(s.s, s.z, s.id);
@@ -680,13 +680,13 @@ export class World {
 
   private hasEntityChangedBucket(): boolean {
     for (const unit of this.units) {
-      if (unit.alive && this.entityBucketById[unit.id] !== this.bucketIndex(unit.s, unit.z)) return true;
+      if (unit.alive && this.entityBucketById.get(unit.id) !== this.bucketIndex(unit.s, unit.z)) return true;
     }
     for (const structure of this.structures) {
-      if (structure.alive && this.entityBucketById[structure.id] !== this.bucketIndex(structure.s, structure.z)) return true;
+      if (structure.alive && this.entityBucketById.get(structure.id) !== this.bucketIndex(structure.s, structure.z)) return true;
     }
     for (const wreck of this.wreckages) {
-      if (wreck.alive && this.entityBucketById[wreck.id] !== this.bucketIndex(wreck.s, wreck.z)) return true;
+      if (wreck.alive && this.entityBucketById.get(wreck.id) !== this.bucketIndex(wreck.s, wreck.z)) return true;
     }
     return false;
   }
@@ -1272,7 +1272,7 @@ export class World {
       const near = this.nearby(a.s, a.z, 40);
       for (const id of near) {
         if (id <= a.id) continue;
-        const entity = this.entitiesById[id];
+        const entity = this.entitiesById.get(id);
         if (!entity?.alive || !('order' in entity)) continue;
         const b = entity;
         const rb = UNITS[b.kind].radius;
@@ -1304,7 +1304,7 @@ export class World {
   // ---- Targeting ----------------------------------------------------------
 
   private isValidTarget(f: Faction, id: number, s: number, z: number, range: number): boolean {
-    const target = this.entitiesById[id];
+    const target = this.entitiesById.get(id);
     if (!target?.alive || target.faction === f || target.faction < 0) return false;
     return surfaceDistSq(s, z, target.s, target.z) <= range * range && this.isEntityVisible(f, id);
   }
@@ -1315,7 +1315,7 @@ export class World {
     let best = 0;
     let bestScore = Infinity;
     for (const id of near) {
-      const entity = this.entitiesById[id];
+      const entity = this.entitiesById.get(id);
       if (!entity?.alive || entity.faction === f || entity.faction < 0) continue;
       const d = surfaceDist(s, z, entity.s, entity.z);
       if (d > range || !this.isEntityVisible(f, id)) continue;
@@ -2390,7 +2390,7 @@ export class World {
         lifetime: WRECK_LIFETIME,
       };
       this.wreckages.push(wreck);
-      this.entitiesById[wreck.id] = wreck;
+      this.entitiesById.set(wreck.id, wreck);
     }
     this.emit(
       'unitDied',
@@ -2471,7 +2471,7 @@ export class World {
       let compact = 0;
       let choir = 0;
       for (const id of near) {
-        const entity = this.entitiesById[id];
+        const entity = this.entitiesById.get(id);
         if (!entity?.alive || !('order' in entity)) continue;
         const u = entity;
         if (surfaceDistSq(u.s, u.z, st.s, st.z) > 110 * 110) continue;
@@ -2514,10 +2514,28 @@ export class World {
     // Compact the arrays occasionally rather than every tick; splicing during
     // iteration is the classic source of skipped entities.
     if (this.tick % 30 !== 0) return;
-    this.units = this.units.filter((u) => u.alive);
-    this.structures = this.structures.filter((s) => s.alive);
+    this.units = this.units.filter((unit) => {
+      if (!unit.alive) {
+        this.entitiesById.delete(unit.id);
+        this.entityBucketById.delete(unit.id);
+      }
+      return unit.alive;
+    });
+    this.structures = this.structures.filter((structure) => {
+      if (!structure.alive) {
+        this.entitiesById.delete(structure.id);
+        this.entityBucketById.delete(structure.id);
+      }
+      return structure.alive;
+    });
     this.projectiles = this.projectiles.filter((p) => p.alive);
-    this.wreckages = this.wreckages.filter((wreck) => wreck.alive);
+    this.wreckages = this.wreckages.filter((wreck) => {
+      if (!wreck.alive) {
+        this.entitiesById.delete(wreck.id);
+        this.entityBucketById.delete(wreck.id);
+      }
+      return wreck.alive;
+    });
   }
 
   private stepVictory(): void {
@@ -2711,14 +2729,15 @@ export class World {
   }
 
   private rebuildEntityIndex(): void {
-    this.entitiesById = [];
+    this.entitiesById.clear();
+    this.entityBucketById.clear();
     for (const unit of this.units) {
-      this.entitiesById[unit.id] = unit;
+      this.entitiesById.set(unit.id, unit);
     }
     for (const structure of this.structures) {
-      this.entitiesById[structure.id] = structure;
+      this.entitiesById.set(structure.id, structure);
     }
-    for (const wreck of this.wreckages) this.entitiesById[wreck.id] = wreck;
+    for (const wreck of this.wreckages) this.entitiesById.set(wreck.id, wreck);
   }
 
   /** Stable checksum for replay and determinism verification. */

@@ -127,6 +127,11 @@ export class DebugOverlay {
       `           spin ${RING_PERIOD.toFixed(0)}s  far side ${(2 * RING_RADIUS) / 1000}km up`,
     ].join('\n');
   }
+
+  dispose(): void {
+    this.el.remove();
+    this.toast.remove();
+  }
 }
 
 function readMemory(): string {

@@ -30,6 +30,7 @@ import {
 import { Rng } from '@core/rng';
 import { clamp01, smoothstep } from '@gen/noise';
 import type { RenderAnchor } from './anchor';
+import { disposeObject } from './disposeObject';
 
 /** Radial offset of the filament from the true axis, as a fraction of R.
  *  Non-zero so that shading has direction instead of being flatly top-down. */
@@ -189,6 +190,7 @@ export class Environment {
   private atmosphere!: THREE.Mesh;
   private readonly starPivot = new THREE.Group();
   private envTarget: THREE.WebGLRenderTarget | null = null;
+  private environmentScene: THREE.Scene | null = null;
 
   private readonly _v = new THREE.Vector3();
 
@@ -531,6 +533,12 @@ export class Environment {
    * blurred across curved metal.
    */
   buildEnvironment(renderer: THREE.WebGLRenderer, scene: THREE.Scene): void {
+    if (this.environmentScene && this.envTarget && this.environmentScene.environment === this.envTarget.texture) {
+      this.environmentScene.environment = null;
+    }
+    this.envTarget?.dispose();
+    this.envTarget = null;
+    this.environmentScene = scene;
     const w = 64;
     const h = 32;
     const data = new Float32Array(w * h * 4);
@@ -583,9 +591,15 @@ export class Environment {
   }
 
   dispose(): void {
+    if (this.environmentScene && this.envTarget && this.environmentScene.environment === this.envTarget.texture) {
+      this.environmentScene.environment = null;
+    }
     this.envTarget?.dispose();
-    this.atmosphere.geometry.dispose();
-    (this.atmosphere.material as THREE.Material).dispose();
+    this.envTarget = null;
+    this.environmentScene = null;
+    this.keyLight.shadow.map?.dispose();
+    this.keyLight.shadow.map = null;
+    disposeObject(this.group);
   }
 }
 

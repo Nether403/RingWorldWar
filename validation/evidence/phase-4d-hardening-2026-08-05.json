@@ -1,0 +1,76 @@
+{
+  "schema": "rww.tracked-performance-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-05",
+  "status": "phase-4d-complete",
+  "hardware": {
+    "target": "t480s-low-candidate",
+    "cpu": "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz",
+    "logicalCpus": 8,
+    "gpu": "Intel(R) UHD Graphics 620",
+    "renderer": "ANGLE D3D11",
+    "browser": "Chromium 151.0.7922.34",
+    "doctorViewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+    "quality": "low"
+  },
+  "startup": {
+    "viewport": { "width": 1100, "height": 640, "deviceScaleFactor": 1 },
+    "contractMilliseconds": 15000,
+    "fullSuiteMilliseconds": 2028.5,
+    "isolatedMilliseconds": 3774.5,
+    "isolatedShaderPrewarmMilliseconds": 1044.3,
+    "passed": true
+  },
+  "acceleratedSoak": {
+    "viewport": { "width": 1100, "height": 640, "deviceScaleFactor": 1 },
+    "simulatedTicks": 6000,
+    "fixedTickRateHz": 30,
+    "forcedGarbageCollection": true,
+    "usedHeapBytes": [37300000, 37300000, 37300000],
+    "geometries": [136, 136, 136],
+    "textures": [2, 2, 2],
+    "programs": [17, 17, 17],
+    "heapGrowthBytes": 0,
+    "passed": true
+  },
+  "lifecycle": {
+    "repeatedSessionCycles": 3,
+    "disposedOwnersCollected": ["game", "renderer", "hud"],
+    "presentationEventLimit": 4096,
+    "sparseEntityIndexEliminated": true,
+    "webglLossPausedSimulation": true,
+    "webglRestoreResumedSameWorld": true,
+    "pmremRegenerated": true,
+    "stalledRecoveryFallbackSeconds": 10,
+    "passed": true
+  },
+  "headlessGuard": {
+    "warmupSimulationMilliseconds": [10194.5379],
+    "measuredSimulationMilliseconds": [10008.7931, 9586.3907, 9838.9708],
+    "medianSimulationMilliseconds": 9838.9708,
+    "maximumMedianMilliseconds": 15000,
+    "resultSha256": "6cbce1c53391f33b78949037500c429fc1b59b2c74ee051ed9cebce001fac9c0",
+    "passed": true,
+    "receipt": "output/runs/20260805T185901.220Z-24452-127c8dae/receipt.json",
+    "receiptSha256": "c39f356220cbb9a8a292d73926317cb56da68d881cf01b7a2f856ebc835b2ac0"
+  },
+  "verification": {
+    "unitTestsPassed": 322,
+    "unitTestsSkipped": 1,
+    "buildPassed": true,
+    "browserTestsPassed": 44,
+    "independentReview": "approved"
+  },
+  "source": {
+    "sourceBaseSha": "902e9a1f4c5f276e2827aaf81eefdfdfcbc5ee15",
+    "dirty": true,
+    "trackedPatchSha256": "1fd6ef53a5fd8d16bd2ce9559c4d4afc09063a93a35fd1ded147f10081cfa762",
+    "untrackedSourceManifestSha256": "67eadc059c44b1a521ea67b553226422a22719b0e85cb1fdc4f55f8ee9b8c11a",
+    "doctorReceipt": "output/runs/20260805T194053.637Z-18232-bbf65285/receipt.json",
+    "doctorReceiptSha256": "437d497440fe166b50848e8307ecefc4b97a829e28964bab77dee49c16c83bd4"
+  },
+  "limits": [
+    "The accelerated soak is not the open ten-minute 1080p GTX 1660 Gate 4 soak.",
+    "Additional browsers and GPU classes remain Phase 4E work."
+  ]
+}

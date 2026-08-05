@@ -5,9 +5,9 @@
 - [x] Run source-current doctor and browser capability receipt.
 - [x] Run three 72,000-tick standard headless samples.
 - [x] Run source-current T480s 30-second heavy-combat sample.
-- [ ] Capture High/Ultra resource characterization.
+- [x] Capture High/Ultra resource characterization.
 - [ ] Add ten-minute soak and quality-thrash scenarios.
-- [ ] Record baseline report with exact source and hardware provenance.
+- [x] Record baseline report with exact source and hardware provenance.
 
 ## 4B Simulation
 
@@ -35,14 +35,14 @@
 - [x] Isolate the full procedural PBR terrain path as the dominant Intel UHD 620 GPU cost.
 - [x] Prewarm active-quality forward and generated shadow programs before the playable frame.
 - [x] Conclude that no LOD/batching, upload-range, or transparent product change is justified.
-- [ ] Revisit minimap cadence only if Phase 4D profiling shows HUD CPU pressure in long sessions.
+- [x] Keep the current minimap cadence; Phase 4D did not show sustained HUD CPU or heap pressure.
 
 ## 4D Hardening
 
-- [ ] Zero-allocation and bounded-cache audit.
-- [ ] Long-session heap and teardown tests.
-- [ ] Startup under 15 seconds.
-- [ ] Context-loss and recovery tests.
+- [x] Zero-allocation and bounded-cache audit.
+- [x] Long-session heap and teardown tests.
+- [x] Startup under 15 seconds.
+- [x] Context-loss and recovery tests.
 
 ## 4E/4F Qualification
 
