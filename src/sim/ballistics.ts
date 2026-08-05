@@ -433,7 +433,7 @@ export function isWithinDragAimEnvelope(
   return minimumRequiredLaunchSpeed(from, to, t0, maxFlightTime) <= speed * 1.25;
 }
 
-function minimumRequiredLaunchSpeed(
+export function minimumRequiredLaunchSpeed(
   from: RingPoint,
   to: RingPoint,
   t0: number,

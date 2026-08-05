@@ -92,8 +92,10 @@ actual victory condition.
 Requirement 17.5 is not closed on this machine. A representative 35-minute
 standard-terrain match completed in roughly 23.5 seconds of wall time, and the
 full cohorts showed substantial shared-machine variance. The deterministic
-simulation and balance gates pass, but a 40-minute-under-10-second assertion
-should only be added on pinned CI hardware after another profiling pass.
+simulation and balance gates pass. This historical ten-second criterion was
+superseded on 2026-08-04 by the explicit warm-median runner contract in
+`docs/headless-performance-policy.md`; clean-source pinned-runner qualification
+remains open.
 
 The sprint also used AI proxies. A real first-time-player observation session is
 still needed before tutorial copy and objective timing are finalized.

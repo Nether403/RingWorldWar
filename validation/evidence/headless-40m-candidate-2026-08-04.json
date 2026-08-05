@@ -1,0 +1,62 @@
+{
+  "schema": "rww.tracked-performance-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-04T21:40:43.081Z",
+  "status": "calibration-inconclusive",
+  "profile": {
+    "id": "headless-40m",
+    "terrain": "standard",
+    "seed": 501,
+    "tickCap": 72000,
+    "policyPath": "docs/headless-performance-policy.md",
+    "capturedPolicySha256": "119477663d53dc729ace5c3c8d9b74d3ab9679eeb453a22bc147fef32190400b"
+  },
+  "environment": {
+    "os": "Windows 11 Pro 10.0.26220 x64",
+    "cpu": "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz",
+    "logicalCpus": 8,
+    "ramBytes": 25600958464,
+    "node": "v26.4.0"
+  },
+  "measurement": {
+    "terrainGenerationMilliseconds": 2153.249,
+    "warmupRuns": 1,
+    "warmupSimulationMilliseconds": [16033.8398],
+    "measuredRuns": 5,
+    "simulationMilliseconds": [15461.5852, 14015.6806, 14312.8287, 14021.4463, 13965.3501],
+    "medianSimulationMilliseconds": 14021.4463,
+    "maximumMedianMilliseconds": 15000,
+    "medianBudgetPassed": true,
+    "resultTicks": 50890,
+    "winner": "Choir",
+    "endReason": "Your Bastion was destroyed"
+  },
+  "artifacts": {
+    "sourceArtifact": "output/runs/20260804T214043.081Z-9828-22c568f3/artifacts/performance-profile.log",
+    "sourceArtifactSha256": "2e2a9de70a0d30ab4d9c4cf6253b12d446d1d174397d624a86aa18a89a33ad6e",
+    "sourceReceipt": "output/runs/20260804T214043.081Z-9828-22c568f3/receipt.json",
+    "sourceReceiptSha256": "a07fcabb07ccb787a8f2d85e57f55880dad1266cf2d70b44661fc4c863236bbc"
+  },
+  "subsequentNonDedicatedSample": {
+    "capturedAt": "2026-08-04T22:59:02.771Z",
+    "medianSimulationMilliseconds": 16115.2993,
+    "maximumMedianMilliseconds": 15000,
+    "medianBudgetPassed": false,
+    "measuredResultsMatch": true,
+    "resultHash": "6cbce1c53391f33b78949037500c429fc1b59b2c74ee051ed9cebce001fac9c0",
+    "structuredReportSha256": "769da6d8cdb2ae1f8137c7af2c61f49aa8daaff56c1a01db5464eec99759d2f7",
+    "sourceReceipt": "output/runs/20260804T225902.771Z-25968-91cc7d6e/receipt.json",
+    "sourceReceiptSha256": "11d45f9e3d9091500884b130b4482266ae7221ed0cd5f9bd36dde94cb161a92d"
+  },
+  "code": {
+    "sha": "a0c72a25f66548bec38df21e3996f9c1abaa1074",
+    "sourceBaseSha": "a0c72a25f66548bec38df21e3996f9c1abaa1074",
+    "branch": "master",
+    "dirty": true,
+    "trackedPatchSha256": "e2d70fb5cf028026059d5ec00f4121f7fc9496907159ad8830c09dfb1af72b92",
+    "untrackedSourceManifestSha256": "5e51a179a9acfefad7bb0b1d9ff993b3423d28e6173764c05da598be5cde9244",
+    "untrackedSourceCount": 5,
+    "untrackedSourceExclusions": ["validation/evidence/**"],
+    "caveat": "Two dirty, non-dedicated samples disagree on the 15-second budget. They calibrate the candidate policy but cannot qualify it. Final evidence requires the protected dedicated runner and clean immutable source."
+  }
+}

@@ -7,6 +7,7 @@ npm run rww -- doctor --json
 npm run rww -- doctor --browser --target validation/hardware/t480s-low.json
 npm run rww -- run validation/manifests/veteran-mirror.json --repeat 2
 npm run rww -- perf headless-40m --terrain standard --runs 3 --ticks 72000
+npm run rww -- perf headless-40m --qualify
 npm run rww -- visual signature-lance
 npm run rww -- visual signature-lance --compare
 npm run rww -- visual rim-atmosphere
@@ -24,6 +25,19 @@ Each executed command writes a versioned receipt under ignored `output/runs/<run
 Git provenance records the `HEAD` source-base SHA, dirty flag, SHA-256 of the staged plus unstaged `git diff --binary HEAD`, and a sorted manifest of non-ignored untracked source paths and content SHA-256 values. The manifest also has an aggregate SHA-256 and count. Git-ignored paths such as `output/` are omitted by `git ls-files --others --exclude-standard`. `validation/evidence/**` is explicitly excluded from the untracked-source manifest so a tracked evidence summary can quote a receipt digest without hashing itself; this exclusion and its pattern are recorded in every receipt. Evidence files remain represented by their own artifact/receipt hashes.
 
 Exit codes are stable: `0` success, `2` usage/configuration error, `3` deterministic or gate failure, and `4` infrastructure/runtime failure.
+
+`perf headless-40m` keeps ordinary profiling backward-compatible. `--warmup-runs`
+executes excluded process/JIT warmups before `--runs` measured matches, while
+`--max-median-ms` turns the measured median into a gate. Warmup, terrain,
+measured wall, measured CPU, budget, and verdict fields are retained in the log
+and receipt. The tracked qualification policy is in
+`docs/headless-performance-policy.md`.
+Add `--require-clean` when a custom profile should enforce cleanliness; a dirty
+tree then fails before the benchmark begins while still emitting a gate-failure
+receipt. This flag alone is not final qualification.
+`--qualify` is the preferred final gate: it locks standard terrain, one warmup,
+five measured runs, 72,000 ticks, the 15-second median budget, clean source, the
+canonical result hash, and the pinned runner identity.
 
 `doctor --browser` reuses a Ring World War Vite server at port 5180 when one is already running; otherwise it starts an isolated Vite process and cleans it up. The T480s target contains candidate 720p Low budgets and an advisory 1080p target. Doctor reports these as `not-measured`: certification requires a future representative visual benchmark, not a capability probe.
 

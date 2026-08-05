@@ -1,0 +1,69 @@
+name: Headless qualification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: headless-qualification-t480s
+  cancel-in-progress: false
+
+jobs:
+  requirement-17-5:
+    name: Requirement 17.5
+    if: github.ref == 'refs/heads/master'
+    runs-on: [self-hosted, Windows, X64, t480s-headless-01]
+    environment: headless-qualification
+    timeout-minutes: 25
+    env:
+      RWW_PINNED_RUNNER_ID: t480s-headless-01
+      RWW_RUNNER_DEDICATED: "1"
+      RWW_RUNNER_IMMUTABLE_WORKSPACE: "1"
+    steps:
+      - name: Check out immutable source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          clean: true
+          fetch-depth: 1
+
+      - name: Use Node.js 26
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify AC power and fixed performance plan
+        shell: pwsh
+        run: |
+          $battery = @(Get-CimInstance Win32_Battery -ErrorAction Stop)
+          if ($battery.Count -eq 0) {
+            throw "Qualification runner battery telemetry is unavailable"
+          }
+          $acStatuses = @(2, 3, 6, 7, 8, 9, 11)
+          if (@($battery | Where-Object { $_.BatteryStatus -notin $acStatuses }).Count -gt 0) {
+            throw "Qualification runner is not on AC power: $($battery.BatteryStatus -join ',')"
+          }
+          $powerPlan = powercfg /GETACTIVESCHEME
+          $highPerformanceGuid = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
+          if ($LASTEXITCODE -ne 0 -or $powerPlan -notmatch $highPerformanceGuid) {
+            throw "Qualification runner is not using a fixed high-performance power plan: $powerPlan"
+          }
+          "RWW_RUNNER_AC_POWER=1" | Add-Content -Path $env:GITHUB_ENV
+          "RWW_RUNNER_POWER_POLICY=fixed-performance" | Add-Content -Path $env:GITHUB_ENV
+
+      - name: Qualify canonical headless simulation
+        run: npm run rww -- perf headless-40m --qualify
+
+      - name: Upload qualification receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: headless-qualification-${{ github.run_id }}
+          path: output/runs/
+          if-no-files-found: error
+          retention-days: 30

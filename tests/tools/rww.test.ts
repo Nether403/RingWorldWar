@@ -19,7 +19,7 @@ import { EventEmitter } from 'node:events';
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
 import { collectGit, runChild } from '../../tools/rww/process.mjs';
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
-import { writeSanitizedErrorArtifact } from '../../tools/rww/commands.mjs';
+import { parseHeadlessDeterminismReport, parseHeadlessPerformanceReport, referenceRunnerFailures, writeSanitizedErrorArtifact } from '../../tools/rww/commands.mjs';
 
 describe('RWW CLI argument parsing', () => {
   it('parses and normalizes doctor options in a stable order', () => {
@@ -49,6 +49,10 @@ describe('RWW CLI argument parsing', () => {
       profile: 'headless-40m',
       terrain: 'flat',
       runs: 1,
+      warmupRuns: 0,
+      maxMedianMs: null,
+      requireClean: false,
+      qualify: false,
       ticks: 72_000,
     });
     expect(parseCliArgs(['visual', 'signature-lance', '--compare'])).toEqual({
@@ -58,6 +62,84 @@ describe('RWW CLI argument parsing', () => {
       command: 'perf', profile: 'browser-heavy', scenario: 'heavy-combat',
       target: 'validation/hardware/t480s-low.json', seconds: 5, json: true,
     });
+  });
+
+  it('parses and normalizes the headless qualification policy', () => {
+    const parsed = parseCliArgs(['perf', 'headless-40m', '--qualify']);
+    expect(parsed).toEqual({
+      command: 'perf',
+      profile: 'headless-40m',
+      terrain: 'standard',
+      runs: 5,
+      warmupRuns: 1,
+      maxMedianMs: 15_000,
+      requireClean: true,
+      qualify: true,
+      ticks: 72_000,
+    });
+    expect(normalizeCommand(parsed)).toEqual(['perf', 'headless-40m', '--qualify']);
+  });
+
+  it('extracts a structured headless report from Vitest output', () => {
+    const report = {
+      schema: 'rww.headless-performance-report',
+      version: 1,
+      mode: 'wall',
+      simulationMilliseconds: [14_000],
+      medianSimulationMilliseconds: 14_000,
+      medianBudgetPassed: true,
+      qualificationResultPassed: null,
+      measuredResultsMatch: true,
+      resultHashes: ['a'.repeat(64)],
+    };
+    expect(parseHeadlessPerformanceReport(`prefix\u001b[32m${JSON.stringify(report)}\nsummary`)).toEqual(report);
+    expect(parseHeadlessPerformanceReport('no report')).toBeNull();
+    expect(parseHeadlessPerformanceReport(`${JSON.stringify({ mode: 'wall' })}\n`)).toBeNull();
+  });
+
+  it('extracts a versioned determinism report', () => {
+    const report = {
+      schema: 'rww.headless-determinism-report',
+      version: 1,
+      periodicHashes: [{ tick: 9_000, world: 'a'.repeat(64), controllers: ['b'.repeat(64)] }],
+      eventTranscriptHash: 'c'.repeat(64),
+      timelineHash: 'd'.repeat(64),
+      qualificationTimelinePassed: true,
+    };
+    expect(parseHeadlessDeterminismReport(`${JSON.stringify(report)}\n`)).toEqual(report);
+    expect(parseHeadlessDeterminismReport(`${JSON.stringify({ schema: report.schema })}\n`)).toBeNull();
+  });
+
+  it('validates the pinned headless runner identity', () => {
+    const runtime = {
+      node: 'v26.4.0',
+      platform: 'win32',
+      arch: 'x64',
+      release: '10.0.26220',
+      cpu: { model: 'Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz', logicalCpus: 8 },
+      totalRamBytes: 25_600_958_464,
+    };
+    const attestation = {
+      RWW_PINNED_RUNNER_ID: 't480s-headless-01',
+      RWW_RUNNER_DEDICATED: '1',
+      RWW_RUNNER_AC_POWER: '1',
+      RWW_RUNNER_POWER_POLICY: 'fixed-performance',
+      RWW_RUNNER_IMMUTABLE_WORKSPACE: '1',
+      GITHUB_ACTIONS: 'true',
+      RUNNER_ENVIRONMENT: 'self-hosted',
+      RUNNER_NAME: 't480s-headless-01',
+      GITHUB_REPOSITORY: 'Nether403/RingWorldWar',
+      GITHUB_REF: 'refs/heads/master',
+      GITHUB_REF_PROTECTED: 'true',
+      GITHUB_EVENT_NAME: 'workflow_dispatch',
+      GITHUB_RUN_ID: '12345',
+      GITHUB_WORKFLOW_REF: 'Nether403/RingWorldWar/.github/workflows/headless-qualification.yml@refs/heads/master',
+    };
+    expect(referenceRunnerFailures(runtime, attestation)).toEqual([]);
+    expect(referenceRunnerFailures({ ...runtime, node: 'v25.0.0' }, attestation)).toContain('Node v25.0.0 is not v26.x');
+    expect(referenceRunnerFailures(runtime, {})).toContain(
+      'RWW_PINNED_RUNNER_ID is not the registered t480s-headless-01 runner',
+    );
   });
 
   it('parses and normalizes human playtest options', () => {
@@ -77,6 +159,9 @@ describe('RWW CLI argument parsing', () => {
     expect(() => parseCliArgs(['test'])).toThrow(/unknown command/i);
     expect(() => parseCliArgs(['run', 'x.json', '--repeat', '0'])).toThrow(/repeat/i);
     expect(() => parseCliArgs(['perf', 'headless-40m', '--terrain', 'ocean'])).toThrow(/terrain/i);
+    expect(() => parseCliArgs(['perf', 'headless-40m', '--runs', '26'])).toThrow(/runs/i);
+    expect(() => parseCliArgs(['perf', 'headless-40m', '--warmup-runs', '6'])).toThrow(/warmup/i);
+    expect(() => parseCliArgs(['perf', 'headless-40m', '--ticks', '1000001'])).toThrow(/ticks/i);
     expect(() => parseCliArgs(['play'])).toThrow(/scenario/i);
     expect(() => parseCliArgs(['play', 'directional-artillery', '--seconds', '0'])).toThrow(/seconds/i);
     expect(() => parseCliArgs(['play', 'directional-artillery', '--json'])).toThrow(/play option/i);
@@ -302,10 +387,26 @@ describe('RWW hashing and receipts', () => {
       const second = await collectGit(directory);
       expect(second.trackedPatchSha256).toBe(first.trackedPatchSha256);
       expect(second.untrackedSourceManifestSha256).toBe(first.untrackedSourceManifestSha256);
+
+      const originalGitDirectory = process.env.GIT_DIR;
+      process.env.GIT_DIR = join(directory, 'adversarial-git-dir');
+      try {
+        const hostileEnvironment = await collectGit(directory);
+        expect(hostileEnvironment.sourceBaseSha).toBe(first.sourceBaseSha);
+        expect(hostileEnvironment.trackedPatchSha256).toBe(first.trackedPatchSha256);
+      } finally {
+        if (originalGitDirectory === undefined) delete process.env.GIT_DIR;
+        else process.env.GIT_DIR = originalGitDirectory;
+      }
+
+      await runGit('git', ['update-index', '--assume-unchanged', 'tracked.bin'], { cwd: directory });
+      const hidden = await collectGit(directory);
+      expect(hidden.hiddenTrackedEntries).toEqual(['tracked.bin']);
+      expect(hidden.dirty).toBe(true);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });
 
 describe('RWW child process redaction', () => {

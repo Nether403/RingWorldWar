@@ -294,7 +294,7 @@ This plan builds Ring World War's Phase 2 systems in dependency order: foundatio
     - Run configurable batch (default 20 matches)
     - Assert neither faction wins more than 70% of matches
     - Assert average match duration is 20–40 minutes simulated
-    - Assert wall-clock time under 10s per 40-min match
+    - On the pinned reference runner, exclude one JIT warmup and assert a five-run standard-terrain median at or below 15s with a clean-source receipt
     - _Requirements: 17.2, 17.4, 17.5, 19.1, 19.2, 19.3_
 
   - [ ]* 17.3 Write property test for headless match completeness

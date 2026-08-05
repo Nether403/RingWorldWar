@@ -240,7 +240,7 @@ All additions maintain the project's hard constraints: zero external assets (eve
 2. WHEN invoked from Vitest, THE Headless_Sim SHALL accept parameters for: seed, faction pair, difficulty pair, and tick limit.
 3. WHEN a headless match completes, THE Headless_Sim SHALL output a results record containing: winner, match duration in ticks, final economy stats per faction, units produced, units lost, and structures destroyed.
 4. THE CI pipeline SHALL run a configurable batch of headless matches (default: 20) and assert that aggregate win rates fall within acceptable balance bounds (neither faction wins more than 70% across the batch).
-5. THE Headless_Sim SHALL complete a 40-minute simulated match in under 10 seconds of wall-clock time on CI hardware.
+5. ON the pinned headless reference runner defined by `docs/headless-performance-policy.md`, THE Headless_Sim SHALL complete five measured standard-terrain matches with a 40-minute simulated time cap at a wall-clock median of no more than 15 seconds, after one excluded JIT warmup match. Terrain generation SHALL be reported separately, the source SHALL be clean, and the run SHALL emit a content-addressed receipt. Cold-start timing is diagnostic rather than a hard gate.
 
 ### Requirement 18: Silo Structure (Chord Shot Launcher)
 

@@ -20,34 +20,74 @@ export async function runChild(executable, args, options = {}) {
     });
     const stdoutChunks = [];
     const stderrChunks = [];
+    const maximumOutputBytes = options.maximumOutputBytes ?? 32 * 1024 * 1024;
+    let outputBytes = 0;
+    let outputLimitExceeded = false;
+    let timedOut = false;
+    const timeout = options.timeoutMs === undefined ? null : setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, options.timeoutMs);
     child.stdout.on('data', (chunk) => {
-      stdoutChunks.push(Buffer.from(chunk));
+      const buffered = Buffer.from(chunk);
+      outputBytes += buffered.length;
+      if (outputBytes <= maximumOutputBytes) stdoutChunks.push(buffered);
+      else if (!outputLimitExceeded) {
+        outputLimitExceeded = true;
+        child.kill();
+      }
     });
     child.stderr.on('data', (chunk) => {
-      stderrChunks.push(Buffer.from(chunk));
+      const buffered = Buffer.from(chunk);
+      outputBytes += buffered.length;
+      if (outputBytes <= maximumOutputBytes) stderrChunks.push(buffered);
+      else if (!outputLimitExceeded) {
+        outputLimitExceeded = true;
+        child.kill();
+      }
     });
-    child.on('error', reject);
+    child.on('error', (error) => {
+      if (timeout !== null) clearTimeout(timeout);
+      reject(error);
+    });
     child.on('close', (code, signal) => {
+      if (timeout !== null) clearTimeout(timeout);
       const stdout = sanitizeSecrets(Buffer.concat(stdoutChunks).toString());
       const stderr = sanitizeSecrets(Buffer.concat(stderrChunks).toString());
       if (options.echo !== false) {
         if (stdout) process.stdout.write(stdout);
         if (stderr) process.stderr.write(stderr);
       }
-      resolve({ code: code ?? 1, signal, stdout, stderr });
+      resolve({ code: code ?? 1, signal, stdout, stderr, timedOut, outputLimitExceeded });
     });
   });
 }
 
 export async function collectGit(cwd) {
-  const run = async (args) => (await execFileAsync('git', args, { cwd, windowsHide: true })).stdout.trim();
+  const gitEnvironment = minimalGitEnvironment();
+  const run = async (args) => (await execFileAsync('git', args, {
+    cwd,
+    windowsHide: true,
+    env: gitEnvironment,
+  })).stdout.trim();
   try {
-    const [sourceBaseSha, branch, trackedPatch, untrackedPaths] = await Promise.all([
+    const [sourceBaseSha, branch, trackedPatch, untrackedPaths, indexEntries, topLevel, gitVersion] = await Promise.all([
       run(['rev-parse', 'HEAD']),
       run(['branch', '--show-current']),
-      hashGitOutput(cwd, ['diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD', '--']),
-      collectGitPaths(cwd, ['ls-files', '--others', '--exclude-standard', '-z']),
+      hashGitOutput(cwd, ['diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD', '--'], gitEnvironment),
+      collectGitPaths(cwd, ['ls-files', '--others', '--exclude-standard', '-z'], gitEnvironment),
+      run(['ls-files', '-v']),
+      run(['rev-parse', '--show-toplevel']),
+      run(['--version']),
     ]);
+    if (resolve(topLevel).toLowerCase() !== resolve(cwd).toLowerCase()) {
+      throw new Error(`Git top-level ${topLevel} does not match workspace ${cwd}`);
+    }
+    const hiddenTrackedEntries = indexEntries.split(/\r?\n/)
+      .filter(Boolean)
+      .filter((line) => line[0] === 'S' || line[0] === line[0]?.toLowerCase())
+      .map((line) => line.slice(2).replaceAll('\\', '/'))
+      .sort(comparePaths);
     const sourcePaths = untrackedPaths
       .map((path) => path.replaceAll('\\', '/'))
       .filter((path) => !isEvidencePath(path))
@@ -60,12 +100,15 @@ export async function collectGit(cwd) {
       sha: sourceBaseSha,
       sourceBaseSha,
       branch: branch || null,
-      dirty: trackedPatch.bytes > 0 || untrackedPaths.length > 0,
+      dirty: trackedPatch.bytes > 0 || untrackedPaths.length > 0 || hiddenTrackedEntries.length > 0,
       trackedPatchSha256: trackedPatch.sha256,
       untrackedSourceManifest,
       untrackedSourceManifestSha256: sha256Json(untrackedSourceManifest),
       untrackedSourceCount: untrackedSourceManifest.length,
       untrackedSourceExclusions: ['validation/evidence/**'],
+      hiddenTrackedEntries,
+      topLevel: resolve(topLevel),
+      gitVersion,
     };
   } catch (error) {
     return {
@@ -78,16 +121,36 @@ export async function collectGit(cwd) {
       untrackedSourceManifestSha256: null,
       untrackedSourceCount: null,
       untrackedSourceExclusions: ['validation/evidence/**'],
+      hiddenTrackedEntries: [],
+      topLevel: null,
+      gitVersion: null,
       error: error instanceof Error ? error.message : String(error),
     };
   }
 }
 
-function hashGitOutput(cwd, args) {
+function minimalGitEnvironment() {
+  const environment = {
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+    GIT_OPTIONAL_LOCKS: '0',
+  };
+  for (const key of ['PATH', 'Path', 'PATHEXT', 'SystemRoot', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'HOME', 'USERPROFILE']) {
+    if (process.env[key] !== undefined) environment[key] = process.env[key];
+  }
+  return environment;
+}
+
+function hashGitOutput(cwd, args, environment) {
   return new Promise((resolvePromise, reject) => {
     const hash = createHash('sha256');
     let bytes = 0;
-    const child = spawn('git', args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('git', args, {
+      cwd,
+      env: environment,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     const stderr = [];
     child.stdout.on('data', (chunk) => {
       bytes += chunk.length;
@@ -105,9 +168,14 @@ function hashGitOutput(cwd, args) {
   });
 }
 
-function collectGitPaths(cwd, args) {
+function collectGitPaths(cwd, args, environment) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn('git', args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('git', args, {
+      cwd,
+      env: environment,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     const chunks = [];
     const stderr = [];
     child.stdout.on('data', (chunk) => chunks.push(Buffer.from(chunk)));

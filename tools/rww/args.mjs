@@ -48,11 +48,15 @@ export function normalizeCommand(parsed) {
       ...(parsed.json ? ['--json'] : []),
     ];
   }
+  if (parsed.qualify) return ['perf', 'headless-40m', '--qualify'];
   return [
     'perf', parsed.profile,
     '--terrain', parsed.terrain,
+    '--warmup-runs', String(parsed.warmupRuns),
     '--runs', String(parsed.runs),
     '--ticks', String(parsed.ticks),
+    ...(parsed.maxMedianMs === null ? [] : ['--max-median-ms', String(parsed.maxMedianMs)]),
+    ...(parsed.requireClean ? ['--require-clean'] : []),
   ];
 }
 
@@ -120,16 +124,37 @@ function parsePlay(args) {
 function parsePerf(args) {
   if (args[0] === 'browser-heavy') return parseBrowserPerf(args.slice(1));
   if (args[0] !== 'headless-40m') throw new UsageError('perf requires the headless-40m or browser-heavy profile');
-  const result = { command: 'perf', profile: 'headless-40m', terrain: 'flat', runs: 1, ticks: 72_000 };
+  const result = {
+    command: 'perf', profile: 'headless-40m', terrain: 'flat',
+    runs: 1, warmupRuns: 0, maxMedianMs: null, requireClean: false, qualify: false, ticks: 72_000,
+  };
   for (let index = 1; index < args.length; index++) {
     const arg = args[index];
+    if (arg === '--require-clean') {
+      result.requireClean = true;
+      continue;
+    }
+    if (arg === '--qualify') {
+      result.qualify = true;
+      continue;
+    }
     const value = optionValue(args, ++index, arg);
     if (arg === '--terrain') {
       if (value !== 'standard' && value !== 'flat') throw new UsageError('terrain must be standard or flat');
       result.terrain = value;
-    } else if (arg === '--runs') result.runs = positiveInteger(value, 'runs');
-    else if (arg === '--ticks') result.ticks = positiveInteger(value, 'ticks');
+    } else if (arg === '--runs') result.runs = boundedPositiveInteger(value, 'runs', 25);
+    else if (arg === '--warmup-runs') result.warmupRuns = boundedNonNegativeInteger(value, 'warmup-runs', 5);
+    else if (arg === '--max-median-ms') result.maxMedianMs = boundedPositiveInteger(value, 'max-median-ms', 600_000);
+    else if (arg === '--ticks') result.ticks = boundedPositiveInteger(value, 'ticks', 1_000_000);
     else throw new UsageError(`Unknown perf option: ${arg}`);
+  }
+  if (result.qualify) {
+    result.terrain = 'standard';
+    result.runs = 5;
+    result.warmupRuns = 1;
+    result.maxMedianMs = 15_000;
+    result.requireClean = true;
+    result.ticks = 72_000;
   }
   return result;
 }
@@ -164,6 +189,25 @@ function positiveInteger(value, label) {
     throw new UsageError(`${label} must be a positive integer`);
   }
   return Number(value);
+}
+
+function nonNegativeInteger(value, label) {
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    throw new UsageError(`${label} must be a non-negative integer`);
+  }
+  return Number(value);
+}
+
+function boundedPositiveInteger(value, label, maximum) {
+  const parsed = positiveInteger(value, label);
+  if (parsed > maximum) throw new UsageError(`${label} must be at most ${maximum}`);
+  return parsed;
+}
+
+function boundedNonNegativeInteger(value, label, maximum) {
+  const parsed = nonNegativeInteger(value, label);
+  if (parsed > maximum) throw new UsageError(`${label} must be at most ${maximum}`);
+  return parsed;
 }
 
 function normalizePath(value) {

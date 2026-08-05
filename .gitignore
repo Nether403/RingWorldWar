@@ -8,3 +8,6 @@ playwright-report/
 .vite/
 .DS_Store
 image, video and voice/
+.env
+Speech-image-video.env
+Speech-image-video.md

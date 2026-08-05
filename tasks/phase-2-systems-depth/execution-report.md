@@ -67,7 +67,7 @@ The systems implementation is operational, but the statistical match-quality gat
 - the required full-length 20-match Veteran balance sample has not demonstrated a 20–40 minute mean;
 - the short 20-seed Veteran mirror diagnostic produced 17 draws, so it is not a substitute for full-match tuning;
 - Recruit/Veteran/Commander ordering is covered behaviorally and in short diagnostics, but not yet by representative 20–40 minute match samples;
-- the under-10-second 40-minute capability is demonstrated under low load, not yet enforced on known CI hardware;
+- the original under-10-second criterion was later superseded by the explicit warm-median runner contract in `docs/headless-performance-policy.md`; final clean-source pinned-runner qualification remains open;
 - Ultra retains the stable direct renderer rather than enabling the post-processing stack that Gate 1 explicitly deferred;
 - faction palettes are distinct, but geometry remains roster-shared rather than providing fully separate faction silhouettes.
 
