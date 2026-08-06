@@ -2,6 +2,7 @@ import type { QualityLevel, Renderer } from './renderer';
 
 export const SETTINGS_STORAGE_KEY = 'rww-settings';
 export const DEFAULT_VOLUME = 0.8;
+export const DEFAULT_VOICE_VOLUME = 0.8;
 
 export interface StorageAdapter {
   getItem(key: string): string | null;
@@ -16,11 +17,13 @@ export interface SettingsOptions {
 interface PersistedSettings {
   quality?: QualityLevel;
   volume: number;
+  voiceVolume?: number;
 }
 
 export class Settings {
   quality: QualityLevel = 'high';
   volume = DEFAULT_VOLUME;
+  voiceVolume = DEFAULT_VOICE_VOLUME;
   adaptiveQuality = true;
 
   private readonly storage: StorageAdapter | null;
@@ -36,6 +39,7 @@ export class Settings {
         this.adaptiveQuality = false;
       }
       if (isVolume(persisted.volume)) this.volume = persisted.volume;
+      if (isVolume(persisted.voiceVolume)) this.voiceVolume = persisted.voiceVolume;
     }
 
     const urlQuality = readUrlQuality(options.search ?? browserSearch());
@@ -59,6 +63,11 @@ export class Settings {
     this.save();
   }
 
+  setVoiceVolume(volume: number): void {
+    this.voiceVolume = clamp01(volume);
+    this.save();
+  }
+
   setAdaptiveQuality(enabled: boolean, currentQuality: QualityLevel = this.quality): void {
     this.adaptiveQuality = enabled;
     this.quality = currentQuality;
@@ -74,6 +83,7 @@ export class Settings {
   save(): void {
     const value: PersistedSettings = { volume: this.volume };
     if (this.savedQuality) value.quality = this.savedQuality;
+    if (this.voiceVolume !== DEFAULT_VOICE_VOLUME) value.voiceVolume = this.voiceVolume;
     try {
       this.storage?.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(value));
     } catch {

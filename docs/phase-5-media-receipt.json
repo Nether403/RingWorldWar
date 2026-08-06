@@ -1,0 +1,464 @@
+{
+  "schema": "rww.phase-5-media-receipt",
+  "version": 1,
+  "reviewedAt": "2026-08-06",
+  "providers": {
+    "voices": {
+      "provider": "Deepgram",
+      "compactModel": "aura-2-orion-en",
+      "choirModel": "aura-2-luna-en"
+    },
+    "images": {
+      "provider": "Azure OpenAI",
+      "deployment": "gpt-image-2-2"
+    }
+  },
+  "assets": [
+    {
+      "path": "public/media/presentation/last-rotation-title.webp",
+      "bytes": 104726,
+      "sha256": "7e6d635dbdb7cb489e686fea4f7676ccafed69d7146f70d60349f43f3ea7bc22",
+      "generationRequestId": "4534b63e-db23-4878-af25-4333c0262628"
+    },
+    {
+      "path": "public/media/presentation/narrative/signal-briefing.webp",
+      "bytes": 29842,
+      "sha256": "dab0fea363bc6879bca8eecdf885c82f19660dd568b721e21249dc28abe446d7",
+      "generationRequestId": "367fb502-dbba-4785-9c92-ea783b4ad2f8"
+    },
+    {
+      "path": "public/media/presentation/narrative/signal-hunters.webp",
+      "bytes": 44866,
+      "sha256": "7e877a6faf4dbb1af6e410fccbe9ee15b0f39d91ff528b80a83dc468c5811ecf",
+      "generationRequestId": "10faa43f-1d9f-400d-93f5-ff3285cdc1bb"
+    },
+    {
+      "path": "public/media/presentation/narrative/signal-last-correction.webp",
+      "bytes": 40958,
+      "sha256": "3cfddf8c3555249c4bdf2a5a3878ac22861e0d2bdf969b617d65eb5674719f3a",
+      "generationRequestId": "55cc8157-4f25-4084-b7fd-c423f9c6c3bd"
+    },
+    {
+      "path": "public/media/presentation/narrative/signal-migration.webp",
+      "bytes": 30318,
+      "sha256": "cd675aae79d36394da7196403a1c3bc01eb22847c577fb37accf638076acbb99",
+      "generationRequestId": "d3f5bd60-42ff-4ecc-b1d4-5dfee14ba7ab"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.choir.aegis.webp",
+      "bytes": 34026,
+      "sha256": "959f584f9e8f6bad4e25253314267b1fad8673ef80689525946d47c243c16962",
+      "generationRequestId": "d0234e88-697e-4803-a498-38566f1799d9"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.choir.engineer.webp",
+      "bytes": 21088,
+      "sha256": "4b7aeedaa756dca2a12996b8bc19caf006aa90c4ce9393966d8300286212a60b",
+      "generationRequestId": "7dc70709-9ed2-4d13-ba60-6b1c95eeaaca"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.choir.longbow.webp",
+      "bytes": 24720,
+      "sha256": "e6fd512fb879f21f45f1bbf80b836258640a565cdea6be3c071c3169de0dd88e",
+      "generationRequestId": "526a6376-3f00-40cb-9b3f-9295d8d72ff8"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.choir.needle.webp",
+      "bytes": 20262,
+      "sha256": "0f81532df269e7fc0337eb5775a43aeadb1712289d8f8f354101b321da1eafa8",
+      "generationRequestId": "953f2268-fa65-414a-a359-5635839dc5fd"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.choir.vanguard.webp",
+      "bytes": 27668,
+      "sha256": "eacc364f2f38fe0ed864dc82f418220985c2d570661b88efdf4d35cfa42f0c38",
+      "generationRequestId": "6b64daf6-5885-4958-9d0e-64ee23da1b3e"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.choir.wisp.webp",
+      "bytes": 16616,
+      "sha256": "41191e00dd8f799c781d720f4f92c661ee63c25a7887277d940a111001bc670e",
+      "generationRequestId": "15d53318-2e11-4fb3-a1d3-108cbf0d7357"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.compact.aegis.webp",
+      "bytes": 35286,
+      "sha256": "a0e815ddd4fd63073d672ea55b30bc7cbf08cafd5f388ece0fce32796fa1865f",
+      "generationRequestId": "4a26a10e-5852-4d99-aeea-9b84fe970971"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.compact.bulwark.webp",
+      "bytes": 32426,
+      "sha256": "606202df5929311091a7d2eb802c97df345aa9ff91c7837d80d5a93767185e31",
+      "generationRequestId": "1517daec-52a5-4646-9edb-8f74a86b914e"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.compact.engineer.webp",
+      "bytes": 34252,
+      "sha256": "66c0b9db54b95e7bb5f79fedd6fb41e7537276f18eb273934699e23fdf231b71",
+      "generationRequestId": "af88c976-6954-4fbf-9be2-51417d141731"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.compact.longbow.webp",
+      "bytes": 21824,
+      "sha256": "448c4c6c834b5ce45307f30739663d4ca1383049f994c3ac3e89df3f15fe41b1",
+      "generationRequestId": "615eafdc-d9e8-4de3-8b8b-2cfd2fd2f519"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.compact.vanguard.webp",
+      "bytes": 36608,
+      "sha256": "ef64abc27042ebe71ac97b77cd158d7533c5821bce3a881e13ba14b520d786a6",
+      "generationRequestId": "40b208a2-153a-4ca6-b8cf-6b5b4864274f"
+    },
+    {
+      "path": "public/media/presentation/units/dossier.compact.wisp.webp",
+      "bytes": 23956,
+      "sha256": "cc3f16d180c39077cf29c3cabbe3b2b53e608012c39bce0899fb814eb9caef64",
+      "generationRequestId": "991efb61-7aca-40f3-a5da-e3de0b46245c"
+    },
+    {
+      "path": "public/media/voices/choir.aegis.attack.mp3",
+      "bytes": 12333,
+      "sha256": "43f7972c071b3e2167b2a911a0c0c34f8178b9b3df6c2c794976729486729c93"
+    },
+    {
+      "path": "public/media/voices/choir.aegis.critical.mp3",
+      "bytes": 12765,
+      "sha256": "fc0691b078c9fa0b3dd501dd223b47926a59c31c5c50bb3c3fcc2fd3a44a4c7a"
+    },
+    {
+      "path": "public/media/voices/choir.aegis.move.mp3",
+      "bytes": 12045,
+      "sha256": "3cd6a65193e57374150225579c573e05161023603c33be820ea4370d33d81407"
+    },
+    {
+      "path": "public/media/voices/choir.aegis.ready.mp3",
+      "bytes": 12045,
+      "sha256": "faa7c814625b71d2924458ecdef408395cbb5ec5674493f3599d42c60262f672"
+    },
+    {
+      "path": "public/media/voices/choir.aegis.selected.mp3",
+      "bytes": 13053,
+      "sha256": "ec035b2e1a1c2a9948d18c51a32eeb41d3efbff6e540918a9758673e564c42ff"
+    },
+    {
+      "path": "public/media/voices/choir.engineer.attack.mp3",
+      "bytes": 10893,
+      "sha256": "997708847806faf21807381a374ab51b673f3d2c1d7102b60a095511ab2eee8f"
+    },
+    {
+      "path": "public/media/voices/choir.engineer.critical.mp3",
+      "bytes": 12333,
+      "sha256": "8fd10a98b6e8fab8caa21e37a7a0cce339888942514266321bc045dba800d98d"
+    },
+    {
+      "path": "public/media/voices/choir.engineer.move.mp3",
+      "bytes": 12045,
+      "sha256": "f4402aaad91d33b7d966e17afdf5ddcbc512a56256ba3b8e7013d71cc99c0972"
+    },
+    {
+      "path": "public/media/voices/choir.engineer.ready.mp3",
+      "bytes": 16365,
+      "sha256": "45f0e2ba7b4ea7ba223c86d8aa12d166c94adeec82242b083922ab776206f5f6"
+    },
+    {
+      "path": "public/media/voices/choir.engineer.selected.mp3",
+      "bytes": 10605,
+      "sha256": "bf87f73300daa0b2cd9dd86d0cb4df3e6eece21c06da48bd75b2af59aad881a2"
+    },
+    {
+      "path": "public/media/voices/choir.group-attack.mp3",
+      "bytes": 15501,
+      "sha256": "7635630a0c1f8b1dee04aa8ab88d729df1f06ae478cac59b79c24a629c503403"
+    },
+    {
+      "path": "public/media/voices/choir.group-lost.mp3",
+      "bytes": 10173,
+      "sha256": "89c0e88e7d4914f5edb116474ea698adcd876a442a55336d0912b0f5c939d981"
+    },
+    {
+      "path": "public/media/voices/choir.group-move.mp3",
+      "bytes": 11181,
+      "sha256": "077a52b506c908f0f910f7e905975fe98885c8f546a1504931dcc2910fb42159"
+    },
+    {
+      "path": "public/media/voices/choir.group-selected.mp3",
+      "bytes": 10173,
+      "sha256": "e19c7ef3fd0a434081d1ffc17065e8969f370fff39bbe01e39de9fa7329819be"
+    },
+    {
+      "path": "public/media/voices/choir.longbow.attack.mp3",
+      "bytes": 13485,
+      "sha256": "fab89981705aa0739f2dc3e5894ad18492c401ee31ca25a71bf9a09d95400685"
+    },
+    {
+      "path": "public/media/voices/choir.longbow.critical.mp3",
+      "bytes": 12765,
+      "sha256": "eb2142df72104bd07d0c33438e4f770b9fbec360f1575d0903cfade951e57a55"
+    },
+    {
+      "path": "public/media/voices/choir.longbow.move.mp3",
+      "bytes": 12045,
+      "sha256": "4a3653930ad5eae425c9a50f780e2685f1e5c517f938f47758fcdac299e2c4ef"
+    },
+    {
+      "path": "public/media/voices/choir.longbow.ready.mp3",
+      "bytes": 14781,
+      "sha256": "997565c6c19b308c3ba119866f8aefbda025e770a9bea7aa01c65bc5c295d933"
+    },
+    {
+      "path": "public/media/voices/choir.longbow.selected.mp3",
+      "bytes": 13773,
+      "sha256": "f7d01626c9bf49ede3a4467441597e63c1b6e4f837771d83a3fac283a67dad47"
+    },
+    {
+      "path": "public/media/voices/choir.needle.attack.mp3",
+      "bytes": 11181,
+      "sha256": "56c0352f66f2216d7e87b7a641c903bbb0cb8d199bd50acb86158eb7c6996d47"
+    },
+    {
+      "path": "public/media/voices/choir.needle.critical.mp3",
+      "bytes": 14781,
+      "sha256": "0c94eeaff940676b12def73c9da7f75aef7ecc6a56a194b4e55f62dbe0aa2105"
+    },
+    {
+      "path": "public/media/voices/choir.needle.move.mp3",
+      "bytes": 11613,
+      "sha256": "516c22c3021ccc4dd84e2ec96abd0b118c5f5a1ae6b3f47a11441ee908daaf49"
+    },
+    {
+      "path": "public/media/voices/choir.needle.ready.mp3",
+      "bytes": 11325,
+      "sha256": "3302bf32d6cf5316f17fe2ee4f30eb8f55971136aa7cbb813f32a53e59c2e888"
+    },
+    {
+      "path": "public/media/voices/choir.needle.selected.mp3",
+      "bytes": 11613,
+      "sha256": "a262e312a55dd891e50a7245206a4dc538f7a5b57f8ca1dc11ce3aca43bafc3f"
+    },
+    {
+      "path": "public/media/voices/choir.vanguard.attack.mp3",
+      "bytes": 13053,
+      "sha256": "9e88f5e65f80b26350d7936bfd82e31a4e2f170777989a128c5e1358c0dbd516"
+    },
+    {
+      "path": "public/media/voices/choir.vanguard.critical.mp3",
+      "bytes": 14781,
+      "sha256": "48629cae5028d93458f5780815e79425365e8e2ad9ec940d5cd676c6d302cc38"
+    },
+    {
+      "path": "public/media/voices/choir.vanguard.move.mp3",
+      "bytes": 10893,
+      "sha256": "9298e5cb14bffaeea461e0ad990ee8ff8bbf056ea3ad7bf74cb4b665aed20439"
+    },
+    {
+      "path": "public/media/voices/choir.vanguard.ready.mp3",
+      "bytes": 12765,
+      "sha256": "1e70ab51aa5b7ab0ca03871c5aeef78c9fdb07ea5a4438c47d88757a557b2a1a"
+    },
+    {
+      "path": "public/media/voices/choir.vanguard.selected.mp3",
+      "bytes": 10461,
+      "sha256": "d2b0e2078327ca820b61c4dc1c89853a13a1dd2a8018feea1fce4c0ac75299ef"
+    },
+    {
+      "path": "public/media/voices/choir.wisp.attack.mp3",
+      "bytes": 12045,
+      "sha256": "21aff6e5dc76ad1d1d087f7fe9039058d32c28f8173bf9b1c0b17fbaa80444be"
+    },
+    {
+      "path": "public/media/voices/choir.wisp.critical.mp3",
+      "bytes": 11613,
+      "sha256": "51c17453dd809dfadf574174536a00988bf96c76d5f495e2ed89488b28975e6a"
+    },
+    {
+      "path": "public/media/voices/choir.wisp.move.mp3",
+      "bytes": 13341,
+      "sha256": "fa4bff1aefcc9073a37350b8e32d4b7b2ea7a836f87b4edea12e1a941921479f"
+    },
+    {
+      "path": "public/media/voices/choir.wisp.ready.mp3",
+      "bytes": 13341,
+      "sha256": "247380d10179c0404060263bcd6b60e56a86b89581a6d45a75ee508df7f2f645"
+    },
+    {
+      "path": "public/media/voices/choir.wisp.selected.mp3",
+      "bytes": 10893,
+      "sha256": "11269e9a4c4fc924085a6788c9178bc62d471422e35dd91a58083f4cf0d00f1b"
+    },
+    {
+      "path": "public/media/voices/compact.aegis.attack.mp3",
+      "bytes": 10893,
+      "sha256": "825e3218d2e92b38d043712c9de8d090d177e9570b05afeacbdf4d62c88fe4d8"
+    },
+    {
+      "path": "public/media/voices/compact.aegis.critical.mp3",
+      "bytes": 10461,
+      "sha256": "c54e77508a3349f57630922f4d71ce1206ff04519f45395bb74fb57aeb8902d0"
+    },
+    {
+      "path": "public/media/voices/compact.aegis.move.mp3",
+      "bytes": 11613,
+      "sha256": "050f81fc207f9b3de58a4dd93655f31f218c3ec75689d78b17be561d174bcfcb"
+    },
+    {
+      "path": "public/media/voices/compact.aegis.ready.mp3",
+      "bytes": 10461,
+      "sha256": "264c1df6b0f743450d5973a6fddc9350e057cddd2dcbacd551aa28be03f35928"
+    },
+    {
+      "path": "public/media/voices/compact.aegis.selected.mp3",
+      "bytes": 9453,
+      "sha256": "15a993ca622168cc3d11439a3e53bb3345379bbebc78c2a7517c9b67e9d46428"
+    },
+    {
+      "path": "public/media/voices/compact.bulwark.attack.mp3",
+      "bytes": 8733,
+      "sha256": "56cb95b432eb9cbbcf29af2e7044abc1a41098380e274eaf7085539ca6535a3a"
+    },
+    {
+      "path": "public/media/voices/compact.bulwark.critical.mp3",
+      "bytes": 12333,
+      "sha256": "6d95975fb6cae729949db118eb30b53ba5bafc980f9fa0890b1b9ff129ead928"
+    },
+    {
+      "path": "public/media/voices/compact.bulwark.move.mp3",
+      "bytes": 12621,
+      "sha256": "09e51cbd752fb3493dd8072f3d68882e71858e657b4b995351bab6021a9bb556"
+    },
+    {
+      "path": "public/media/voices/compact.bulwark.ready.mp3",
+      "bytes": 10605,
+      "sha256": "36653f3eb761697ca0cf5791b1dd97169952f8213d55f69e4ca699034316d254"
+    },
+    {
+      "path": "public/media/voices/compact.bulwark.selected.mp3",
+      "bytes": 13773,
+      "sha256": "9bc7b1bbb5c3d46ca7aab5ead273d986272332bcf611c3b61dac0b0ae31c2e16"
+    },
+    {
+      "path": "public/media/voices/compact.engineer.attack.mp3",
+      "bytes": 12621,
+      "sha256": "f4e7687c838125d14d1c39d1ebfa8d3f83805d79f156015778745a4fc6caf85a"
+    },
+    {
+      "path": "public/media/voices/compact.engineer.critical.mp3",
+      "bytes": 15501,
+      "sha256": "ea4f8808cc0c8fbc43bb41e468a6ccc574556799771aa8f64decc8ae4520c3e0"
+    },
+    {
+      "path": "public/media/voices/compact.engineer.move.mp3",
+      "bytes": 9741,
+      "sha256": "e4ef359bd7c5cc7ca8aed494445ecb00824303aee8ff382646437e597628ae35"
+    },
+    {
+      "path": "public/media/voices/compact.engineer.ready.mp3",
+      "bytes": 15213,
+      "sha256": "29fc242cb20ad21a37024034d043586a69d893aeeddbc2b98daff23f7d6c2c18"
+    },
+    {
+      "path": "public/media/voices/compact.engineer.selected.mp3",
+      "bytes": 14061,
+      "sha256": "7ccbf2ddab38f25aa5229ffbfe942dc3fe36116e8703e6aa0e55d0f63e5d3f38"
+    },
+    {
+      "path": "public/media/voices/compact.group-attack.mp3",
+      "bytes": 14781,
+      "sha256": "192a1ab6ea3e9365c7edcdff604ac6019362b14a450d4c760d158e11b2578f27"
+    },
+    {
+      "path": "public/media/voices/compact.group-lost.mp3",
+      "bytes": 14061,
+      "sha256": "e3f7ee30c17de03dc58b22472ff57d5eba4e43eb164321d3d2be7b661efa540c"
+    },
+    {
+      "path": "public/media/voices/compact.group-move.mp3",
+      "bytes": 12621,
+      "sha256": "062c38082e0a58e22ed6e535afd3423c337342ae5d250f03c7e95a1f55a35c67"
+    },
+    {
+      "path": "public/media/voices/compact.group-selected.mp3",
+      "bytes": 14061,
+      "sha256": "a97ae180f83a91158c75b0b5cd6dbf095c2578a138b62a7da78c733b20f1e450"
+    },
+    {
+      "path": "public/media/voices/compact.longbow.attack.mp3",
+      "bytes": 11181,
+      "sha256": "08ab22fba8b1e50b3e582c6591a6658ffb6d747e60c55f61733241df43a924fb"
+    },
+    {
+      "path": "public/media/voices/compact.longbow.critical.mp3",
+      "bytes": 5421,
+      "sha256": "62fa822c83a51f9943b61e826e04565e36db370d7392d994d900b4737d847e78"
+    },
+    {
+      "path": "public/media/voices/compact.longbow.move.mp3",
+      "bytes": 12333,
+      "sha256": "4b3cec85f812f5968b12249c58e72fb20de1291d53bf3c6403a411dd8cde6980"
+    },
+    {
+      "path": "public/media/voices/compact.longbow.ready.mp3",
+      "bytes": 12045,
+      "sha256": "567495dd3dc141c50729d5a55af6f9de4c039bb37a839c3770243331d468bd57"
+    },
+    {
+      "path": "public/media/voices/compact.longbow.selected.mp3",
+      "bytes": 11613,
+      "sha256": "d0be8790736f55c0fc1683fdca7b2103a5515a52c4c112c789e2e12056cdb911"
+    },
+    {
+      "path": "public/media/voices/compact.vanguard.attack.mp3",
+      "bytes": 8013,
+      "sha256": "fda11e1a997fd9335ee519b1aefbd795342d9e59374b67f1fa756a9d5bbe446f"
+    },
+    {
+      "path": "public/media/voices/compact.vanguard.critical.mp3",
+      "bytes": 11181,
+      "sha256": "c19a6c6adbd2fb10f5948d3d36492e6e725923d652ec78d514ea07d1f54264d5"
+    },
+    {
+      "path": "public/media/voices/compact.vanguard.move.mp3",
+      "bytes": 5853,
+      "sha256": "047205ed039dc190d7716bbaa90e860bd91d40c183d342706f78bf55bb3a16bc"
+    },
+    {
+      "path": "public/media/voices/compact.vanguard.ready.mp3",
+      "bytes": 9453,
+      "sha256": "2c4f17e6c3d30f315c0ed29683503b49838b111452f2bdb0862ae6683ed81ded"
+    },
+    {
+      "path": "public/media/voices/compact.vanguard.selected.mp3",
+      "bytes": 9885,
+      "sha256": "c18b6dbc4ad7ee67471ef7a4a268dbf9567384e4d43878d8e9e8d734328840c7"
+    },
+    {
+      "path": "public/media/voices/compact.wisp.attack.mp3",
+      "bytes": 12621,
+      "sha256": "9a0cbd3600d6e82d4d61034004031f38548c0cf95b2ae37418c91cd674bdeb4b"
+    },
+    {
+      "path": "public/media/voices/compact.wisp.critical.mp3",
+      "bytes": 4845,
+      "sha256": "6f9f7a7a8cddd2a9c2f86cfca65395563b931cb384a1b4576bc5c1700cfa942d"
+    },
+    {
+      "path": "public/media/voices/compact.wisp.move.mp3",
+      "bytes": 8733,
+      "sha256": "35556e30cc5e8d5eb6032562bf759a6d6d913394727efc9c87995f5a7f196c59"
+    },
+    {
+      "path": "public/media/voices/compact.wisp.ready.mp3",
+      "bytes": 14781,
+      "sha256": "f906f71d92f4892d4fb3ae6c37e52b687c38cafd0f8189debca8be4b83381967"
+    },
+    {
+      "path": "public/media/voices/compact.wisp.selected.mp3",
+      "bytes": 11325,
+      "sha256": "a13d049b7086599e37eba1d7dd893965b242a8e8dcae430ad5ecba0c06324b20"
+    }
+  ],
+  "totals": {
+    "files": 85,
+    "bytes": 1384390
+  }
+}

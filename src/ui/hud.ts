@@ -37,6 +37,7 @@ import type { BallisticFireResult, SimEvent, Structure, Unit, World } from '@sim
 import type { MissionHudModel } from '../tutorial/mission';
 import type { MissionDebriefModel } from '../tutorial/mission';
 import type { NarrativeHudModel } from '../tutorial/narrative';
+import { PRESENTATION_MEDIA, type PresentationMedia } from '../presentation/media';
 
 const CSS = `
 .rww-root { position: fixed; inset: 0; pointer-events: none; z-index: 30;
@@ -61,7 +62,8 @@ const CSS = `
 /* Selection + build bar */
 .rww-bottom { position: absolute; bottom: max(8px, env(safe-area-inset-bottom)); left: 8px; right: 486px;
   display: grid; grid-template-columns: minmax(250px, 300px) 1fr; align-items: end; gap: 8px; }
-.rww-sel { min-width: 0; padding: 11px 14px 12px; position:relative; border-left:2px solid rgba(240,130,30,.72); }
+.rww-sel { min-width: 0; padding: 11px 14px 12px; position:relative; display:flow-root;
+  border-left:2px solid rgba(240,130,30,.72); }
 .rww-eyebrow { margin-bottom:4px; color:#9fd8ff; font-size:9px; letter-spacing:.2em; text-transform:uppercase; }
 .rww-sel h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; letter-spacing: 0.1em; }
 .rww-sel p { margin: 0; font-size: 11px; opacity: 0.6; line-height: 1.45; max-width: 34ch; }
@@ -73,6 +75,8 @@ const CSS = `
 .rww-sel .rww-hp i { display: block; height: 100%; background: #6ee7a0; }
 .rww-hp-row { display:flex; justify-content:space-between; margin-top:7px; font-size:9px; text-transform:uppercase; opacity:.68; }
 .rww-order { margin-top:5px!important; color:#f0b26e; text-transform:uppercase; letter-spacing:.12em; }
+.rww-dossier { display:block; float:right; width:clamp(58px,7vw,86px); aspect-ratio:4/5; margin:0 0 8px 12px;
+  border:1px solid rgba(159,216,255,.24); object-fit:cover; background:rgba(3,7,11,.72); }
 
 .rww-cmds { display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-end; padding-bottom:1px; }
 .rww-btn { pointer-events: auto; cursor: pointer; padding: 7px 11px; min-width: 92px;
@@ -89,6 +93,9 @@ const CSS = `
   text-decoration: none; font-variant-numeric: tabular-nums; }
 .rww-btn em { position: absolute; margin-left: -9px; margin-top: -2px;
   font-style: normal; font-size: 9px; opacity: 0.7; }
+.rww-btn.rww-with-dossier { min-height:54px; padding-left:54px; }
+.rww-btn .rww-command-dossier { position:absolute; left:7px; top:7px; width:38px; height:38px; aspect-ratio:1;
+  border:1px solid rgba(159,216,255,.18); object-fit:cover; background:rgba(3,7,11,.72); }
 .rww-queue-status { align-self:stretch; padding:7px 10px; border:1px dashed rgba(159,216,255,.25);
   color:#9fd8ff; font-size:9px; text-transform:uppercase; letter-spacing:.12em; }
 
@@ -169,6 +176,9 @@ const CSS = `
 .rww-narrative p { margin: 0; line-height: 1.55; font-size: 14px; }
 .rww-narrative button { margin-top: 18px; padding: 9px 22px; color: #f0b26e; background: transparent;
   border: 1px solid rgba(240,130,30,.7); text-transform: uppercase; letter-spacing: .16em; cursor: pointer; }
+.rww-narrative.has-portrait { display:grid; grid-template-columns:minmax(110px,28%) 1fr; gap:20px; align-items:start; }
+.rww-narrative-portrait { display:block; width:100%; aspect-ratio:4/5; border:1px solid rgba(159,216,255,.24);
+  object-fit:cover; background:rgba(3,7,11,.72); }
 
 /* Toggleable controls reference */
 .rww-help-toggle { position:absolute; top:max(10px,env(safe-area-inset-top)); right:10px; pointer-events:auto;
@@ -319,7 +329,7 @@ export class Hud {
     return !this.helpEl.hidden;
   }
 
-  constructor() {
+  constructor(private readonly media: PresentationMedia = PRESENTATION_MEDIA) {
     this.style = document.createElement('style');
     this.style.textContent = CSS;
     document.head.appendChild(this.style);
@@ -636,7 +646,16 @@ export class Hud {
       }
       this.onNarrativeAcknowledge?.();
     };
-    panel.append(speaker, title, body, acknowledge);
+    const portraitSource = this.media.narrativePortraits?.[narrative.id];
+    if (portraitSource) {
+      const copy = el('div', 'rww-narrative-copy');
+      copy.append(speaker, title, body, acknowledge);
+      panel.classList.add('has-portrait');
+      panel.append(
+        decorativeImage(portraitSource, 'rww-narrative-portrait', () => panel.classList.remove('has-portrait')),
+        copy,
+      );
+    } else panel.append(speaker, title, body, acknowledge);
     this.root.appendChild(panel);
     this.narrativeEl = panel;
     if (narrative.blocking) this.activateModal(panel, acknowledge);
@@ -868,6 +887,8 @@ export class Hud {
           `<p class="rww-order">Order — ${formatOrder(first.order.kind)}</p>${sensorCopy}${rangeCopy}` +
           `<div class="rww-hp-row"><span>Hull integrity</span><b>${pct}%</b></div>` +
           `<div class="rww-hp" role="meter" aria-label="Hull integrity" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%;background:${pct > 50 ? '#6ee7a0' : pct > 25 ? '#f0c26e' : '#ff7a5e'}"></i></div>`;
+        const dossierSource = this.unitDossier(first.faction, first.kind);
+        if (dossierSource) this.selEl.prepend(decorativeImage(dossierSource, 'rww-dossier'));
       } else {
         const counts = new Map<UnitKind, number>();
         for (const u of units) counts.set(u.kind, (counts.get(u.kind) ?? 0) + 1);
@@ -967,6 +988,13 @@ export class Hud {
       `<u>${def.name}</u><s>${effective.salvageCost} slv` +
       (def.cost.command ? ` · ${def.cost.command} cmd` : '') +
       `</s>`;
+    const dossierSource = this.unitDossier(player, kind);
+    if (dossierSource) {
+      b.classList.add('rww-with-dossier');
+      b.prepend(decorativeImage(dossierSource, 'rww-command-dossier', () => {
+        b.classList.remove('rww-with-dossier');
+      }));
+    }
     b.title = def.role;
     b.onclick = (): void => {
       if (!world.tryQueueUnit(st.id, kind)) {
@@ -976,6 +1004,11 @@ export class Hud {
       } else this.command(`${def.name} queued`);
     };
     this.cmdEl.appendChild(b);
+  }
+
+  private unitDossier(faction: number, kind: UnitKind): string | undefined {
+    if (faction !== Faction.Compact && faction !== Faction.Choir) return undefined;
+    return this.media.unitDossiers?.[faction]?.[kind];
   }
 
   private addBuildButton(world: World, player: Faction, kind: StructureKind): void {
@@ -1412,6 +1445,20 @@ function button(cls: string): HTMLButtonElement {
   b.className = cls;
   b.type = 'button';
   return b;
+}
+
+function decorativeImage(src: string, className: string, onError?: () => void): HTMLImageElement {
+  const image = document.createElement('img');
+  image.className = className;
+  image.alt = '';
+  image.loading = 'lazy';
+  image.decoding = 'async';
+  image.addEventListener('error', () => {
+    image.remove();
+    onError?.();
+  }, { once: true });
+  image.src = src;
+  return image;
 }
 
 /** Shortest signed screen-space delta, used for minimap camera boxes. */

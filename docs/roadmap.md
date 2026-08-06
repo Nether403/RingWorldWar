@@ -26,6 +26,7 @@ This is the authoritative source for current delivery status and near-term seque
 | Phase 3D battlefield memory | Internal completion pass | Scars, debris, smoke, wreck staging, and strategic Chord presentation passed combined human review in baseline `01261e8` |
 | Phase 3E tactical HUD | Internal completion pass | Command hierarchy, feedback, accessibility, compact layouts, and controls reference passed combined review in baseline `a0c72a2` |
 | Phase 4 performance and hardening | In progress | Measurement, Requirement 17.5, renderer, memory/startup, device, and CI sequencing is defined in `docs/phase-4-performance-hardening.md` |
+| Phase 5 voice and visual identity | Delivered | 68 tactical voices, 12 unit cards, four narrative portraits, and the title poster are human reviewed, budgeted, hashed, and enabled with complete fallbacks |
 | Phase 2 overall | Technical qualification passed | Gameplay cohorts and Requirement 17.5 pass; broader human observation remains open |
 
 ## Immediate Sequence
@@ -49,13 +50,16 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 15. **Completed - Phase 4B simulation:** Requirement 17.5 passed on the protected reference runner without changing accepted gameplay semantics.
 16. **Completed - Phase 4C renderer and GPU:** quality tiers, GPU timing, terrain attribution, active-quality prewarm, uploads, transparency, and HUD costs are characterized.
 17. **Completed - Phase 4D hardening:** bounded caches, complete session disposal, startup, accelerated heap/resource stability, and WebGL recovery are qualified on the T480s reference machine.
-18. **Current - Phase 4E device and browser matrix:** qualify available renderer classes and browsers without weakening the accepted T480s Low gate.
+18. **Current - Phase 4E device and browser matrix:** Chromium, Chrome stable, Firefox, and Playwright WebKit pass on the T480s; unavailable physical GPU classes, Edge, and Safari remain open without weakening the accepted T480s Low gate.
+19. **Completed - Cinematic front door:** the neutral Last Rotation title screen and reviewed archive intro ship behind missing-media, reduced-motion, Low-capability, caption, and skip fallbacks while gameplay remains frozen.
+20. **Current - Presentation audio expansion:** inventory and improve menu ambience, faction transmissions, and gameplay audio one reviewed category at a time.
+21. **Completed - Phase 5 voice and visual identity:** approved Orion/Luna tactical voices, title poster, class dossiers, and Signal narrative portraits are enabled through typed manifests with delivery hashes and fallbacks.
 
 ## Direction Decisions
 
 - **Authoritative artillery direction:** antispinward is the long-range direction; spinward is the short-range direction.
 - **Faction state:** mechanical asymmetry between the Meridian Compact and Axiom Choir is implemented. Further silhouette, roster, or doctrine differentiation remains future work.
-- **Asset policy:** the current product remains procedural-only. A Blender/glTF pipeline is a proposed future option, not an active roadmap commitment, and would require an explicit change to the asset constraint.
+- **Asset policy:** gameplay terrain, units, structures, and effects remain procedural-only. Human-reviewed generated presentation video, poster, captions, voices, audio, and DOM-only tactical dossier/transmission images are allowed with provenance and complete fallbacks. A Blender/glTF gameplay pipeline remains a proposed future option requiring an explicit asset-constraint decision.
 - **Phase 3A balance boundary:** presentation-only. Unit and structure statistics, weapons, abilities, economy, movement, AI, navigation, ballistics, visibility, and victory rules remain frozen.
 - **Gate 3 artifact policy:** generated screenshots remain ignored artifacts. Their deterministic scenario, visual signature, renderer identity, source hashes, artifact hashes, and receipt digest are durable evidence.
 - **Phase 3B renderer boundary:** one analytic atmosphere draw on Medium through Ultra; Low keeps a zero-draw dark-space/fog fallback. No post-processing composer, atmosphere render target, volumetric raymarch, or dynamic environment-map rebuild.

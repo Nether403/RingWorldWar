@@ -80,6 +80,8 @@ export class SettingsMenu {
   private readonly quality: HTMLSelectElement;
   private readonly volume: HTMLInputElement;
   private readonly volumeOutput: HTMLOutputElement;
+  private readonly voiceVolume = document.createElement('input');
+  private readonly voiceVolumeOutput = document.createElement('output');
   private readonly save: HTMLButtonElement;
   private readonly load: HTMLButtonElement;
   private readonly saveStatus: HTMLParagraphElement;
@@ -94,6 +96,7 @@ export class SettingsMenu {
     private readonly renderer: Renderer,
     private readonly onOpenChange: (open: boolean) => void,
     private readonly onMasterVolumeChange: (volume: number) => void = () => {},
+    private readonly onVoiceVolumeChange: (volume: number) => void = () => {},
   ) {
     this.style = document.createElement('style');
     this.style.textContent = CSS;
@@ -145,6 +148,18 @@ export class SettingsMenu {
     volumeControl.append(this.volume, this.volumeOutput);
     const volumeField = field('Master volume', volumeControl, this.volume.id);
 
+    this.voiceVolume.id = 'rww-voice-volume';
+    this.voiceVolume.type = 'range';
+    this.voiceVolume.min = '0';
+    this.voiceVolume.max = '100';
+    this.voiceVolume.step = '1';
+    this.voiceVolume.setAttribute('aria-label', 'Voice volume');
+    this.voiceVolumeOutput.htmlFor = this.voiceVolume.id;
+    const voiceVolumeControl = document.createElement('div');
+    voiceVolumeControl.className = 'rww-settings-volume';
+    voiceVolumeControl.append(this.voiceVolume, this.voiceVolumeOutput);
+    const voiceVolumeField = field('Voice volume', voiceVolumeControl, this.voiceVolume.id);
+
     const keys = document.createElement('section');
     keys.className = 'rww-settings-keys';
     const keysTitle = document.createElement('h3');
@@ -181,7 +196,7 @@ export class SettingsMenu {
     this.resume.type = 'button';
     this.resume.textContent = 'Resume';
 
-    body.append(qualityField, volumeField, keys, saveControls, this.resume);
+    body.append(qualityField, volumeField, voiceVolumeField, keys, saveControls, this.resume);
     card.append(head, body);
     this.root.appendChild(card);
     document.body.appendChild(this.root);
@@ -195,6 +210,11 @@ export class SettingsMenu {
       this.settings.setVolume(Number(this.volume.value) / 100);
       this.onMasterVolumeChange(this.settings.volume);
       this.updateVolumeOutput();
+    });
+    this.voiceVolume.addEventListener('input', () => {
+      this.settings.setVoiceVolume(Number(this.voiceVolume.value) / 100);
+      this.onVoiceVolumeChange(this.settings.voiceVolume);
+      this.updateVoiceVolumeOutput();
     });
     this.save.addEventListener('click', () => this.runSaveAction(this.onSave));
     this.load.addEventListener('click', () => this.runSaveAction(this.onLoad));
@@ -216,7 +236,9 @@ export class SettingsMenu {
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.quality.value = this.renderer.quality;
     this.volume.value = String(Math.round(this.settings.volume * 100));
+    this.voiceVolume.value = String(Math.round(this.settings.voiceVolume * 100));
     this.updateVolumeOutput();
+    this.updateVoiceVolumeOutput();
     this.root.hidden = false;
     this.onOpenChange(true);
     this.quality.focus();
@@ -236,6 +258,10 @@ export class SettingsMenu {
 
   private updateVolumeOutput(): void {
     this.volumeOutput.value = `${this.volume.value}%`;
+  }
+
+  private updateVoiceVolumeOutput(): void {
+    this.voiceVolumeOutput.value = `${this.voiceVolume.value}%`;
   }
 
   private runSaveAction(action: (() => { ok: boolean; message: string }) | null): void {

@@ -1,6 +1,9 @@
 # Procedural Asset Generation
 
-**Constraint:** zero external art, audio, or model files. Everything is generated in code.
+**Gameplay-rendering constraint:** terrain, 3D units, structures, effects, and
+world-space presentation remain generated in code. Human-reviewed generated
+cinematic media, sampled voices, and optional DOM dossier/transmission images may
+ship through typed manifests with provenance and complete fallbacks.
 
 **Why this can still look expensive:** the things that read as "AAA" are lighting, atmosphere, coherent materials, silhouette design, animation weight, and post-processing — none of which require downloaded assets. What procedural generation costs us is *hand-authored uniqueness*; what it buys us is perfect stylistic coherence (impossible to have mismatched assets when one system makes them all), a sub-megabyte download, and infinite variation for free.
 
@@ -81,10 +84,11 @@ cost, line-of-sight effect, cover value, salvage value, damage, or targeting
 identity. A gameplay-bearing ruin would require separate deterministic
 simulation data and a new balance decision.
 
-Allowed source assets are TypeScript, GLSL, CSS, generated in-memory geometry,
+Gameplay source assets are TypeScript, GLSL, CSS, generated in-memory geometry,
 generated `DataTexture`s, SVG, and WebAudio graphs. Authored `.blend`, `.glb`,
-image textures, binary LUTs, sampled audio, and committed screenshots remain
-forbidden while the procedural-only rule is active.
+image textures, binary LUTs, and committed screenshots remain forbidden while
+the procedural-only gameplay rule is active. Reviewed sampled speech and DOM-only
+presentation images are the bounded exception; they cannot carry gameplay state.
 
 ## 9. Budget
 Total download target: **< 1 MB** (JS bundle only). Generation cost at load: **< 3 s** on a mid-range machine, run on workers with a progress bar, and cached in IndexedDB where the result is deterministic and expensive.

@@ -407,19 +407,21 @@ describe('RWW hashing and receipts', () => {
     try {
       await runGit('git', ['init'], { cwd: directory });
       await writeFile(join(directory, 'tracked.bin'), Buffer.from([0, 1, 2, 3]));
-      await runGit('git', ['add', 'tracked.bin'], { cwd: directory });
+      await mkdir(join(directory, 'validation', 'evidence'), { recursive: true });
+      await writeFile(join(directory, 'validation', 'evidence', 'receipt.json'), '{"status":"baseline"}\n');
+      await runGit('git', ['add', 'tracked.bin', 'validation/evidence/receipt.json'], { cwd: directory });
       await runGit('git', ['-c', 'user.name=RWW Test', '-c', 'user.email=rww@example.test', 'commit', '-m', 'base'], {
         cwd: directory,
       });
       await writeFile(join(directory, 'tracked.bin'), Buffer.from([0, 1, 9, 3]));
       await writeFile(join(directory, 'source.ts'), 'export const source = 1;\n');
-      await mkdir(join(directory, 'validation', 'evidence'), { recursive: true });
       await writeFile(join(directory, 'validation', 'evidence', 'receipt.json'), '{"self":"reference"}\n');
 
       const first = await collectGit(directory);
       expect(first).toMatchObject({
         dirty: true,
         untrackedSourceCount: 1,
+        trackedPatchExclusions: ['validation/evidence/**'],
         untrackedSourceExclusions: ['validation/evidence/**'],
       });
       expect(first.sourceBaseSha).toMatch(/^[0-9a-f]{40}$/);
@@ -433,6 +435,11 @@ describe('RWW hashing and receipts', () => {
       const second = await collectGit(directory);
       expect(second.trackedPatchSha256).toBe(first.trackedPatchSha256);
       expect(second.untrackedSourceManifestSha256).toBe(first.untrackedSourceManifestSha256);
+
+      await writeFile(join(directory, 'validation', 'evidence', 'receipt.json'), '{"self":"changed again"}\n');
+      const evidenceChanged = await collectGit(directory);
+      expect(evidenceChanged.trackedPatchSha256).toBe(first.trackedPatchSha256);
+      expect(evidenceChanged.untrackedSourceManifestSha256).toBe(first.untrackedSourceManifestSha256);
 
       const originalGitDirectory = process.env.GIT_DIR;
       process.env.GIT_DIR = join(directory, 'adversarial-git-dir');

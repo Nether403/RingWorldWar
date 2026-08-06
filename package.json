@@ -11,7 +11,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:qualify": "node tools/phase4e-qualification.mjs",
     "rww": "node tools/rww.mjs",
+    "media:check": "node tools/media/validate-manifests.mjs",
+    "media:voices": "node tools/media/generate-voice-lines.mjs",
+    "media:images": "node tools/media/generate-images.mjs",
+    "media:receipt": "node tools/media/write-delivery-receipt.mjs",
     "validate:core-match": "vitest run --config vitest.core-match.config.ts",
     "check": "npm run lint && npm test && npm run build",
     "typecheck": "tsc --noEmit"

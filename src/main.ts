@@ -16,11 +16,16 @@ import { Settings } from '@render/settings';
 import { RingMesh } from '@render/ringMesh';
 import { BattlefieldDressing } from '@render/battlefieldDressing';
 import { BUILDABLE, STRUCTURES } from '@sim/data';
-import { Game, PLAYER } from './game';
+import { Game, PLAYER, SAVE_SLOT_KEY } from './game';
 import { DebugOverlay } from '@ui/debugOverlay';
 import { SettingsMenu } from '@ui/settingsMenu';
+import { TitleScreen, type TitleAction } from '@ui/titleScreen';
 import { ProceduralAudio, armAudioUnlock } from './audio/audioEngine';
 import { createWebAudioBackend } from './audio/webAudioBackend';
+import { VoiceDirector } from './audio/voiceDirector';
+import { REVIEWED_VOICE_CLIPS } from './presentation/voiceMedia';
+import { PRESENTATION_MEDIA, type PresentationMedia } from './presentation/media';
+import { parseGameSaveSnapshot } from './gameSave';
 
 const boot = {
   el: document.getElementById('boot')!,
@@ -80,7 +85,8 @@ class CleanupStack {
 }
 
 async function start(): Promise<void> {
-  const cleanup = new CleanupStack();
+  const params = new URLSearchParams(location.search);
+  const settings = new Settings({ search: params });
   const navigation = performance.getEntriesByType('navigation')[0];
   const startup: StartupMetrics = {
     startedAt: navigation?.startTime ?? 0,
@@ -88,20 +94,38 @@ async function start(): Promise<void> {
     durationMilliseconds: null,
     shaderPrewarmMilliseconds: null,
   };
-  try {
-    await startSession(cleanup, startup);
-  } catch (error) {
-    cleanup.dispose();
-    throw error;
+  let titleError = '';
+  while (true) {
+    const cleanup = new CleanupStack();
+    const titleScreenShown = shouldShowTitleScreen(params);
+    const titleAction = titleScreenShown
+      ? await showTitleScreen(settings, params, titleError)
+      : 'new-campaign';
+    if (titleScreenShown) startup.startedAt = performance.now();
+    try {
+      await startSession(cleanup, startup, params, settings, titleAction);
+      return;
+    } catch (error) {
+      cleanup.dispose();
+      if (titleScreenShown && titleAction === 'continue') {
+        titleError = error instanceof Error ? error.message : String(error);
+        continue;
+      }
+      throw error;
+    }
   }
 }
 
-async function startSession(cleanup: CleanupStack, startup: StartupMetrics): Promise<void> {
+async function startSession(
+  cleanup: CleanupStack,
+  startup: StartupMetrics,
+  params: URLSearchParams,
+  settings: Settings,
+  titleAction: TitleAction,
+): Promise<void> {
   const container = document.getElementById('app')!;
-  const params = new URLSearchParams(location.search);
   const scenarioDriverEnabled = import.meta.env.DEV && params.get('scenarioDriver') === '1';
   const seed = Number(params.get('seed') ?? '20260731') || 20260731;
-  const settings = new Settings({ search: params });
 
   await boot.step(0.08, 'surveying the ring');
   const anchor = new RenderAnchor();
@@ -119,15 +143,37 @@ async function startSession(cleanup: CleanupStack, startup: StartupMetrics): Pro
   const audio = new ProceduralAudio(seed, createWebAudioBackend);
   cleanup.defer(() => audio.dispose());
   audio.setMasterVolume(settings.volume);
-  game.onPresentationEvents = (events) => audio.consume(events, {
-    world: game.world,
-    viewer: PLAYER,
-    anchorS: anchor.s,
-    listenerS: rig.s,
-    listenerZ: rig.z,
-    listenerYaw: rig.yaw,
-  }, true);
-  game.onTransientReset = () => audio.reset();
+  audio.setVoiceVolume(settings.voiceVolume);
+  // Every player clip must be decoded before its first event. Tactical events are
+  // intentionally never replayed after an asynchronous load completes.
+  audio.setVoiceClips(REVIEWED_VOICE_CLIPS.filter((clip) => clip.faction === PLAYER));
+  const voiceDirector = new VoiceDirector(
+    ({ clip }) => { audio.playVoice(clip); },
+    REVIEWED_VOICE_CLIPS,
+  );
+  game.onPlayerVoiceAction = (action) => {
+    if (action.kind === 'selection') voiceDirector.observeSelection(action.faction, action.units);
+    else voiceDirector.observeOrder(action.faction, action.units, action.order);
+  };
+  game.onPresentationEvents = (events) => {
+    audio.consume(events, {
+      world: game.world,
+      viewer: PLAYER,
+      anchorS: anchor.s,
+      listenerS: rig.s,
+      listenerZ: rig.z,
+      listenerYaw: rig.yaw,
+    }, true);
+    voiceDirector.consumePresentation(events, game.world, PLAYER);
+  };
+  game.onTransientReset = () => {
+    audio.reset();
+    voiceDirector.reset();
+  };
+  if (titleAction === 'continue') {
+    const loaded = game.loadGame();
+    if (!loaded.ok) throw new Error(loaded.message);
+  }
 
   await boot.step(0.62, 'tessellating the floor');
   const ringMesh = new RingMesh(game.terrain, renderer.quality);
@@ -187,7 +233,7 @@ async function startSession(cleanup: CleanupStack, startup: StartupMetrics): Pro
     renderer.gl.domElement.inert = open || game.hud.blocksGameplayInput;
     game.hud.root.setAttribute('aria-hidden', String(open));
     if (open) commandWiring?.cancel();
-  }, (volume) => audio.setMasterVolume(volume));
+  }, (volume) => audio.setMasterVolume(volume), (volume) => audio.setVoiceVolume(volume));
   cleanup.defer(() => menu.dispose());
   game.hud.onBlockingOverlayChange = (blocked) => {
     renderer.gl.domElement.inert = blocked || menu.isOpen;
@@ -264,7 +310,12 @@ async function startSession(cleanup: CleanupStack, startup: StartupMetrics): Pro
     overlay.update(dt, renderer, game, rig, environment);
     markFirstPlayable();
 
-    if (game.hud.restartRequested) location.reload();
+    if (game.hud.restartRequested) {
+      game.hud.restartRequested = false;
+      const restart = new URL(location.href);
+      restart.searchParams.set('menu', '0');
+      location.assign(restart);
+    }
   }
 
   function frame(): void {
@@ -323,6 +374,7 @@ async function startSession(cleanup: CleanupStack, startup: StartupMetrics): Pro
     resumeAfterContextRestore ||= !loopStopped;
     loopStopped = true;
     cancelAnimationFrame(animationFrame);
+    environment.handleContextLoss();
     input.setEnabled(false);
     showRecovery();
     clearRecoveryTimer();
@@ -496,6 +548,48 @@ async function startSession(cleanup: CleanupStack, startup: StartupMetrics): Pro
   };
   window.addEventListener('pagehide', onPageHide);
   cleanup.defer(() => window.removeEventListener('pagehide', onPageHide));
+}
+
+async function showTitleScreen(
+  settings: Settings,
+  params: URLSearchParams,
+  errorMessage: string,
+): Promise<TitleAction> {
+  boot.msg.textContent = 'awaiting command';
+  boot.el.setAttribute('aria-hidden', 'true');
+  const title = new TitleScreen({
+    settings,
+    hasSave: hasSavedGame() && !errorMessage,
+    media: presentationMediaForSession(params),
+    statusMessage: errorMessage,
+  });
+  const action = await title.show();
+  boot.el.removeAttribute('aria-hidden');
+  return action;
+}
+
+function presentationMediaForSession(params: URLSearchParams): PresentationMedia {
+  if (import.meta.env.DEV && params.get('mediaTest') === 'missing-intro') {
+    return { ...PRESENTATION_MEDIA, introVideo: '/media/presentation/missing-intro.mp4' };
+  }
+  return PRESENTATION_MEDIA;
+}
+
+function shouldShowTitleScreen(params: URLSearchParams): boolean {
+  if (params.get('scenarioDriver') === '1' || params.get('menu') === '0') return false;
+  if (import.meta.env.DEV && navigator.webdriver && params.get('menu') !== '1') return false;
+  return true;
+}
+
+function hasSavedGame(): boolean {
+  try {
+    const saved = localStorage.getItem(SAVE_SLOT_KEY);
+    if (!saved) return false;
+    parseGameSaveSnapshot(saved);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

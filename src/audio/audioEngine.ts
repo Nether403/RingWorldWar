@@ -2,6 +2,7 @@ import { deltaS } from '@core/ringMath';
 import { WEAPONS, type Faction } from '@sim/data';
 import type { SimEvent, World } from '@sim/world';
 import { isPresentationEventEligible, isPresentationEventInRange } from '@render/presentationEvents';
+import type { VoiceClip } from './voiceDirector';
 
 export type AudioState = 'idle' | 'starting' | 'running' | 'unavailable';
 
@@ -40,9 +41,12 @@ export interface AudioFrame {
 }
 
 export interface AudioBackend {
+  readonly loadedVoiceCount?: number;
   resume(): Promise<boolean>;
-  setVolumes(master: number, sfx: number, ambience: number): void;
+  setVolumes(master: number, sfx: number, ambience: number, voice: number): void;
   play(cue: AudioCue): void;
+  preloadVoices(clips: readonly VoiceClip[]): Promise<void>;
+  playVoice(clip: VoiceClip): boolean;
   update(dt: number, tension: number): void;
   reset(): void;
   dispose(): void;
@@ -55,11 +59,17 @@ export class ProceduralAudio {
   masterVolume = 0.8;
   sfxVolume = 1;
   ambienceVolume = 0.42;
+  voiceVolume = 0.8;
   cueCount = 0;
+
+  get loadedVoiceCount(): number {
+    return this.backend?.loadedVoiceCount ?? 0;
+  }
 
   private backend: AudioBackend | null = null;
   private starting: Promise<boolean> | null = null;
   private tension = 0;
+  private voiceClips: readonly VoiceClip[] = [];
 
   constructor(
     private readonly seed: number,
@@ -89,6 +99,21 @@ export class ProceduralAudio {
   setAmbienceVolume(value: number): void {
     this.ambienceVolume = clamp01(value);
     this.syncVolumes();
+  }
+
+  setVoiceVolume(value: number): void {
+    this.voiceVolume = clamp01(value);
+    this.syncVolumes();
+  }
+
+  setVoiceClips(clips: readonly VoiceClip[]): void {
+    this.voiceClips = clips;
+    if (this.state === 'running') void this.backend?.preloadVoices(clips);
+  }
+
+  playVoice(clip: VoiceClip): boolean {
+    if (this.state !== 'running' || !this.backend || this.voiceVolume <= 0) return false;
+    return this.backend.playVoice(clip);
   }
 
   consume(events: readonly SimEvent[], frame: AudioFrame, visibilityPrevalidated = false): void {
@@ -134,7 +159,9 @@ export class ProceduralAudio {
       const backend = this.backendFactory(this.seed);
       this.backend = backend;
       this.syncVolumes();
-      const running = await backend.resume();
+      const resumed = await backend.resume();
+      if (resumed) await backend.preloadVoices(this.voiceClips);
+      const running = resumed && this.backend === backend;
       this.state = running ? 'running' : 'unavailable';
       if (!running) {
         backend.dispose();
@@ -151,7 +178,7 @@ export class ProceduralAudio {
   }
 
   private syncVolumes(): void {
-    this.backend?.setVolumes(this.masterVolume, this.sfxVolume, this.ambienceVolume);
+    this.backend?.setVolumes(this.masterVolume, this.sfxVolume, this.ambienceVolume, this.voiceVolume);
   }
 }
 

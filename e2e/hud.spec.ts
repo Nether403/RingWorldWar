@@ -73,6 +73,47 @@ test('controls reference is hidden by default and toggles with F1', async ({ pag
   await expect(toggle).toBeFocused();
 });
 
+test('optional unit dossiers retain HUD copy and disappear cleanly on image failure', async ({ page }) => {
+  await page.route('**/missing-unit-dossier.webp', (route) => route.abort());
+  await page.goto('/?scenarioDriver=1');
+  await page.waitForFunction(() => Boolean((window as unknown as { RWW?: { testDriver?: unknown } }).RWW?.testDriver));
+  await page.evaluate(async () => {
+    const mediaPath = '/src/presentation/media.ts';
+    const { PRESENTATION_MEDIA } = await import(/* @vite-ignore */ mediaPath);
+    PRESENTATION_MEDIA.unitDossiers = {
+      0: {
+        vanguard: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="4" height="5"/%3E',
+      },
+      1: { needle: '/missing-unit-dossier.webp' },
+    };
+    const rww = (window as unknown as { RWW: any }).RWW;
+    const unit = rww.game.world.units.find((candidate: any) => candidate.faction === 0 && candidate.kind === 'vanguard') ??
+      rww.game.world.spawnUnit(0, 'vanguard', 120, 0);
+    rww.game.selection.clear();
+    rww.game.selection.add(unit.id);
+    rww.game.hud.invalidate();
+    rww.testDriver.presentFrame(0, 1);
+  });
+
+  const dossier = page.locator('.rww-sel .rww-dossier');
+  await expect(dossier).toBeVisible();
+  await expect(dossier).toHaveAttribute('alt', '');
+  await expect(dossier).toHaveAttribute('loading', 'lazy');
+  await expect(dossier).toHaveAttribute('decoding', 'async');
+  await expect(page.locator('.rww-sel')).toContainText('Vanguard');
+
+  await page.evaluate(() => {
+    const rww = (window as unknown as { RWW: any }).RWW;
+    const unit = rww.game.world.spawnUnit(1, 'needle', 180, 0);
+    rww.game.selection.clear();
+    rww.game.selection.add(unit.id);
+    rww.game.hud.invalidate();
+    rww.testDriver.presentFrame(0, 2);
+  });
+  await expect(page.locator('.rww-sel .rww-dossier')).toHaveCount(0);
+  await expect(page.locator('.rww-sel')).toContainText('Needle');
+});
+
 test('Settings makes gameplay inert and compact HUD remains contained', async ({ page }) => {
   await page.setViewportSize({ width: 700, height: 600 });
   await page.goto('/?scenarioDriver=1');
@@ -132,6 +173,11 @@ test('blocking narrative traps focus and suppresses gameplay authority', async (
   await page.keyboard.press('F1');
   await expect(page.getByRole('dialog', { name: 'Game controls' })).toBeVisible();
   await page.evaluate(async (scenario) => {
+    const mediaPath = '/src/presentation/media.ts';
+    const { PRESENTATION_MEDIA } = await import(/* @vite-ignore */ mediaPath);
+    PRESENTATION_MEDIA.narrativePortraits = {
+      'signal-briefing': 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="4" height="5"/%3E',
+    };
     const modulePath = '/e2e/support/scenario-driver.ts';
     const driver = await import(/* @vite-ignore */ modulePath);
     driver.applyBrowserScenario(scenario);
@@ -145,6 +191,11 @@ test('blocking narrative traps focus and suppresses gameplay authority', async (
   const begin = page.getByRole('button', { name: 'Begin' });
   await expect(begin).toBeInViewport();
   await expect(begin).toBeFocused();
+  const portrait = page.locator('[data-narrative-id="signal-briefing"] .rww-narrative-portrait');
+  await expect(portrait).toBeVisible();
+  await expect(portrait).toHaveAttribute('alt', '');
+  await expect(portrait).toHaveAttribute('loading', 'lazy');
+  await expect(portrait).toHaveAttribute('decoding', 'async');
   await page.keyboard.press('Shift+Tab');
   await expect(begin).toBeFocused();
   expect(await page.evaluate(() => (window as unknown as { RWW: any }).RWW.game.hud.blocksGameplayInput)).toBe(true);

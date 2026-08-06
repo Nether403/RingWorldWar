@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -22,10 +24,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npx playwright install --with-deps
+      - run: npx playwright install chrome
+      - run: npm run test:e2e:qualify
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase-4e-browser-qualification
+          path: output/runs/**
+          if-no-files-found: error
+          retention-days: 14

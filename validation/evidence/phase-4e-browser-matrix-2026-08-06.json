@@ -1,0 +1,142 @@
+{
+  "schema": "rww.browser-matrix-evidence",
+  "version": 1,
+  "capturedAt": "2026-08-06",
+  "status": "available-engines-and-presentation-pass",
+  "measurementMode": "isolated local matrix characterization; not a portable performance gate",
+  "viewport": { "width": 1100, "height": 640, "deviceScaleFactor": 1 },
+  "host": {
+    "machine": "Lenovo ThinkPad T480s",
+    "cpu": "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz",
+    "gpu": "Intel(R) UHD Graphics 620",
+    "platform": "Windows"
+  },
+  "engines": [
+    {
+      "project": "chromium-regression",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "classification": "portable-regression; local sample is hardware-rendered",
+      "vendor": "Google Inc. (Intel)",
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11)",
+      "startupMilliseconds": 4813.7,
+      "shaderPrewarmMilliseconds": 281.9,
+      "meanLuminance": 138.3649796666724,
+      "luminanceVariance": 2659.627429070628,
+      "programsAfterBoot": 17,
+      "programsAfterMediumRecovery": 18,
+      "shadowMapRecovered": true,
+      "contextRecoveryPassed": true,
+      "consoleErrors": 0,
+      "pageErrors": 0,
+      "passed": true
+    },
+    {
+      "project": "chrome-stable-compatibility",
+      "browser": "chrome",
+      "version": "150.0.7871.187",
+      "classification": "branded-browser-compatibility",
+      "vendor": "Google Inc. (Intel)",
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11)",
+      "startupMilliseconds": 9284.5,
+      "shaderPrewarmMilliseconds": 1656,
+      "meanLuminance": 136.71221944791986,
+      "luminanceVariance": 2771.2724803895835,
+      "programsAfterBoot": 17,
+      "programsAfterMediumRecovery": 18,
+      "shadowMapRecovered": true,
+      "contextRecoveryPassed": true,
+      "consoleErrors": 0,
+      "pageErrors": 0,
+      "passed": true
+    },
+    {
+      "project": "firefox-compatibility",
+      "browser": "firefox",
+      "version": "153.0",
+      "classification": "browser-engine-compatibility",
+      "vendor": "Google Inc. (Intel)",
+      "renderer": "ANGLE D3D11, privacy-coarsened Intel identity",
+      "parallelShaderCompileSupported": false,
+      "startupMilliseconds": 6924,
+      "shaderPrewarmMilliseconds": 2302,
+      "meanLuminance": 135.21511737500316,
+      "luminanceVariance": 2868.183826602908,
+      "programsAfterBoot": 17,
+      "programsAfterMediumRecovery": 18,
+      "shadowMapRecovered": true,
+      "contextRecoveryPassed": true,
+      "consoleErrors": 0,
+      "pageErrors": 0,
+      "passed": true
+    },
+    {
+      "project": "webkit-compatibility",
+      "browser": "webkit",
+      "version": "26.5",
+      "classification": "browser-engine-compatibility-not-safari",
+      "vendor": "Apple Inc.",
+      "renderer": "Apple GPU (Playwright WebKit backend identity)",
+      "startupMilliseconds": 3903,
+      "shaderPrewarmMilliseconds": 1105,
+      "meanLuminance": 135.73920989583678,
+      "luminanceVariance": 2836.2427549815256,
+      "programsAfterBoot": 17,
+      "programsAfterMediumRecovery": 18,
+      "shadowMapRecovered": true,
+      "contextRecoveryPassed": true,
+      "consoleErrors": 0,
+      "pageErrors": 0,
+      "passed": true
+    }
+  ],
+  "scenarioDeterminism": {
+    "repetitionsPerEngine": 3,
+    "preSetupStateHash": "a4edc7b0",
+    "appliedScenarioStateHash": "a8809baa",
+    "matchedAcrossEngines": true
+  },
+  "scenarioSuites": {
+    "chromiumFullRegressionTests": 58,
+    "chromeCompatibilityTests": 7,
+    "firefoxCompatibilityTests": 7,
+    "webkitCompatibilityTests": 7,
+    "totalExpectedTests": 79,
+    "reviewedIntroDecodeProjects": 4,
+    "reviewedIntroSha256": "7b9fe72aa56878a0b70a63a1c646e32ce45ee2e7f0f27476515cccf4897cf15a"
+  },
+  "verification": {
+    "browserTestsPassed": 79,
+    "qualificationDurationMilliseconds": 764877.832,
+    "qualificationSkipped": 0,
+    "qualificationUnexpected": 0,
+    "qualificationFlaky": 0
+  },
+  "defects": [
+    {
+      "engine": "webkit",
+      "issue": "Lost-context PMREM target disposal emitted INVALID_OPERATION errors",
+      "resolution": "Abandon context-owned handles on loss and regenerate after restoration",
+      "regressionTest": "tests/render/environment.test.ts and e2e/matrix.spec.ts",
+      "status": "fixed"
+    }
+  ],
+  "unavailable": [
+    { "cell": "Microsoft Edge stable", "reason": "not installed" },
+    { "cell": "Safari", "reason": "unavailable on Windows" },
+    { "cell": "GTX 1660", "reason": "hardware unavailable" },
+    { "cell": "RTX 3070", "reason": "hardware unavailable" },
+    { "cell": "Apple Silicon", "reason": "hardware unavailable" }
+  ],
+  "source": {
+    "sourceBaseSha": "a9dadb02f4960547c253fc0bcd68cc36d8a0b634",
+    "dirty": true,
+    "trackedPatchSha256": "6681627ac8ea924d6cb046da2cd7529099280f2d7ebc8dbf057c97eee3eabe1e",
+    "untrackedSourceManifestSha256": "c8132b0d74a6a0b759f935ade05a1bf4f72baaa1fcf13ff534013d353b933976",
+    "qualificationReceipt": "output/runs/20260806T032153.595Z-4884-cd9212f4/receipt.json",
+    "qualificationReceiptSha256": "9e6aabb4d094a2c52039a0c7a549ebe9238bf2561aa970a2e9c5a637c4bdab34",
+    "playwrightReport": "output/runs/20260806T032153.595Z-4884-cd9212f4/playwright-report.json",
+    "playwrightReportSha256": "ba0f49a8f49992969e0d69c1b4d4b36dbfb5b591bfa23b63b162eb411569364a",
+    "reportSourceMatched": true
+  }
+}

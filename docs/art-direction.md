@@ -122,7 +122,7 @@ Diegetic-adjacent, not fantasy-ornate. Thin strokes, high contrast, faction-tint
 
 ## 11. Asset Pipeline
 
-The current product has no external asset pipeline: meshes, materials, textures, animation, and audio remain generated in code under the procedural-only rule.
+Gameplay meshes, materials, textures, animation, and sound effects remain generated in code under the procedural-only gameplay rule. Human-reviewed generated presentation video, poster frames, captions, voices, music, cinematic mixes, and DOM-only tactical dossier/transmission images may ship with recorded provenance, usage-rights review, accessibility controls, and complete missing-media/reduced-motion fallbacks. Dossier art is decorative and may not replace unit names, costs, roles, health, orders, or warnings.
 
 A Blender → glTF 2.0 → `gltf-transform` → KTX2/Basis workflow is a **proposed future option**, not an active roadmap commitment. Adopting it would require an explicit product decision to relax `docs/spec.md`'s zero-binary-asset constraint, followed by naming, download-budget, calibration-scene, and CI rules. Until that decision is recorded, `.blend`, `.glb`, and authored texture files must not be added.
 

@@ -35,16 +35,18 @@ describe('Settings', () => {
     expect(Object.values(QUALITY).every((quality) => quality.postProcessingLevel === 'none')).toBe(true);
   });
 
-  it('round-trips quality and volume through storage', () => {
+  it('round-trips quality and audio volumes through storage', () => {
     const storage = new MemoryStorage();
     const settings = new Settings({ storage });
 
     settings.setQuality('ultra');
     settings.setVolume(0.35);
+    settings.setVoiceVolume(0.55);
 
     const restored = new Settings({ storage });
     expect(restored.quality).toBe('ultra');
     expect(restored.volume).toBe(0.35);
+    expect(restored.voiceVolume).toBe(0.55);
     expect(restored.adaptiveQuality).toBe(false);
   });
 
@@ -68,6 +70,15 @@ describe('Settings', () => {
     expect(settings.quality).toBe('high');
     expect(settings.volume).toBe(0.25);
     expect(settings.adaptiveQuality).toBe(true);
+  });
+
+  it('uses the default voice volume for older saved settings', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ quality: 'medium', volume: 0.25 }));
+
+    const settings = new Settings({ storage });
+
+    expect(settings.voiceVolume).toBe(0.8);
   });
 
   it('gives a valid URL quality precedence without overwriting persistence', () => {

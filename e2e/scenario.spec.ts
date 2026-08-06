@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 
 const scenario = JSON.parse(readFileSync('validation/scenarios/signature-lance.json', 'utf8'));
 const directionalScenario = JSON.parse(readFileSync('validation/scenarios/directional-artillery.json', 'utf8'));
+const EXPECTED_PRE_SETUP_HASH = 'a4edc7b0';
+const EXPECTED_APPLIED_HASH = 'a8809baa';
 
 test('drives a deterministic browser scenario without page errors', async ({ page }) => {
   const errors: string[] = [];
@@ -31,7 +33,7 @@ test('drives a deterministic browser scenario without page errors', async ({ pag
   expect(errors).toEqual([]);
 });
 
-test('keeps delayed scenario imports at tick zero and repeats exact state hashes', async ({ page }) => {
+test('keeps delayed scenario imports at tick zero and repeats exact state hashes', async ({ page, browserName }, testInfo) => {
   const zeroTickScenario = {
     ...scenario,
     simulation: { ...scenario.simulation, targetTick: 0 },
@@ -57,9 +59,17 @@ test('keeps delayed scenario imports at tick zero and repeats exact state hashes
   }
   expect(runs.map((run) => run.pre.tick)).toEqual([0, 0, 0]);
   expect(runs.map((run) => run.applied.tick)).toEqual([0, 0, 0]);
+  expect(runs.map((run) => run.preHash)).toEqual(Array(3).fill(EXPECTED_PRE_SETUP_HASH));
+  expect(runs.map((run) => run.appliedHash)).toEqual(Array(3).fill(EXPECTED_APPLIED_HASH));
   expect(new Set(runs.map((run) => run.preHash)).size).toBe(1);
   expect(new Set(runs.map((run) => run.appliedHash)).size).toBe(1);
   expect(runs.map((run) => run.applied)).toEqual([runs[0]!.applied, runs[0]!.applied, runs[0]!.applied]);
+  console.log('phase4e scenario hash evidence', JSON.stringify({
+    project: testInfo.project.name,
+    browserName,
+    preHash: runs[0]!.preHash,
+    appliedHash: runs[0]!.appliedHash,
+  }));
 });
 
 test('deployed Longbow exposes wrapped directional range and authoritative targeting', async ({ page }) => {

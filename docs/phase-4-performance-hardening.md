@@ -11,12 +11,15 @@ hardware without changing accepted gameplay semantics. Every optimization begins
 with a source-current measurement and ends with deterministic and human-visible
 regression evidence.
 
-## Deferred Product Work
+## Presentation Work During Deferred Qualification
 
-Speech, generated images, cutscenes, generated video, post-processing,
-volumetrics, cinematic cameras, and other content expansion remain out of scope
-until Gate 4 passes. Local generation credentials remain in ignored `.env` files
-and must never enter source, receipts, logs, prompts, or artifacts.
+Gate 4 still blocks formal performance closure, post-processing, volumetrics,
+cinematic gameplay cameras, and new gameplay systems. A 2026-08-05 product
+decision allows presentation-only preproduction and integration to proceed:
+title screens, generated images/video, cutscenes, voices, music, and audio may be
+added behind Low-quality, missing-media, and reduced-motion fallbacks without
+changing simulation authority. Local generation credentials remain in ignored
+`.env` files and must never enter source, receipts, logs, prompts, or artifacts.
 
 ## Sequence
 
@@ -70,6 +73,13 @@ See `docs/phase-4d-hardening.md` and
 - RTX 3070-class.
 - Apple Silicon where available.
 - Chrome, Edge, Firefox, and Safari where hardware is available.
+
+The locally available T480s matrix now runs the full Chromium regression suite
+plus shared boot, rendering, picking, context-recovery, and deterministic
+scenario checks on Chrome stable, Firefox, and Playwright WebKit. All available
+engines pass.
+This is browser-engine compatibility evidence, not Safari or Apple-hardware
+qualification. See `docs/phase-4e-device-browser-matrix.md`.
 
 ### 4F - CI Gates
 

@@ -590,6 +590,15 @@ export class Environment {
     pmrem.dispose();
   }
 
+  /** Drop handles owned by a lost WebGL context without issuing invalid deletes. */
+  handleContextLoss(): void {
+    if (this.environmentScene && this.envTarget && this.environmentScene.environment === this.envTarget.texture) {
+      this.environmentScene.environment = null;
+    }
+    this.envTarget = null;
+    this.keyLight.shadow.map = null;
+  }
+
   dispose(): void {
     if (this.environmentScene && this.envTarget && this.environmentScene.environment === this.envTarget.texture) {
       this.environmentScene.environment = null;

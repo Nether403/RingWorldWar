@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RING_OMEGA, RING_RADIUS } from '@core/constants';
 import { RenderAnchor } from '@render/anchor';
 import { Environment, sampleAtmosphere } from '@render/environment';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('inertial starfield', () => {
   it('moves opposite physical ring rotation around the ring axis', () => {
@@ -65,5 +65,33 @@ describe('inertial starfield', () => {
     }
     expect(day.horizon.getHex()).not.toBe(shadow.horizon.getHex());
     expect(shadow.fogDensity).toBeGreaterThan(day.fogDensity);
+  });
+
+  it('abandons render targets from a lost context without disposing them', () => {
+    const environment = new Environment(29);
+    const target = new THREE.WebGLRenderTarget(4, 4);
+    const scene = new THREE.Scene();
+    scene.environment = target.texture;
+    const dispose = vi.spyOn(target, 'dispose');
+    const shadowTarget = new THREE.WebGLRenderTarget(4, 4);
+    const disposeShadow = vi.spyOn(shadowTarget, 'dispose');
+    const exact = environment as unknown as {
+      envTarget: THREE.WebGLRenderTarget | null;
+      environmentScene: THREE.Scene | null;
+    };
+    exact.envTarget = target;
+    exact.environmentScene = scene;
+    environment.keyLight.shadow.map = shadowTarget;
+
+    environment.handleContextLoss();
+
+    expect(scene.environment).toBeNull();
+    expect(exact.envTarget).toBeNull();
+    expect(environment.keyLight.shadow.map).toBeNull();
+    expect(dispose).not.toHaveBeenCalled();
+    expect(disposeShadow).not.toHaveBeenCalled();
+    environment.dispose();
+    expect(dispose).not.toHaveBeenCalled();
+    expect(disposeShadow).not.toHaveBeenCalled();
   });
 });

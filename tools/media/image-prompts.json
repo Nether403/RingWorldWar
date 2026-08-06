@@ -1,0 +1,149 @@
+{
+  "schema": "rww.media.image-prompts",
+  "version": 1,
+  "prompts": [
+    {
+      "id": "title.last-rotation",
+      "kind": "title",
+      "size": "1536x1024",
+      "prompt": "Ring World War title key art, viewed from a dark command deck over the inhabited inner surface of a colossal rotating ring curving upward and closing overhead, unstable Solar Filament, broken Shadow-Square panels, tiny arc-cities and distant conflict lights, monumental ominous restrained science fiction, systems and civilization rather than heroes, no people in foreground, no logos, no text, cinematic wide composition, charcoal black, oxidized orange and cold cyan accents."
+    },
+    {
+      "id": "dossier.compact",
+      "kind": "faction-dossier",
+      "faction": "compact",
+      "size": "1024x1536",
+      "prompt": "Meridian Compact visual style anchor for a tactical unit dossier: one broad heavy industrial walker centered in a dark graphite maintenance bay, layered angular armor, external buttresses, weathered practical alloy, restrained oxidized orange recognition strips, ring habitat curvature visible in the distant background, clean three-quarter machine portrait with generous negative space, dark low-key lighting compatible with a tactical HUD, no people, no emblem, no insignia, no symbol column, no logo, no interface frame, no diagram labels, no readable text, no pseudo-text."
+    },
+    {
+      "id": "dossier.choir",
+      "kind": "faction-dossier",
+      "faction": "choir",
+      "size": "1024x1536",
+      "prompt": "Axiom Choir visual style anchor for a tactical unit dossier: one slender asymmetric mobile machine centered in a dark graphite fabrication bay, narrow composite shells, articulated maintenance limbs, vertical sensor fins and deliberate negative space, restrained cold cyan recognition lights over dark adaptive alloy, precise and humane rather than alien, ring habitat curvature visible in the distant background, clean three-quarter machine portrait with generous negative space, dark low-key lighting compatible with a tactical HUD, no people, no emblem, no insignia, no symbol column, no logo, no interface frame, no blueprint board, no diagram labels, no readable text, no pseudo-text."
+    },
+    {
+      "id": "dossier.compact.engineer",
+      "kind": "unit-dossier",
+      "faction": "compact",
+      "unit": "engineer",
+      "size": "1024x1536",
+      "prompt": "Meridian Compact Engineer support walker dossier, compact unarmed repair platform with manipulators, cable drums, welding arrays and rugged orange work lights, graphite and weathered alloy, visibly fragile beside habitat-scale machinery, clean three-quarter technical plate on dark neutral field, no pilot portrait, no readable text, no logo."
+    },
+    {
+      "id": "dossier.compact.vanguard",
+      "kind": "unit-dossier",
+      "faction": "compact",
+      "unit": "vanguard",
+      "size": "1024x1536",
+      "prompt": "Meridian Compact Vanguard heavy brawler mech dossier, broad layered armor and twin practical autocannons built to hold a ring-habitat corridor, low stable stance, oxidized orange recognition strips over graphite metal, scarred and maintained rather than ornate, clean three-quarter technical plate, no readable text, no logo."
+    },
+    {
+      "id": "dossier.compact.longbow",
+      "kind": "unit-dossier",
+      "faction": "compact",
+      "unit": "longbow",
+      "size": "1024x1536",
+      "prompt": "Meridian Compact Longbow mobile artillery mech dossier, tall recoil-braced siege mortar and exposed ranging systems, narrow transport stance showing that it must displace after firing, oxidized orange optics over graphite alloy, practical field repairs, clean three-quarter technical plate, no projectile firing, no readable text, no logo."
+    },
+    {
+      "id": "dossier.compact.wisp",
+      "kind": "unit-dossier",
+      "faction": "compact",
+      "unit": "wisp",
+      "size": "1024x1536",
+      "prompt": "Meridian Compact Wisp scout mech dossier, fast light frame, long sensor mast, terrain-scanning optics and compact repeater, oxidized orange identification points over graphite alloy, poised for speed across the ring surface, clean three-quarter technical plate, no readable text, no logo."
+    },
+    {
+      "id": "dossier.compact.aegis",
+      "kind": "unit-dossier",
+      "faction": "compact",
+      "unit": "aegis",
+      "size": "1024x1536",
+      "prompt": "Meridian Compact Aegis point-defence mech dossier, medium escort chassis with interceptor battery, tracking dishes and overlapping protective fire arcs suggested by restrained orange instrument light, graphite armored panels, clean three-quarter technical plate, no magical shield bubble, no readable text, no logo."
+    },
+    {
+      "id": "dossier.compact.bulwark",
+      "kind": "unit-dossier",
+      "faction": "compact",
+      "unit": "bulwark",
+      "size": "1024x1536",
+      "prompt": "Meridian Compact Bulwark escort walker dossier, immense corridor-locking armor, twin autocannons and deployable restoration-team shielding surfaces, heavy low silhouette, oxidized orange hazard and command lights over graphite alloy, clean three-quarter technical plate, no readable text, no logo."
+    },
+    {
+      "id": "dossier.choir.engineer",
+      "kind": "unit-dossier",
+      "faction": "choir",
+      "unit": "engineer",
+      "size": "1024x1536",
+      "prompt": "Axiom Choir Engineer support walker dossier, unarmed modular maintenance body with fine manipulators, sensor filaments and interchangeable repair tools, cold cyan status lights over dark adaptive alloy, mobile-guild construction language, clean three-quarter technical plate, no pilot portrait, no readable text, no logo."
+    },
+    {
+      "id": "dossier.choir.vanguard",
+      "kind": "unit-dossier",
+      "faction": "choir",
+      "unit": "vanguard",
+      "size": "1024x1536",
+      "prompt": "Axiom Choir Vanguard heavy brawler mech dossier, broad load-bearing frame and twin autocannons integrated into a distributed sensor lattice, cold cyan lines over dark adaptive alloy, powerful but not monstrous, clean three-quarter technical plate, no readable text, no logo."
+    },
+    {
+      "id": "dossier.choir.longbow",
+      "kind": "unit-dossier",
+      "faction": "choir",
+      "unit": "longbow",
+      "size": "1024x1536",
+      "prompt": "Axiom Choir Longbow mobile artillery mech dossier, articulated siege mortar, distributed ranging vanes and recoil legs tuned to ring rotation, cold cyan computation traces over dark alloy, elegant maintenance-derived geometry, clean three-quarter technical plate, no firing effect, no readable text, no logo."
+    },
+    {
+      "id": "dossier.choir.wisp",
+      "kind": "unit-dossier",
+      "faction": "choir",
+      "unit": "wisp",
+      "size": "1024x1536",
+      "prompt": "Axiom Choir Wisp scout mech dossier, extremely light fast frame with branching sensor antennae and compact repeater, cold cyan sensing points over dark adaptive alloy, mobile and observant rather than insectoid, clean three-quarter technical plate, no readable text, no logo."
+    },
+    {
+      "id": "dossier.choir.aegis",
+      "kind": "unit-dossier",
+      "faction": "choir",
+      "unit": "aegis",
+      "size": "1024x1536",
+      "prompt": "Axiom Choir Aegis point-defence mech dossier, medium mobile shelter platform with precise interceptor cells and shared tracking sensors, cold cyan vector lights over dark alloy, restrained maintenance-guild geometry, clean three-quarter technical plate, no magical shield bubble, no readable text, no logo."
+    },
+    {
+      "id": "dossier.choir.needle",
+      "kind": "unit-dossier",
+      "faction": "choir",
+      "unit": "needle",
+      "size": "1024x1536",
+      "prompt": "Axiom Choir Needle cloaked hunter mech dossier, narrow high-speed ambush frame, single precision lance and low-observable segmented surfaces, faint cold cyan sensor seams emerging from partial optical camouflage, predatory function without animal styling, clean three-quarter technical plate, no readable text, no logo."
+    },
+    {
+      "id": "signal-briefing",
+      "kind": "signal-narrative",
+      "faction": "compact",
+      "size": "1536x1024",
+      "prompt": "Narrative archive still for A Signal in the Spine, matching a dark monumental cosmic-industrial series: a dormant Spinal Node rises alone from a vast silent ring-habitat service district, the inhabited ring curves overhead through black space and cold haze, one weak amber correction pulse begins deep inside the node while a few distant cyan reflections imply unseen Choir observation, colossal infrastructure and system-scale mystery rather than characters, austere restrained wide composition, graphite black with sparse amber and cyan, no vegetation, no people in foreground, no visible faces, no cockpit frame, no interface overlay, no readable text, no pseudo-text."
+    },
+    {
+      "id": "signal-hunters",
+      "kind": "signal-narrative",
+      "faction": "compact",
+      "size": "1536x1024",
+      "prompt": "Narrative still for Contact: a Compact Wisp sensor view discovers several Axiom Choir Needles screening approaches to a Spinal Node without firing on it, subtle cyan silhouettes hidden among habitat service structures, orange reconnaissance overlays suggested but no readable text, vast curved ring horizon, tense restrained wide composition."
+    },
+    {
+      "id": "signal-migration",
+      "kind": "signal-narrative",
+      "faction": "choir",
+      "size": "1536x1024",
+      "prompt": "Narrative still for the intercepted Migration Protocol: archival vector geometry projects from a Choir field command toward a distant star across the open ring interior, selected ring sectors and biological archives represented as tiny luminous cargo forms, cold cyan against black and failing solar light, ambiguous promise and sacrifice, no readable text, no people foreground."
+    },
+    {
+      "id": "signal-last-correction",
+      "kind": "signal-narrative",
+      "size": "1536x1024",
+      "prompt": "Narrative still for Correction Capacity: the awakened Spinal Archive reveals one remaining habitat-scale operation as a single austere pulse traveling around the ring-wide structural network, Solar Filament unstable at center, inhabited arcs and shadow panels dwarfed by the megastructure, neutral archive viewpoint, ominous restrained science fiction, no readable text, no faction victory framing."
+    }
+  ]
+}

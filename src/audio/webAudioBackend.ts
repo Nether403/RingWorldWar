@@ -1,6 +1,9 @@
 import type { AudioBackend, AudioCue } from './audioEngine';
+import { Faction } from '@sim/data';
+import type { VoiceClip } from './voiceDirector';
 
 const MAX_VOICES = 24;
+const MAX_VOICE_BUFFERS = 96;
 
 interface VoiceRecord {
   readonly sources: AudioScheduledSourceNode[];
@@ -10,15 +13,36 @@ interface VoiceRecord {
   readonly priority: number;
 }
 
+interface SpeechRecord {
+  readonly source: AudioBufferSourceNode;
+  readonly gain: GainNode;
+  readonly filter: BiquadFilterNode;
+  readonly priority: number;
+}
+
 export class WebAudioBackend implements AudioBackend {
   private readonly context: AudioContext;
   private readonly master: GainNode;
   private readonly sfx: GainNode;
   private readonly ambience: GainNode;
+  private readonly voice: GainNode;
   private readonly ambienceFilter: BiquadFilterNode;
   private readonly activeVoices = new Set<VoiceRecord>();
   private readonly ambientSources: AudioScheduledSourceNode[] = [];
   private readonly noise: AudioBuffer;
+  private readonly voiceBuffers = new Map<string, AudioBuffer>();
+  private readonly loadingVoices = new Map<string, Promise<void>>();
+  private readonly failedVoiceSources = new Set<string>();
+  private currentSpeech: SpeechRecord | null = null;
+  private sfxVolume = 1;
+  private ambienceVolume = 0.42;
+  private voiceEpoch = 0;
+  private preloadGeneration = 0;
+  private disposed = false;
+
+  get loadedVoiceCount(): number {
+    return this.voiceBuffers.size;
+  }
 
   constructor(seed: number) {
     const AudioContextClass = globalThis.AudioContext ??
@@ -29,6 +53,7 @@ export class WebAudioBackend implements AudioBackend {
     this.master = this.context.createGain();
     this.sfx = this.context.createGain();
     this.ambience = this.context.createGain();
+    this.voice = this.context.createGain();
     this.ambienceFilter = this.context.createBiquadFilter();
     const compressor = this.context.createDynamicsCompressor();
     compressor.threshold.value = -12;
@@ -38,6 +63,7 @@ export class WebAudioBackend implements AudioBackend {
     compressor.release.value = 0.22;
     this.sfx.connect(this.master);
     this.ambience.connect(this.master);
+    this.voice.connect(this.master);
     this.master.connect(compressor).connect(this.context.destination);
     this.noise = createNoiseBuffer(this.context, seed);
     this.startAmbience(seed);
@@ -48,11 +74,13 @@ export class WebAudioBackend implements AudioBackend {
     return this.context.state === 'running';
   }
 
-  setVolumes(master: number, sfx: number, ambience: number): void {
+  setVolumes(master: number, sfx: number, ambience: number, voice: number): void {
     const now = this.context.currentTime;
+    this.sfxVolume = sfx;
+    this.ambienceVolume = ambience;
     this.master.gain.setTargetAtTime(master, now, 0.025);
-    this.sfx.gain.setTargetAtTime(sfx, now, 0.025);
-    this.ambience.gain.setTargetAtTime(ambience, now, 0.08);
+    this.voice.gain.setTargetAtTime(voice, now, 0.025);
+    this.applyDucking(Boolean(this.currentSpeech));
   }
 
   play(cue: AudioCue): void {
@@ -104,6 +132,42 @@ export class WebAudioBackend implements AudioBackend {
     oscillator.stop(end + 0.02);
   }
 
+  preloadVoices(clips: readonly VoiceClip[]): Promise<void> {
+    const generation = ++this.preloadGeneration;
+    const ordered = [...clips].sort((a, b) => preloadRank(a.trigger) - preloadRank(b.trigger));
+    return this.preloadSequentially(ordered, generation);
+  }
+
+  playVoice(clip: VoiceClip): boolean {
+    const buffer = this.voiceBuffers.get(clip.src);
+    if (!buffer) {
+      void this.loadVoice(clip);
+      return false;
+    }
+    if (this.currentSpeech && this.currentSpeech.priority >= clip.priority) return false;
+    this.stopSpeech();
+
+    const now = this.context.currentTime;
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    const filter = this.context.createBiquadFilter();
+    source.buffer = buffer;
+    filter.type = clip.faction === Faction.Choir ? 'bandpass' : 'highpass';
+    filter.frequency.value = clip.faction === Faction.Choir ? 1_900 : 120;
+    filter.Q.value = clip.faction === Faction.Choir ? 0.42 : 0.7;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(1, now + 0.012);
+    gain.gain.setValueAtTime(1, Math.max(now + 0.012, now + buffer.duration - 0.04));
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + buffer.duration);
+    source.connect(filter).connect(gain).connect(this.voice);
+    const record: SpeechRecord = { source, gain, filter, priority: clip.priority };
+    this.currentSpeech = record;
+    this.applyDucking(true);
+    source.addEventListener('ended', () => this.releaseSpeech(record), { once: true });
+    source.start(now);
+    return true;
+  }
+
   update(_dt: number, tension: number): void {
     const now = this.context.currentTime;
     this.ambienceFilter.frequency.setTargetAtTime(180 + tension * 720, now, 0.3);
@@ -111,13 +175,75 @@ export class WebAudioBackend implements AudioBackend {
 
   reset(): void {
     for (const voice of [...this.activeVoices]) this.stopVoice(voice);
+    this.voiceEpoch++;
+    this.stopSpeech();
   }
 
   dispose(): void {
+    this.disposed = true;
     this.reset();
     for (const source of this.ambientSources) stopQuietly(source);
     this.ambientSources.length = 0;
     void this.context.close();
+  }
+
+  private loadVoice(clip: VoiceClip): Promise<void> {
+    if (this.disposed || this.voiceBuffers.has(clip.src) || this.failedVoiceSources.has(clip.src)) {
+      return Promise.resolve();
+    }
+    const current = this.loadingVoices.get(clip.src);
+    if (current) return current;
+    const epoch = this.voiceEpoch;
+    const loading = fetch(clip.src)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Voice asset failed: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((bytes) => this.context.decodeAudioData(bytes))
+      .then((buffer) => {
+        if (this.disposed || epoch !== this.voiceEpoch) return;
+        if (this.voiceBuffers.size >= MAX_VOICE_BUFFERS) {
+          const oldest = this.voiceBuffers.keys().next().value as string | undefined;
+          if (oldest) this.voiceBuffers.delete(oldest);
+        }
+        this.voiceBuffers.set(clip.src, buffer);
+      })
+      .catch(() => { this.failedVoiceSources.add(clip.src); })
+      .finally(() => this.loadingVoices.delete(clip.src));
+    this.loadingVoices.set(clip.src, loading);
+    return loading;
+  }
+
+  private async preloadSequentially(clips: readonly VoiceClip[], generation: number): Promise<void> {
+    for (const clip of clips) {
+      if (this.disposed || generation !== this.preloadGeneration) return;
+      await this.loadVoice(clip);
+    }
+  }
+
+  private releaseSpeech(record: SpeechRecord): void {
+    if (this.currentSpeech !== record) return;
+    this.currentSpeech = null;
+    record.source.disconnect();
+    record.gain.disconnect();
+    record.filter.disconnect();
+    this.applyDucking(false);
+  }
+
+  private stopSpeech(): void {
+    const speech = this.currentSpeech;
+    if (!speech) return;
+    this.currentSpeech = null;
+    stopQuietly(speech.source);
+    speech.gain.disconnect();
+    speech.filter.disconnect();
+    this.applyDucking(false);
+  }
+
+  private applyDucking(active: boolean): void {
+    const now = this.context.currentTime;
+    this.sfx.gain.setTargetAtTime(this.sfxVolume * (active ? 0.55 : 1), now, 0.035);
+    this.ambience.gain.setTargetAtTime(this.ambienceVolume * (active ? 0.35 : 1), now, 0.06);
   }
 
   private trackVoice(voice: VoiceRecord, lifetimeSource: AudioScheduledSourceNode): void {
@@ -209,4 +335,10 @@ function noiseRate(kind: AudioCue['kind']): number {
 function stopQuietly(source: AudioScheduledSourceNode): void {
   try { source.stop(); } catch { /* already stopped */ }
   source.disconnect();
+}
+
+function preloadRank(trigger: VoiceClip['trigger']): number {
+  if (trigger === 'selected' || trigger === 'group-selected') return 0;
+  if (trigger === 'move' || trigger === 'attack' || trigger === 'group-move' || trigger === 'group-attack') return 1;
+  return 2;
 }

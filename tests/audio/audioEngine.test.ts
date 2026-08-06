@@ -7,6 +7,7 @@ import {
   type AudioBackend,
   type AudioCue,
 } from '../../src/audio/audioEngine';
+import type { VoiceClip } from '../../src/audio/voiceDirector';
 
 describe('ProceduralAudio', () => {
   it('constructs its backend only after a trusted gesture and never replays earlier events', async () => {
@@ -69,11 +70,12 @@ describe('ProceduralAudio', () => {
     audio.setMasterVolume(3);
     audio.setSfxVolume(-2);
     audio.setAmbienceVolume(0.35);
+    audio.setVoiceVolume(0.65);
     await audio.resumeFromGesture();
 
     audio.consume([event('weaponFired', Faction.Choir, { id: 91 })], frame());
     expect(backend.cues).toEqual([]);
-    expect(backend.volumes).toEqual({ master: 1, sfx: 0, ambience: 0.35 });
+    expect(backend.volumes).toEqual({ master: 1, sfx: 0, ambience: 0.35, voice: 0.65 });
 
     audio.setSfxVolume(0.6);
     audio.consume(
@@ -84,6 +86,49 @@ describe('ProceduralAudio', () => {
 
     audio.reset();
     expect(backend.resetCount).toBe(1);
+  });
+
+  it('delegates reviewed voice clips to the shared backend', async () => {
+    const backend = new RecordingBackend();
+    const audio = new ProceduralAudio(24, () => backend);
+    const clip: VoiceClip = {
+      id: 'compact.vanguard.selected',
+      src: '/media/voices/compact/vanguard-selected.mp3',
+      faction: Faction.Compact,
+      unit: 'vanguard',
+      trigger: 'selected',
+      priority: 1,
+    };
+
+    expect(audio.playVoice(clip)).toBe(false);
+    await audio.resumeFromGesture();
+    expect(audio.playVoice(clip)).toBe(true);
+    expect(backend.voiceClips).toEqual([clip]);
+  });
+
+  it('does not accept voice dispatch until the reviewed preload is complete', async () => {
+    let release = (): void => {};
+    const backend = new RecordingBackend();
+    backend.preload = new Promise<void>((resolve) => { release = resolve; });
+    const audio = new ProceduralAudio(25, () => backend);
+    const clip: VoiceClip = {
+      id: 'compact.vanguard.selected',
+      src: '/media/voices/compact.vanguard.selected.mp3',
+      faction: Faction.Compact,
+      unit: 'vanguard',
+      trigger: 'selected',
+      priority: 1,
+    };
+    audio.setVoiceClips([clip]);
+
+    const starting = audio.resumeFromGesture();
+    await Promise.resolve();
+    expect(audio.state).toBe('starting');
+    expect(audio.playVoice(clip)).toBe(false);
+    release();
+    await starting;
+    expect(audio.state).toBe('running');
+    expect(audio.playVoice(clip)).toBe(true);
   });
 
   it('fails closed when browser audio is unavailable', async () => {
@@ -125,14 +170,18 @@ describe('ProceduralAudio', () => {
 
 class RecordingBackend implements AudioBackend {
   readonly cues: AudioCue[] = [];
-  volumes = { master: 0, sfx: 0, ambience: 0 };
+  readonly voiceClips: VoiceClip[] = [];
+  volumes = { master: 0, sfx: 0, ambience: 0, voice: 0 };
   resetCount = 0;
+  preload: Promise<void> = Promise.resolve();
 
   async resume(): Promise<boolean> { return true; }
-  setVolumes(master: number, sfx: number, ambience: number): void {
-    this.volumes = { master, sfx, ambience };
+  setVolumes(master: number, sfx: number, ambience: number, voice: number): void {
+    this.volumes = { master, sfx, ambience, voice };
   }
   play(cue: AudioCue): void { this.cues.push({ ...cue }); }
+  preloadVoices(): Promise<void> { return this.preload; }
+  playVoice(clip: VoiceClip): boolean { this.voiceClips.push(clip); return true; }
   update(): void {}
   reset(): void { this.resetCount++; }
   dispose(): void {}

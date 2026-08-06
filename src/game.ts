@@ -19,7 +19,7 @@ import {
   WEAPONS,
   type StructureKind,
 } from '@sim/data';
-import { World, type BallisticFireResult, type SimEvent } from '@sim/world';
+import { World, type BallisticFireResult, type SimEvent, type Unit } from '@sim/world';
 import type { TrajectorySample } from '@sim/ballistics';
 import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
@@ -40,6 +40,7 @@ import {
   type MissionSnapshot,
 } from './tutorial/mission';
 import type { NarrativeHudModel } from './tutorial/narrative';
+import type { VoiceUnitRef } from './audio/voiceDirector';
 
 export const PLAYER: Faction = Faction.Compact;
 export const SAVE_SLOT_KEY = 'ring-world-war/save-slot';
@@ -49,6 +50,10 @@ export interface SaveActionResult {
   ok: boolean;
   message: string;
 }
+
+export type PlayerVoiceAction =
+  | { kind: 'selection'; faction: Faction; units: readonly VoiceUnitRef[] }
+  | { kind: 'order'; faction: Faction; units: readonly VoiceUnitRef[]; order: 'move' | 'attack' };
 
 export class Game {
   readonly world: World;
@@ -63,6 +68,7 @@ export class Game {
   private readonly presentationEvents: SimEvent[] = [];
   onPresentationEvents: ((events: readonly SimEvent[]) => void) | null = null;
   onTransientReset: (() => void) | null = null;
+  onPlayerVoiceAction: ((action: PlayerVoiceAction) => void) | null = null;
 
   selection = new Set<number>();
   /** Ground point under the cursor, in surface coordinates. */
@@ -440,6 +446,7 @@ export class Game {
     if (!unit || targetFaction < 0 || targetFaction === PLAYER) return;
     unit.order = { kind: 'attack', s, z, targetId };
     unit.targetId = targetId;
+    this.emitVoiceOrder([unit], 'attack');
   }
 
   exitDirectControl(): void {
@@ -537,6 +544,7 @@ export class Game {
         : ballisticFireMessage(result),
     );
     if (result.ok) {
+      const voiceUnit = this.world.unitById(this.artillerySourceId);
       this.mission?.observePlayerAction({
         kind: 'artillery-fired',
         sourceId: this.artillerySourceId,
@@ -545,6 +553,7 @@ export class Game {
         targetS: this.cursor.s,
         targetZ: this.cursor.z,
       }, this.world);
+      if (voiceUnit) this.emitVoiceOrder([voiceUnit], 'attack');
       this.cancelArtilleryTarget();
     }
     else this.previewDirty = true;
@@ -782,6 +791,7 @@ export class Game {
       this.hud.command(hostile
         ? `Focus fire — ${members.length} unit${members.length === 1 ? '' : 's'}`
         : `${attackMove ? 'Attack move' : 'Move'} — ${members.length} unit${members.length === 1 ? '' : 's'}`);
+      this.emitVoiceOrder(members, hostile || attackMove ? 'attack' : 'move');
     }
   }
 
@@ -801,12 +811,14 @@ export class Game {
     }
     // Send every selected engineer to work on it.
     let sent = 0;
+    const builders: Unit[] = [];
     for (const id of this.selection) {
       const u = this.world.unitById(id);
       if (!u || u.faction !== PLAYER || !UNITS[u.kind].canBuild) continue;
       u.order = { kind: 'build', s, z, targetId: site.id };
       u.buildTargetId = site.id;
       sent++;
+      builders.push(u);
     }
     if (sent === 0) {
       // Nothing selected can build it: grab the nearest idle engineer.
@@ -823,10 +835,12 @@ export class Game {
       if (best) {
         best.order = { kind: 'build', s, z, targetId: site.id };
         best.buildTargetId = site.id;
+        builders.push(best);
       }
     }
     this.hud.placing = null;
     this.hud.command(`${STRUCTURES[kind].name} placed`);
+    this.emitVoiceOrder(builders, 'move');
     return true;
   }
 
@@ -921,11 +935,27 @@ export class Game {
       kind: 'selection-changed',
       selectedIds: [...this.selection],
     }, this.world);
+    const units = [...this.selection]
+      .map((id) => this.world.unitById(id))
+      .filter((unit): unit is NonNullable<typeof unit> => Boolean(unit && unit.faction === PLAYER))
+      .map((unit) => ({ id: unit.id, kind: unit.kind }));
+    if (units.length > 0) this.onPlayerVoiceAction?.({ kind: 'selection', faction: PLAYER, units });
+  }
+
+  private emitVoiceOrder(units: readonly Unit[], order: 'move' | 'attack'): void {
+    if (units.length === 0) return;
+    this.onPlayerVoiceAction?.({
+      kind: 'order',
+      faction: PLAYER,
+      units: units.map((unit) => ({ id: unit.id, kind: unit.kind })),
+      order,
+    });
   }
 
   dispose(): void {
     this.onPresentationEvents = null;
     this.onTransientReset = null;
+    this.onPlayerVoiceAction = null;
     this.entities.onFootfall = null;
     this.entities.dispose();
     this.effects.dispose();

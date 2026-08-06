@@ -46,6 +46,7 @@
 
 ## 4E/4F Qualification
 
-- [ ] Device/browser matrix.
+- [x] Browser compatibility matrix on the T480s: Chromium, Chrome stable, Firefox, and Playwright WebKit.
+- [ ] Physical device/browser matrix: GTX 1660, RTX 3070, Apple Silicon, Edge, and Safari where available.
 - [ ] CI performance manifests and stable thresholds.
 - [ ] Ten-minute 1080p GTX 1660 Gate 4 soak.
