@@ -6,7 +6,7 @@ test('shows the command deck and starts without media under reduced motion', asy
   const title = page.locator('[data-rww-title-screen]');
   await expect(title.getByRole('heading', { name: 'Ring World War' })).toBeVisible();
   await expect(title.getByRole('button', { name: 'Continue' })).toBeDisabled();
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: unknown }).RWW));
   await expect(title).toHaveCount(0);
 });
@@ -16,7 +16,7 @@ test('decodes the reviewed cinematic and skips into gameplay', async ({ page }) 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/?menu=1&quality=low');
   const title = page.locator('[data-rww-title-screen]');
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
   const intro = title.getByRole('dialog', { name: 'The Last Rotation introduction' });
   const video = intro.locator('video');
   await expect(intro).toBeVisible();

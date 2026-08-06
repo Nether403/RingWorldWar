@@ -3,11 +3,11 @@
 > **Current status and sequencing:** See `docs/roadmap.md`. This specification defines the product contract; it is not the authoritative progress tracker.
 
 ## Objective
-A browser-based 3D real-time strategy game set on the inner surface of a ring-shaped megastructure. Two factions wage war across the curve of the ring: players build bases, extract resources, fire rockets whose trajectories bend with the ring's spin physics, and deploy battle mechs they can optionally pilot directly. Single-player vs AI first, architected for future multiplayer.
+A single-player 3D real-time strategy game for PC, with a browser demo, set on the inner surface of a ring-shaped megastructure. Two factions wage war across the curve of the ring: players build bases, extract resources, fire rockets whose trajectories bend with the ring's spin physics, and deploy battle mechs they can optionally pilot directly. See `docs/publishable-game-roadmap.md` for the campaign and release target.
 
 **Who it's for:** Strategy players who want a tactile, visually stunning RTS with a physics twist no flat-map RTS can offer.
 
-**What success looks like:** A player can load the game in a desktop browser, complete a 20–40 minute skirmish against a competent AI on one map, and the experience feels responsive (60 fps on mid-range hardware), readable, and visually striking — the ring arcing overhead into the sky is always part of the experience.
+**What success looks like:** A player can choose either faction, complete its six-mission campaign, play skirmish and gravity-focused Arcade modes, and understand why direction, rotation, and the inhabited ring change every battle. The browser demo and packaged PC build share deterministic gameplay and remain readable on the qualified Low profile.
 
 **Signature differentiators:**
 1. The enemy is visible *in the sky* — the ring curves up, so distant territory hangs overhead.
@@ -22,8 +22,9 @@ A browser-based 3D real-time strategy game set on the inner surface of a ring-sh
 - **Simulation:** stable-ordered object arrays with fixed-step state hashing
 - **UI:** HTML/CSS overlay (no framework initially; revisit if HUD complexity demands it)
 - **Testing:** Vitest (simulation unit tests), Playwright (smoke/e2e)
-- **Assets: NONE.** Hard constraint — zero external art, audio, or model files. Every mesh, texture, material, animation, and sound is generated in code at build or load time. See `docs/procedural-assets.md`.
-- **Audio:** WebAudio synthesis (no sample files)
+- **Gameplay assets:** terrain, units, structures, and world effects remain procedural unless a later reviewed asset-pipeline decision explicitly changes that contract. See `docs/procedural-assets.md`.
+- **Presentation assets:** reviewed video, posters, captions, voices, and DOM-only images are allowed with provenance, integrity receipts, and complete fallbacks.
+- **Audio:** procedural gameplay effects plus reviewed sampled tactical voices.
 - **No physics engine for gameplay** — custom ring-space kinematics (see docs/architecture.md). Optional Rapier later for cosmetic debris only.
 
 ## Commands
@@ -42,7 +43,7 @@ Typecheck: npm run typecheck       # tsc --noEmit
 ```
 docs/              → Design docs (this spec, GDD, art direction, architecture)
 tasks/             → plan.md and todo.md (development plan + task list)
-public/            → Static web files only; no binary art, model, texture, or audio assets
+  public/            → Reviewed delivery media with provenance and fallback coverage
 src/
   core/            → Engine-agnostic utilities: math (ring-space), events, RNG
   sim/             → Deterministic game simulation (world, navigation, ballistics; no Three.js imports)
@@ -87,7 +88,7 @@ Conventions:
 ## Boundaries
 - **Always:** run `npm run typecheck && npm run lint && npm run test` before commits; keep sim/render separation; use seeded RNG in sim; keep the determinism test passing; profile before optimizing.
 - **Ask first:** adding runtime dependencies; introducing a physics engine; changing the ring's canonical dimensions (they cascade through balance and art); any networking code.
-- **Never:** commit secrets or API keys; **add any binary art/audio/model asset to the repo**; import Three.js inside `src/sim/`; delete or skip the determinism test to make CI green.
+- **Never:** commit secrets or API keys; add unreviewed or unlicensed media; import Three.js inside `src/sim/`; delete or skip the determinism test to make CI green.
 
 ## Success Criteria (vertical slice)
 - [x] One complete 22.6 km ring map, 2 mechanically asymmetric factions, and a playable skirmish vs AI with a 45-minute hard cap.
@@ -99,7 +100,8 @@ Conventions:
 - [x] Determinism test passes: identical seeds → identical outcomes.
 
 ## Open Questions
-- Further faction differentiation: mechanical asymmetry is implemented; distinct silhouettes, faction-specific rosters, and deeper doctrine differences remain open.
-- Audio direction within the procedural-only rule: synthesized score vs generative ambience? Deferred to Phase 4.
-- WebGPU renderer adoption timing — revisit when Three.js WebGPU path is stable for our post stack.
-- Multiplayer model when it comes: deterministic lockstep (cheap bandwidth, needs perfect determinism) vs state sync. Architecture bets on lockstep.
+- Desktop packaging choice after an offline/save/fullscreen/update spike.
+- Commercial title and trademark clearance before store publication.
+- Final code/content license and third-party notice policy.
+- WebGPU renderer adoption timing after the WebGL2 release baseline is stable.
+- Multiplayer remains post-launch research; the launch roadmap does not include netcode.

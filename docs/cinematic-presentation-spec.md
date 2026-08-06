@@ -6,7 +6,7 @@
 
 Give Ring World War a finished narrative front door without changing gameplay
 authority. The first experience is a faction-neutral command deck overlooking
-the ring during the Last Rotation. `New Campaign` leads into a skippable
+the ring during the Last Rotation. `New Skirmish` leads into a skippable
 60-90 second environmental intro; returning players reach the menu immediately
 and can continue a saved match.
 
@@ -31,8 +31,10 @@ choices rather than individual heroes.
 
 - The title screen appears before `Game`, terrain, renderer, or audio authority
   is constructed on normal development and production routes.
-- `New Campaign` plays the intro when a valid asset exists, then starts a new
-  standard match. The intro is skippable and keyboard accessible.
+- `Player faction` selects the Meridian Compact or Axiom Choir perspective for a
+  new standard match.
+- `New Skirmish` plays the intro when a valid asset exists, then starts that
+  faction's standard match. The intro is skippable and keyboard accessible.
 - `Continue` is enabled only when the existing save slot is present. It skips
   the intro and restores through the current atomic save/load boundary.
 - `Settings` edits the existing persisted graphics quality and master-volume
@@ -109,7 +111,7 @@ Never:
 ## Success Criteria
 
 - Normal users see the title screen before any gameplay canvas or HUD.
-- New Campaign, Continue, Settings, Skip, mute, and captions are keyboard usable.
+- Player faction, New Skirmish, Continue, Settings, Skip, mute, and captions are keyboard usable.
 - Existing automated gameplay tests retain tick-zero and startup behavior.
 - Missing media, failed video, and reduced motion still provide a complete menu.
 - The menu is contained at 320x568, 768x1024, 1100x640, and 1440x900.

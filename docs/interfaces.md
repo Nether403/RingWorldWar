@@ -7,8 +7,9 @@ against them and will not be adapted to fit.
 
 ## Ground rules for every module
 - TypeScript, `strict` mode. No `any`. `npm run typecheck` must pass.
-- **No external assets of any kind.** No image, audio, model, or font files.
-  Everything is generated in code. This is the project's defining constraint.
+- Gameplay terrain, units, structures, and world effects remain procedural.
+  Reviewed presentation media may be added only through typed manifests with
+  provenance, integrity receipts, budgets, and complete fallbacks.
 - All randomness comes from `Rng` in `@core/rng`, seeded explicitly. Never
   `Math.random()`.
 - Allocate nothing per frame in update paths. Pool and reuse.

@@ -1,9 +1,12 @@
 import type { Settings } from '@render/settings';
 import { isQualityLevel } from '@render/settings';
+import { FACTION_NAME, Faction } from '@sim/data';
 import type { PresentationMedia } from '../presentation/media';
 import './titleScreen.css';
 
-export type TitleAction = 'new-campaign' | 'continue';
+export type TitleAction =
+  | { kind: 'new-skirmish'; playerFaction: Faction }
+  | { kind: 'continue' };
 const INTRO_TIMEOUT_MILLISECONDS = 120_000;
 
 export interface TitleScreenOptions {
@@ -19,9 +22,10 @@ export class TitleScreen {
   private readonly settingsDialog = document.createElement('div');
   private readonly intro = document.createElement('div');
   private readonly introVideo = document.createElement('video');
-  private readonly newCampaign = document.createElement('button');
+  private readonly newSkirmish = document.createElement('button');
   private readonly continueGame = document.createElement('button');
   private readonly settingsButton = document.createElement('button');
+  private readonly faction = document.createElement('select');
   private readonly settingsClose = document.createElement('button');
   private readonly quality = document.createElement('select');
   private readonly volume = document.createElement('input');
@@ -76,12 +80,25 @@ export class TitleScreen {
 
     const deck = div('rww-title-deck');
     const actions = div('rww-title-actions');
-    configureButton(this.newCampaign, 'New Campaign');
+    this.faction.id = 'rww-title-faction';
+    this.faction.setAttribute('aria-label', 'Player faction');
+    for (const [value, faction] of [
+      ['compact', Faction.Compact],
+      ['choir', Faction.Choir],
+    ] as const) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = FACTION_NAME[faction];
+      this.faction.appendChild(option);
+    }
+    const factionField = field('Player faction', this.faction);
+    factionField.classList.add('rww-title-faction');
+    configureButton(this.newSkirmish, 'New Skirmish');
     configureButton(this.continueGame, 'Continue');
     this.continueGame.classList.add('rww-title-continue');
     configureButton(this.settingsButton, 'Settings');
     this.continueGame.disabled = !options.hasSave;
-    actions.append(this.newCampaign, this.continueGame, this.settingsButton);
+    actions.append(this.newSkirmish, this.continueGame, this.settingsButton);
     const footer = div('rww-title-footer');
     const location = document.createElement('span');
     location.textContent = 'HABITAT CONTROL: DEGRADED';
@@ -93,14 +110,14 @@ export class TitleScreen {
     this.status.setAttribute('aria-live', 'polite');
     this.status.textContent = options.statusMessage ? `ARCHIVE REJECTED // ${options.statusMessage}` : '';
     this.status.hidden = !options.statusMessage;
-    deck.append(actions, this.status, footer);
+    deck.append(factionField, actions, this.status, footer);
     this.chrome.append(topline, copy, deck);
     this.root.appendChild(this.chrome);
 
     this.buildSettings();
     this.buildIntro();
     this.root.addEventListener('keydown', this.onKeyDown);
-    this.newCampaign.addEventListener('click', this.onNewCampaign);
+    this.newSkirmish.addEventListener('click', this.onNewSkirmish);
     this.continueGame.addEventListener('click', this.onContinue);
     this.settingsButton.addEventListener('click', this.openSettings);
     this.settingsClose.addEventListener('click', this.closeSettings);
@@ -109,13 +126,13 @@ export class TitleScreen {
 
   show(): Promise<TitleAction> {
     document.body.appendChild(this.root);
-    requestAnimationFrame(() => this.newCampaign.focus());
+    requestAnimationFrame(() => this.faction.focus());
     return new Promise((resolve) => { this.resolveAction = resolve; });
   }
 
   dispose(): void {
     this.root.removeEventListener('keydown', this.onKeyDown);
-    this.newCampaign.removeEventListener('click', this.onNewCampaign);
+    this.newSkirmish.removeEventListener('click', this.onNewSkirmish);
     this.continueGame.removeEventListener('click', this.onContinue);
     this.settingsButton.removeEventListener('click', this.openSettings);
     this.settingsClose.removeEventListener('click', this.closeSettings);
@@ -254,16 +271,20 @@ export class TitleScreen {
     this.root.appendChild(this.intro);
   }
 
-  private onNewCampaign = (): void => {
+  private onNewSkirmish = (): void => {
     if (this.introPlaying) return;
+    const action: TitleAction = {
+      kind: 'new-skirmish',
+      playerFaction: this.faction.value === 'choir' ? Faction.Choir : Faction.Compact,
+    };
     if (!this.options.media.introVideo || this.motionPreference.matches) {
-      this.finish('new-campaign');
+      this.finish(action);
       return;
     }
-    void this.playIntro().then(() => this.finish('new-campaign'));
+    void this.playIntro().then(() => this.finish(action));
   };
 
-  private onContinue = (): void => this.finish('continue');
+  private onContinue = (): void => this.finish({ kind: 'continue' });
 
   private finish(action: TitleAction): void {
     const resolve = this.resolveAction;

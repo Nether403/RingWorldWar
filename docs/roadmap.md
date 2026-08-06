@@ -1,8 +1,16 @@
 # Current Roadmap And Status
 
-**Status date:** 2026-08-05
+**Status date:** 2026-08-07
 
 This is the authoritative source for current delivery status and near-term sequencing. `tasks/plan.md` and `tasks/todo.md` preserve earlier planning history; unchecked or future-looking items there do not override this document.
+
+## Publishable Game Direction
+
+The project now targets a solo/AI-assisted PC release with a browser demo. The approved expansion roadmap is recorded in `docs/publishable-game-roadmap.md`.
+
+The current implementation milestone is the campaign/session foundation. The title flow now launches an honestly labeled faction-selectable skirmish, runtime player perspective reaches input, fog, rendering, audio, HUD, AI, camera placement, restart, and saves, and version 1 saves migrate to their historical Compact perspective.
+
+The next dependency is a shared runtime scenario definition and world factory. New campaign missions, aircraft, transports, and interactive environmental density must not be added before their supporting runtime contracts exist.
 
 ## Current Status
 
@@ -29,7 +37,7 @@ This is the authoritative source for current delivery status and near-term seque
 | Phase 5 voice and visual identity | Delivered | 68 tactical voices, 12 unit cards, four narrative portraits, and the title poster are human reviewed, budgeted, hashed, and enabled with complete fallbacks |
 | Phase 2 overall | Technical qualification passed | Gameplay cohorts and Requirement 17.5 pass; broader human observation remains open |
 
-## Immediate Sequence
+## Historical Immediate Sequence
 
 Work proceeds in this order. Later steps must not be pulled forward when they depend on evidence from an earlier step.
 

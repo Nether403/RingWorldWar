@@ -6,6 +6,7 @@ import { serializeMatchSession } from '@headless/session';
 import {
   createGameSaveSnapshot,
   deserializeGameSave,
+  GAME_SAVE_SCHEMA,
   MAX_GAME_SAVE_BYTES,
   parseGameSaveSnapshot,
   serializeGameSave,
@@ -35,11 +36,30 @@ describe('game saves', () => {
       new AiOpponent(Faction.Choir, 'veteran', 271),
     ] as const;
 
-    const snapshot = createGameSaveSnapshot(world, controllers, false, mission.snapshot());
-    const restored = deserializeGameSave(serializeGameSave(world, controllers, false, mission.snapshot()), terrain);
+    const snapshot = createGameSaveSnapshot(
+      world,
+      controllers,
+      false,
+      mission.snapshot(),
+      Faction.Choir,
+      Faction.Compact,
+    );
+    const restored = deserializeGameSave(
+      serializeGameSave(
+        world,
+        controllers,
+        false,
+        mission.snapshot(),
+        Faction.Choir,
+        Faction.Compact,
+      ),
+      terrain,
+    );
 
     expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot);
     expect(restored.aiEnabled).toBe(false);
+    expect(restored.playerFaction).toBe(Faction.Choir);
+    expect(restored.opponentFaction).toBe(Faction.Compact);
     expect(restored.world.stateHash()).toBe(world.stateHash());
     expect(restored.mission?.hudModel().objectiveId).toBe('build-power');
   });
@@ -55,8 +75,59 @@ describe('game saves', () => {
     const restored = deserializeGameSave(serializeMatchSession(world, controllers), terrain);
 
     expect(restored.aiEnabled).toBe(true);
+    expect(restored.playerFaction).toBe(Faction.Compact);
+    expect(restored.opponentFaction).toBe(Faction.Choir);
     expect(restored.mission).toBeNull();
     expect(restored.world.stateHash()).toBe(world.stateHash());
+  });
+
+  it('migrates version 1 game saves to the historical Compact player perspective', () => {
+    const world = new World(terrain, 75);
+    world.setup();
+    const controllers = [
+      new AiOpponent(Faction.Compact, 'veteran', 175),
+      new AiOpponent(Faction.Choir, 'veteran', 275),
+    ] as const;
+    const current = createGameSaveSnapshot(
+      world,
+      controllers,
+      true,
+      null,
+      Faction.Choir,
+      Faction.Compact,
+    );
+    const legacy = {
+      schema: GAME_SAVE_SCHEMA,
+      version: 1,
+      session: current.session,
+      aiEnabled: current.aiEnabled,
+      mission: current.mission,
+    };
+
+    const parsed = parseGameSaveSnapshot(legacy);
+
+    expect(parsed.playerFaction).toBe(Faction.Compact);
+    expect(parsed.opponentFaction).toBe(Faction.Choir);
+  });
+
+  it('rejects a version 2 save whose player and opponent factions are not complementary', () => {
+    const world = new World(terrain, 76);
+    world.setup();
+    const controllers = [
+      new AiOpponent(Faction.Compact, 'veteran', 176),
+      new AiOpponent(Faction.Choir, 'veteran', 276),
+    ] as const;
+    const snapshot = createGameSaveSnapshot(
+      world,
+      controllers,
+      true,
+      null,
+      Faction.Compact,
+      Faction.Choir,
+    ) as unknown as { opponentFaction: Faction };
+    snapshot.opponentFaction = Faction.Compact;
+
+    expect(() => parseGameSaveSnapshot(snapshot)).toThrow(/opponentFaction/i);
   });
 
   it('rejects malformed mission progress before returning any live authority', () => {
@@ -66,7 +137,14 @@ describe('game saves', () => {
       new AiOpponent(Faction.Compact, 'veteran', 173),
       new AiOpponent(Faction.Choir, 'veteran', 273),
     ] as const;
-    const snapshot = createGameSaveSnapshot(world, controllers, true, null) as unknown as {
+    const snapshot = createGameSaveSnapshot(
+      world,
+      controllers,
+      true,
+      null,
+      Faction.Compact,
+      Faction.Choir,
+    ) as unknown as {
       mission: unknown;
     };
     snapshot.mission = { schema: 'ring-world-war/mission' };
@@ -89,6 +167,13 @@ describe('game saves', () => {
       new AiOpponent(Faction.Choir, 'veteran', 274),
     ] as const;
 
-    expect(() => serializeGameSave(world, controllers, true, null)).toThrow(/structures.*at most 256/i);
+    expect(() => serializeGameSave(
+      world,
+      controllers,
+      true,
+      null,
+      Faction.Compact,
+      Faction.Choir,
+    )).toThrow(/structures.*at most 256/i);
   });
 });

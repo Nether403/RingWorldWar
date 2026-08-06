@@ -14,6 +14,7 @@ import { deserializeGameSave, serializeGameSave } from './gameSave';
 import {
   effectiveStructureStats,
   Faction,
+  other,
   STRUCTURES,
   UNITS,
   WEAPONS,
@@ -42,7 +43,6 @@ import {
 import type { NarrativeHudModel } from './tutorial/narrative';
 import type { VoiceUnitRef } from './audio/voiceDirector';
 
-export const PLAYER: Faction = Faction.Compact;
 export const SAVE_SLOT_KEY = 'ring-world-war/save-slot';
 const MAX_PENDING_PRESENTATION_EVENTS = 4_096;
 
@@ -62,6 +62,8 @@ export class Game {
   readonly effects: Effects;
   readonly markers: Markers;
   readonly hud: Hud;
+  readonly playerFaction: Faction;
+  readonly opponentFaction: Faction;
   private ai: AiOpponent;
   private aiEnabled = true;
   private mission: MissionController | null = null;
@@ -101,17 +103,23 @@ export class Game {
     private readonly seed: number,
     private readonly anchor: RenderAnchor,
     private readonly rig: CameraRig,
+    playerFaction: Faction = Faction.Compact,
     private readonly difficulty: Difficulty = 'veteran',
   ) {
+    if (playerFaction !== Faction.Compact && playerFaction !== Faction.Choir) {
+      throw new Error('invalid player faction');
+    }
+    this.playerFaction = playerFaction;
+    this.opponentFaction = other(playerFaction);
     this.terrain = createTerrain(seed);
     this.world = new World(this.terrain, seed);
     this.world.setup();
-    this.ai = new AiOpponent(Faction.Choir, difficulty, seed);
+    this.ai = new AiOpponent(this.opponentFaction, difficulty, seed);
 
     this.entities = new EntityRenderer(seed);
     this.effects = new Effects(seed);
     this.markers = new Markers();
-    this.hud = new Hud();
+    this.hud = new Hud(this.playerFaction);
     this.entities.onFootfall = (event) => {
       this.effects.footfall(event, this.anchor, this.rig.s, this.rig.z);
       this.onPresentationEvents?.([event]);
@@ -168,12 +176,12 @@ export class Game {
     this.refreshArtilleryInspection();
 
     const events = this.presentationEvents.splice(0);
-    this.effects.consume(events, this.world, this.anchor, PLAYER, this.rig.s, this.rig.z, true);
+    this.effects.consume(events, this.world, this.anchor, this.playerFaction, this.rig.s, this.rig.z, true);
     this.entities.consumePresentation(events, time);
     this.hud.consumePresentation(events);
     this.onPresentationEvents?.(events);
-    this.entities.update(this.world, this.anchor, time, PLAYER, this.acc / SIM_DT);
-    this.effects.update(dt, this.world, this.anchor, PLAYER, this.rig.camera);
+    this.entities.update(this.world, this.anchor, time, this.playerFaction, this.acc / SIM_DT);
+    this.effects.update(dt, this.world, this.anchor, this.playerFaction, this.rig.camera);
     if (this.effects.shake > 0) this.rig.addShake(this.effects.shake);
     this.markers.update(
       this.world,
@@ -181,7 +189,7 @@ export class Game {
       this.selection,
       this.cursor,
       this.hud.placing,
-      PLAYER,
+      this.playerFaction,
       this.trajectoryPreview,
       this.artilleryTargeting,
       this.artilleryResult,
@@ -194,7 +202,7 @@ export class Game {
     this.hud.update(
       dt,
       this.world,
-      PLAYER,
+      this.playerFaction,
       this.selection,
       this.rig.s,
       this.rig.z,
@@ -221,7 +229,7 @@ export class Game {
     const events = this.world.drainEvents();
     this.mission?.advanceTick(this.world, events);
     for (const event of events) {
-      if (isPresentationEventVisible(event, this.world, PLAYER)) this.presentationEvents.push(event);
+      if (isPresentationEventVisible(event, this.world, this.playerFaction)) this.presentationEvents.push(event);
     }
     if (this.presentationEvents.length > MAX_PENDING_PRESENTATION_EVENTS) {
       this.presentationEvents.splice(0, this.presentationEvents.length - MAX_PENDING_PRESENTATION_EVENTS);
@@ -340,7 +348,7 @@ export class Game {
     let bestD = Infinity;
     for (const u of this.world.units) {
       if (!u.alive) continue;
-      if (!this.world.isEntityVisible(PLAYER, u.id)) continue;
+      if (!this.world.isEntityVisible(this.playerFaction, u.id)) continue;
       const r = UNITS[u.kind].radius + 6;
       const d = surfaceDist(u.s, u.z, s, z);
       if (d < r && d < bestD) {
@@ -351,7 +359,7 @@ export class Game {
     if (best) return best;
     for (const st of this.world.structures) {
       if (!st.alive) continue;
-      if (!this.world.isEntityVisible(PLAYER, st.id)) continue;
+      if (!this.world.isEntityVisible(this.playerFaction, st.id)) continue;
       const r = STRUCTURES[st.kind].radius + 4;
       const d = surfaceDist(st.s, st.z, s, z);
       if (d < r && d < bestD) {
@@ -361,7 +369,7 @@ export class Game {
     }
     if (best) return best;
     for (const wreck of this.world.wreckages) {
-      if (!wreck.alive || !this.world.isEntityVisible(PLAYER, wreck.id)) continue;
+      if (!wreck.alive || !this.world.isEntityVisible(this.playerFaction, wreck.id)) continue;
       const d = surfaceDist(wreck.s, wreck.z, s, z);
       if (d < UNITS[wreck.kind].radius + 4 && d < bestD) {
         bestD = d;
@@ -392,7 +400,7 @@ export class Game {
     if (this.selection.size !== 1) return false;
     const id = this.selection.values().next().value as number | undefined;
     const unit = id ? this.world.unitById(id) : undefined;
-    if (!unit || unit.faction !== PLAYER || !UNITS[unit.kind].isMech) return false;
+    if (!unit || unit.faction !== this.playerFaction || !UNITS[unit.kind].isMech) return false;
     this.cancelArtilleryTarget();
     this.hud.placing = null;
     this.directUnitId = unit.id;
@@ -443,7 +451,7 @@ export class Game {
     const targetWreck = targetId ? this.world.wreckById(targetId) : undefined;
     const targetFaction = targetUnit?.faction ?? targetStructure?.faction ?? targetWreck?.faction ?? -1;
     const unit = this.world.unitById(this.directUnitId);
-    if (!unit || targetFaction < 0 || targetFaction === PLAYER) return;
+    if (!unit || targetFaction < 0 || targetFaction === this.playerFaction) return;
     unit.order = { kind: 'attack', s, z, targetId };
     unit.targetId = targetId;
     this.emitVoiceOrder([unit], 'attack');
@@ -466,7 +474,7 @@ export class Game {
     const unit = this.world.unitById(sourceId);
     const structure = unit ? undefined : this.world.structureById(sourceId);
     const source = unit ?? structure;
-    if (!source || source.faction !== PLAYER) return;
+    if (!source || source.faction !== this.playerFaction) return;
     const weapons = unit ? UNITS[unit.kind].weapons : STRUCTURES[structure!.kind].weapons;
     const selectedWeapon = weaponId ?? weapons.find((id) => WEAPONS[id]?.kind === 'ballistic');
     if (!selectedWeapon || !weapons.includes(selectedWeapon)) return;
@@ -520,7 +528,7 @@ export class Game {
       this.artillerySourceId,
       this.cursor.s,
       this.cursor.z,
-      PLAYER,
+      this.playerFaction,
       weaponId,
     );
     if (!preflight.ok) {
@@ -533,7 +541,7 @@ export class Game {
       this.artillerySourceId,
       this.cursor.s,
       this.cursor.z,
-      PLAYER,
+      this.playerFaction,
       weaponId,
     );
     this.artilleryResult = result;
@@ -593,7 +601,7 @@ export class Game {
       this.artillerySourceId,
       this.cursor.s,
       this.cursor.z,
-      PLAYER,
+      this.playerFaction,
       this.artilleryWeaponId,
     );
     if (sameCoordinates) {
@@ -624,7 +632,7 @@ export class Game {
       this.artillerySourceId,
       this.cursor.s,
       this.cursor.z,
-      PLAYER,
+      this.playerFaction,
       this.artilleryWeaponId,
     );
     const trajectory = inspection.trajectory as TrajectorySample[] | null;
@@ -655,7 +663,7 @@ export class Game {
   private toggleAbility(unitId: number): boolean {
     const unit = this.world.unitById(unitId);
     const ability = unit?.ability;
-    if (!unit || unit.faction !== PLAYER || !ability || ability.id === 'cloak') return false;
+    if (!unit || unit.faction !== this.playerFaction || !ability || ability.id === 'cloak') return false;
     const next = !ability.active;
     const changed = this.world.activateAbility(unit.id, next);
     if (changed) {
@@ -677,7 +685,7 @@ export class Game {
       const u = this.world.unitById(id);
       const st = this.world.structureById(id);
       // Only the player's own things, and only visible enemies, can be selected.
-      if ((u && u.faction === PLAYER) || (st && st.faction === PLAYER)) {
+      if ((u && u.faction === this.playerFaction) || (st && st.faction === this.playerFaction)) {
         this.selection.add(id);
       }
     }
@@ -694,7 +702,7 @@ export class Game {
 
     let found = false;
     for (const u of this.world.units) {
-      if (!u.alive || u.faction !== PLAYER) continue;
+      if (!u.alive || u.faction !== this.playerFaction) continue;
       if (Math.abs(deltaS(mid, u.s)) > half) continue;
       if (u.z < lo || u.z > hi) continue;
       this.selection.add(u.id);
@@ -709,7 +717,7 @@ export class Game {
   selectAllCombat(): void {
     this.selection.clear();
     for (const u of this.world.units) {
-      if (u.alive && u.faction === PLAYER && UNITS[u.kind].isMech) this.selection.add(u.id);
+      if (u.alive && u.faction === this.playerFaction && UNITS[u.kind].isMech) this.selection.add(u.id);
     }
     this.observeSelection();
   }
@@ -718,7 +726,7 @@ export class Game {
     const ids = [...this.selection].filter((id) => {
       const unit = this.world.unitById(id);
       const structure = unit ? undefined : this.world.structureById(id);
-      return unit?.faction === PLAYER || structure?.faction === PLAYER;
+      return unit?.faction === this.playerFaction || structure?.faction === this.playerFaction;
     });
     this.controlGroups.set(index, ids);
     this.hud.alert(`Control group ${index} set — ${ids.length} selected`);
@@ -750,13 +758,13 @@ export class Game {
     const targetStruct = targetId ? this.world.structureById(targetId) : undefined;
     const targetWreck = targetId ? this.world.wreckById(targetId) : undefined;
     const targetFaction = targetUnit?.faction ?? targetStruct?.faction ?? targetWreck?.faction ?? -1;
-    const hostile = targetId !== 0 && targetFaction >= 0 && targetFaction !== PLAYER;
+    const hostile = targetId !== 0 && targetFaction >= 0 && targetFaction !== this.playerFaction;
 
     // Spread the group out around the destination so they do not all pile onto
     // one point and shove each other.
     const members = [...this.selection]
       .map((id) => this.world.unitById(id))
-      .filter((u): u is NonNullable<typeof u> => !!u && u.faction === PLAYER);
+      .filter((u): u is NonNullable<typeof u> => !!u && u.faction === this.playerFaction);
 
     const cols = Math.ceil(Math.sqrt(members.length));
     members.forEach((u, i) => {
@@ -769,7 +777,7 @@ export class Game {
       if (
         UNITS[u.kind].canBuild &&
         targetStruct &&
-        targetStruct.faction === PLAYER &&
+        targetStruct.faction === this.playerFaction &&
         targetStruct.progress < 1
       ) {
         u.order = { kind: 'build', s: targetStruct.s, z: targetStruct.z, targetId: targetStruct.id };
@@ -800,10 +808,11 @@ export class Game {
     if (this.world.status === 'completed') return false;
     const kind = this.hud.placing;
     if (!kind) return false;
-    const site = this.world.tryPlaceStructure(PLAYER, kind, s, z);
+    const site = this.world.tryPlaceStructure(this.playerFaction, kind, s, z);
     if (!site) {
       this.hud.alert(
-        this.world.players[PLAYER].salvage < effectiveStructureStats(PLAYER, kind).salvageCost
+        this.world.players[this.playerFaction].salvage <
+          effectiveStructureStats(this.playerFaction, kind).salvageCost
           ? 'Not enough salvage'
           : 'Cannot build there',
       );
@@ -814,7 +823,7 @@ export class Game {
     const builders: Unit[] = [];
     for (const id of this.selection) {
       const u = this.world.unitById(id);
-      if (!u || u.faction !== PLAYER || !UNITS[u.kind].canBuild) continue;
+      if (!u || u.faction !== this.playerFaction || !UNITS[u.kind].canBuild) continue;
       u.order = { kind: 'build', s, z, targetId: site.id };
       u.buildTargetId = site.id;
       sent++;
@@ -825,7 +834,7 @@ export class Game {
       let best: ReturnType<World['unitById']> = undefined;
       let bestD = Infinity;
       for (const u of this.world.units) {
-        if (!u.alive || u.faction !== PLAYER || !UNITS[u.kind].canBuild) continue;
+        if (!u.alive || u.faction !== this.playerFaction || !UNITS[u.kind].canBuild) continue;
         const d = surfaceDist(u.s, u.z, s, z);
         if (d < bestD) {
           bestD = d;
@@ -847,7 +856,7 @@ export class Game {
   canBuildHere(s: number, z: number): boolean {
     const kind = this.hud.placing;
     if (!kind) return false;
-    return this.world.canPlace(PLAYER, kind, s, z);
+    return this.world.canPlace(this.playerFaction, kind, s, z);
   }
 
   setBuild(kind: StructureKind | null): void {
@@ -868,12 +877,14 @@ export class Game {
 
   saveGame(): SaveActionResult {
     try {
-      const inactivePlayerController = new AiOpponent(PLAYER, this.difficulty, this.seed);
+      const inactivePlayerController = new AiOpponent(this.playerFaction, this.difficulty, this.seed);
       const serialized = serializeGameSave(
         this.world,
         [inactivePlayerController, this.ai],
         this.aiEnabled,
         this.mission?.snapshot() ?? null,
+        this.playerFaction,
+        this.opponentFaction,
       );
       localStorage.setItem(SAVE_SLOT_KEY, serialized);
       this.hud.alert('Game saved');
@@ -893,10 +904,16 @@ export class Game {
       // Deserialize the complete session first. Only after world and both AI
       // controllers pass validation do we replace any live authority.
       const session = deserializeGameSave(saved, this.terrain);
+      if (
+        session.playerFaction !== this.playerFaction ||
+        session.opponentFaction !== this.opponentFaction
+      ) {
+        throw new Error('save belongs to a different player faction');
+      }
       const opponent = session.controllers.find(
-        (controller) => controller.exportPersistenceState().faction === Faction.Choir,
+        (controller) => controller.exportPersistenceState().faction === this.opponentFaction,
       );
-      if (!opponent) throw new Error('save has no Choir controller');
+      if (!opponent) throw new Error('save has no opponent controller');
 
       this.world.restorePersistenceState(session.world.exportPersistenceState());
       this.ai = opponent;
@@ -937,16 +954,19 @@ export class Game {
     }, this.world);
     const units = [...this.selection]
       .map((id) => this.world.unitById(id))
-      .filter((unit): unit is NonNullable<typeof unit> => Boolean(unit && unit.faction === PLAYER))
+      .filter((unit): unit is NonNullable<typeof unit> =>
+        Boolean(unit && unit.faction === this.playerFaction))
       .map((unit) => ({ id: unit.id, kind: unit.kind }));
-    if (units.length > 0) this.onPlayerVoiceAction?.({ kind: 'selection', faction: PLAYER, units });
+    if (units.length > 0) {
+      this.onPlayerVoiceAction?.({ kind: 'selection', faction: this.playerFaction, units });
+    }
   }
 
   private emitVoiceOrder(units: readonly Unit[], order: 'move' | 'attack'): void {
     if (units.length === 0) return;
     this.onPlayerVoiceAction?.({
       kind: 'order',
-      faction: PLAYER,
+      faction: this.playerFaction,
       units: units.map((unit) => ({ id: unit.id, kind: unit.kind })),
       order,
     });

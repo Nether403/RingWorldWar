@@ -15,8 +15,8 @@ import { BASE_EXPOSURE, QUALITY, Renderer, type QualityLevel } from '@render/ren
 import { Settings } from '@render/settings';
 import { RingMesh } from '@render/ringMesh';
 import { BattlefieldDressing } from '@render/battlefieldDressing';
-import { BUILDABLE, STRUCTURES } from '@sim/data';
-import { Game, PLAYER, SAVE_SLOT_KEY } from './game';
+import { BUILDABLE, Faction, STRUCTURES } from '@sim/data';
+import { Game, SAVE_SLOT_KEY } from './game';
 import { DebugOverlay } from '@ui/debugOverlay';
 import { SettingsMenu } from '@ui/settingsMenu';
 import { TitleScreen, type TitleAction } from '@ui/titleScreen';
@@ -100,14 +100,14 @@ async function start(): Promise<void> {
     const titleScreenShown = shouldShowTitleScreen(params);
     const titleAction = titleScreenShown
       ? await showTitleScreen(settings, params, titleError)
-      : 'new-campaign';
+      : { kind: 'new-skirmish' as const, playerFaction: factionFromParams(params) };
     if (titleScreenShown) startup.startedAt = performance.now();
     try {
       await startSession(cleanup, startup, params, settings, titleAction);
       return;
     } catch (error) {
       cleanup.dispose();
-      if (titleScreenShown && titleAction === 'continue') {
+      if (titleScreenShown && titleAction.kind === 'continue') {
         titleError = error instanceof Error ? error.message : String(error);
         continue;
       }
@@ -126,19 +126,23 @@ async function startSession(
   const container = document.getElementById('app')!;
   const scenarioDriverEnabled = import.meta.env.DEV && params.get('scenarioDriver') === '1';
   const seed = Number(params.get('seed') ?? '20260731') || 20260731;
+  const playerFaction = titleAction.kind === 'continue'
+    ? savedPlayerFaction()
+    : titleAction.playerFaction;
+  const startS = playerFaction === Faction.Compact ? 0 : RING_CIRCUMFERENCE * 0.5;
 
   await boot.step(0.08, 'surveying the ring');
   const anchor = new RenderAnchor();
   const rig = new CameraRig(container.clientWidth / container.clientHeight);
-  rig.setFocus(0, 0);
-  anchor.set(0, 0);
+  rig.setFocus(startS, 0);
+  anchor.set(startS, 0);
 
   const renderer = new Renderer(container, rig.camera, settings.quality);
   cleanup.defer(() => renderer.dispose());
   renderer.autoQuality = settings.adaptiveQuality;
 
   await boot.step(0.3, 'generating terrain');
-  const game = new Game(seed, anchor, rig);
+  const game = new Game(seed, anchor, rig, playerFaction);
   cleanup.defer(() => game.dispose());
   const audio = new ProceduralAudio(seed, createWebAudioBackend);
   cleanup.defer(() => audio.dispose());
@@ -146,7 +150,7 @@ async function startSession(
   audio.setVoiceVolume(settings.voiceVolume);
   // Every player clip must be decoded before its first event. Tactical events are
   // intentionally never replayed after an asynchronous load completes.
-  audio.setVoiceClips(REVIEWED_VOICE_CLIPS.filter((clip) => clip.faction === PLAYER));
+  audio.setVoiceClips(REVIEWED_VOICE_CLIPS.filter((clip) => clip.faction === game.playerFaction));
   const voiceDirector = new VoiceDirector(
     ({ clip }) => { audio.playVoice(clip); },
     REVIEWED_VOICE_CLIPS,
@@ -158,19 +162,19 @@ async function startSession(
   game.onPresentationEvents = (events) => {
     audio.consume(events, {
       world: game.world,
-      viewer: PLAYER,
+      viewer: game.playerFaction,
       anchorS: anchor.s,
       listenerS: rig.s,
       listenerZ: rig.z,
       listenerYaw: rig.yaw,
     }, true);
-    voiceDirector.consumePresentation(events, game.world, PLAYER);
+    voiceDirector.consumePresentation(events, game.world, game.playerFaction);
   };
   game.onTransientReset = () => {
     audio.reset();
     voiceDirector.reset();
   };
-  if (titleAction === 'continue') {
+  if (titleAction.kind === 'continue') {
     const loaded = game.loadGame();
     if (!loaded.ok) throw new Error(loaded.message);
   }
@@ -314,6 +318,7 @@ async function startSession(
       game.hud.restartRequested = false;
       const restart = new URL(location.href);
       restart.searchParams.set('menu', '0');
+      restart.searchParams.set('faction', factionSlug(game.playerFaction));
       location.assign(restart);
     }
   }
@@ -590,6 +595,20 @@ function hasSavedGame(): boolean {
   } catch {
     return false;
   }
+}
+
+function savedPlayerFaction(): Faction {
+  const saved = localStorage.getItem(SAVE_SLOT_KEY);
+  if (!saved) throw new Error('no saved game in this browser');
+  return parseGameSaveSnapshot(saved).playerFaction;
+}
+
+function factionFromParams(params: URLSearchParams): Faction {
+  return params.get('faction') === 'choir' ? Faction.Choir : Faction.Compact;
+}
+
+function factionSlug(faction: Faction): 'compact' | 'choir' {
+  return faction === Faction.Choir ? 'choir' : 'compact';
 }
 
 /**

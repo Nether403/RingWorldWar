@@ -7,6 +7,7 @@ import {
   type MatchSessionSnapshot,
 } from '@headless/session';
 import type { Terrain } from '@gen/terrain';
+import { Faction, other } from '@sim/data';
 import { SnapshotValidationError } from '@sim/serialize';
 import type { World } from '@sim/world';
 import {
@@ -16,7 +17,7 @@ import {
 } from './tutorial/mission';
 
 export const GAME_SAVE_SCHEMA = 'ring-world-war/game-save';
-export const GAME_SAVE_VERSION = 1;
+export const GAME_SAVE_VERSION = 2;
 export const MAX_GAME_SAVE_BYTES = 2 * 1024 * 1024;
 
 export interface GameSaveSnapshot {
@@ -25,6 +26,8 @@ export interface GameSaveSnapshot {
   session: MatchSessionSnapshot;
   aiEnabled: boolean;
   mission: MissionSnapshot | null;
+  playerFaction: Faction;
+  opponentFaction: Faction;
 }
 
 export interface RestoredGameSave {
@@ -32,6 +35,8 @@ export interface RestoredGameSave {
   controllers: [AiOpponent, AiOpponent];
   aiEnabled: boolean;
   mission: MissionController | null;
+  playerFaction: Faction;
+  opponentFaction: Faction;
 }
 
 export function createGameSaveSnapshot(
@@ -39,13 +44,18 @@ export function createGameSaveSnapshot(
   controllers: readonly [AiOpponent, AiOpponent],
   aiEnabled: boolean,
   mission: MissionSnapshot | null,
+  playerFaction: Faction,
+  opponentFaction: Faction,
 ): GameSaveSnapshot {
+  assertFactionPair(playerFaction, opponentFaction);
   return {
     schema: GAME_SAVE_SCHEMA,
     version: GAME_SAVE_VERSION,
     session: createMatchSessionSnapshot(world, controllers),
     aiEnabled,
     mission: mission ? structuredClone(mission) : null,
+    playerFaction,
+    opponentFaction,
   };
 }
 
@@ -54,8 +64,17 @@ export function serializeGameSave(
   controllers: readonly [AiOpponent, AiOpponent],
   aiEnabled: boolean,
   mission: MissionSnapshot | null,
+  playerFaction: Faction,
+  opponentFaction: Faction,
 ): string {
-  const snapshot = createGameSaveSnapshot(world, controllers, aiEnabled, mission);
+  const snapshot = createGameSaveSnapshot(
+    world,
+    controllers,
+    aiEnabled,
+    mission,
+    playerFaction,
+    opponentFaction,
+  );
   // Saving must enforce every load-time structural bound before replacing the
   // browser's previous valid slot.
   parseGameSaveSnapshot(snapshot);
@@ -76,12 +95,28 @@ export function parseGameSaveSnapshot(input: unknown): GameSaveSnapshot {
       session: parseMatchSessionSnapshot(value),
       aiEnabled: true,
       mission: null,
+      playerFaction: Faction.Compact,
+      opponentFaction: Faction.Choir,
     };
   }
-  const root = object(value, '$', ['schema', 'version', 'session', 'aiEnabled', 'mission']);
+  if (!isRecord(value)) fail('$', 'expected an object');
+  const version = value.version;
+  const fields = version === 1
+    ? ['schema', 'version', 'session', 'aiEnabled', 'mission']
+    : ['schema', 'version', 'session', 'aiEnabled', 'mission', 'playerFaction', 'opponentFaction'];
+  const root = object(value, '$', fields);
   if (root.schema !== GAME_SAVE_SCHEMA) fail('$.schema', `expected ${GAME_SAVE_SCHEMA}`);
-  if (root.version !== GAME_SAVE_VERSION) fail('$.version', `expected version ${GAME_SAVE_VERSION}`);
+  if (version !== 1 && version !== GAME_SAVE_VERSION) {
+    fail('$.version', `expected version 1 or ${GAME_SAVE_VERSION}`);
+  }
   if (typeof root.aiEnabled !== 'boolean') fail('$.aiEnabled', 'expected a boolean');
+  const playerFaction = version === 1
+    ? Faction.Compact
+    : faction(root.playerFaction, '$.playerFaction');
+  const opponentFaction = version === 1
+    ? Faction.Choir
+    : faction(root.opponentFaction, '$.opponentFaction');
+  assertFactionPair(playerFaction, opponentFaction);
   let mission: MissionSnapshot | null = null;
   if (root.mission !== null) {
     try {
@@ -97,6 +132,8 @@ export function parseGameSaveSnapshot(input: unknown): GameSaveSnapshot {
     session: parseMatchSessionSnapshot(root.session),
     aiEnabled: root.aiEnabled,
     mission,
+    playerFaction,
+    opponentFaction,
   };
 }
 
@@ -113,7 +150,22 @@ export function deserializeGameSave(input: unknown, terrain: Terrain): RestoredG
     ...session,
     aiEnabled: snapshot.aiEnabled,
     mission: snapshot.mission ? MissionController.fromSnapshot(snapshot.mission, session.world) : null,
+    playerFaction: snapshot.playerFaction,
+    opponentFaction: snapshot.opponentFaction,
   };
+}
+
+function faction(value: unknown, path: string): Faction {
+  if (value !== Faction.Compact && value !== Faction.Choir) fail(path, 'expected a faction');
+  return value;
+}
+
+function assertFactionPair(playerFaction: Faction, opponentFaction: Faction): void {
+  faction(playerFaction, '$.playerFaction');
+  faction(opponentFaction, '$.opponentFaction');
+  if (opponentFaction !== other(playerFaction)) {
+    fail('$.opponentFaction', 'must be the opposing faction');
+  }
 }
 
 function object(value: unknown, path: string, fields: readonly string[]): Record<string, unknown> {

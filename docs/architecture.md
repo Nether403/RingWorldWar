@@ -162,8 +162,8 @@ export const VANGUARD: UnitDef = {
 Balance changes never require touching systems. This is also what makes future modding and faction asymmetry cheap.
 
 ## 6. Build & Delivery
-- Vite + TS, code-split by phase (menu bundle vs game bundle).
-- No external assets: terrain, meshes, materials, effects, and UI are generated from code during boot.
+- Vite + TypeScript currently build one application entry. The title screen defers construction of simulation, renderer, terrain, and audio authority until a session starts; menu/game bundle splitting is a future measured optimization.
+- Gameplay terrain, meshes, materials, and effects remain procedural. Reviewed presentation video, posters, captions, tactical voices, and DOM-only images are delivered through typed manifests with provenance, integrity receipts, and complete missing-media fallbacks.
 - WebGL2 required; a capability check gates quality presets and shows a clear message on unsupported hardware.
 
 ## 7. Risk Register

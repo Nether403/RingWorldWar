@@ -1,6 +1,6 @@
 import { expect, test } from 'playwright/test';
 
-test('shows a lightweight Last Rotation menu before starting a new campaign', async ({ page }) => {
+test('shows a lightweight Last Rotation menu before starting a new skirmish', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', (error) => errors.push(error.message));
@@ -30,7 +30,8 @@ test('shows a lightweight Last Rotation menu before starting a new campaign', as
   await title.getByLabel('Graphics quality').selectOption('medium');
   await title.getByRole('button', { name: 'Close settings' }).click();
 
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await expect(title.getByLabel('Player faction')).toHaveValue('compact');
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
   await title.getByRole('dialog', { name: 'The Last Rotation introduction' })
     .getByRole('button', { name: 'Skip intro' }).click();
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: unknown }).RWW));
@@ -78,6 +79,117 @@ test('enables Continue only for a valid existing save and restores it atomically
   expect(restored.salvage).toBe(12_345);
 });
 
+test('starts and continues a skirmish from the selected Choir perspective', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?menu=1&quality=low');
+  const title = page.locator('[data-rww-title-screen]');
+  await title.getByLabel('Player faction').selectOption('choir');
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
+  await page.waitForFunction(() => Boolean((window as unknown as { RWW?: unknown }).RWW));
+
+  const started = await page.evaluate(() => {
+    const rww = (window as unknown as {
+      RWW: {
+        game: {
+          playerFaction: number;
+          opponentFaction: number;
+          world: {
+            players: Record<number, { salvage: number }>;
+            units: Array<{ id: number; faction: number; s: number; z: number; order: { kind: string } }>;
+          };
+          ai: { exportPersistenceState(): { faction: number } };
+          hud: { consumePresentation(events: unknown[]): void };
+          selection: Set<number>;
+          onPlayerVoiceAction: ((action: unknown) => void) | null;
+          selectAt(s: number, z: number, additive: boolean): void;
+          issueOrder(s: number, z: number, attackMove: boolean): void;
+          saveGame(): { ok: boolean };
+        };
+        rig: { s: number };
+      };
+    }).RWW;
+    const voiceActions: unknown[] = [];
+    rww.game.onPlayerVoiceAction = (action) => voiceActions.push(action);
+    const playerUnit = rww.game.world.units.find((unit) => unit.faction === rww.game.playerFaction)!;
+    const enemyUnit = rww.game.world.units.find((unit) => unit.faction === rww.game.opponentFaction)!;
+    rww.game.selectAt(playerUnit.s, playerUnit.z, false);
+    const selectedPlayer = rww.game.selection.has(playerUnit.id);
+    rww.game.issueOrder(playerUnit.s + 80, playerUnit.z, false);
+    const acceptedOrder = playerUnit.order.kind;
+    rww.game.selection.clear();
+    rww.game.selectAt(enemyUnit.s, enemyUnit.z, false);
+    const selectedHiddenEnemy = rww.game.selection.has(enemyUnit.id);
+    rww.game.world.players[rww.game.playerFaction]!.salvage = 23_456;
+    rww.game.hud.consumePresentation([{
+      kind: 'unitDied',
+      id: 99_001,
+      s: playerUnit.s,
+      z: playerUnit.z,
+      h: 0,
+      faction: rww.game.playerFaction,
+      scale: 1,
+    }]);
+    return {
+      playerFaction: rww.game.playerFaction,
+      opponentFaction: rww.game.opponentFaction,
+      aiFaction: rww.game.ai.exportPersistenceState().faction,
+      focusS: rww.rig.s,
+      selectedPlayer,
+      selectedHiddenEnemy,
+      acceptedOrder,
+      voiceActions,
+      eventText: document.querySelector('.rww-event-item')?.textContent,
+      saved: rww.game.saveGame().ok,
+    };
+  });
+  expect(started.playerFaction).toBe(1);
+  expect(started.opponentFaction).toBe(0);
+  expect(started.aiFaction).toBe(0);
+  expect(started.focusS).toBeGreaterThan(10_000);
+  expect(started.selectedPlayer).toBe(true);
+  expect(started.selectedHiddenEnemy).toBe(false);
+  expect(started.acceptedOrder).toBe('move');
+  expect(started.voiceActions).toEqual([
+    expect.objectContaining({ kind: 'selection', faction: 1 }),
+    expect.objectContaining({ kind: 'order', faction: 1, order: 'move' }),
+  ]);
+  expect(started.eventText).toContain('FRIENDLY UNIT LOST');
+  expect(started.saved).toBe(true);
+
+  await page.goto('/?menu=1&quality=low');
+  const continuedTitle = page.locator('[data-rww-title-screen]');
+  await continuedTitle.getByRole('button', { name: 'Continue' }).click();
+  await page.waitForFunction(() => Boolean((window as unknown as { RWW?: unknown }).RWW));
+  const restored = await page.evaluate(() => {
+    const game = (window as unknown as {
+      RWW: {
+        game: {
+          playerFaction: number;
+          opponentFaction: number;
+          world: { players: Record<number, { salvage: number }> };
+        };
+      };
+    }).RWW.game;
+    return {
+      playerFaction: game.playerFaction,
+      opponentFaction: game.opponentFaction,
+      salvage: game.world.players[game.playerFaction]!.salvage,
+    };
+  });
+  expect(restored).toEqual({ playerFaction: 1, opponentFaction: 0, salvage: 23_456 });
+
+  await page.evaluate(() => {
+    (window as unknown as { RWW: { game: { hud: { restartRequested: boolean } } } })
+      .RWW.game.hud.restartRequested = true;
+  });
+  await page.waitForURL((url) =>
+    url.searchParams.get('menu') === '0' && url.searchParams.get('faction') === 'choir');
+  await page.waitForFunction(() => Boolean((window as unknown as { RWW?: unknown }).RWW));
+  expect(await page.evaluate(() =>
+    (window as unknown as { RWW: { game: { playerFaction: number } } }).RWW.game.playerFaction))
+    .toBe(1);
+});
+
 test('disables Continue for a structurally corrupt save slot', async ({ page }) => {
   await page.goto('/?menu=1&quality=low');
   await page.evaluate(() => localStorage.setItem('ring-world-war/save-slot', '{corrupt'));
@@ -114,7 +226,7 @@ test('falls through to gameplay when optional intro media fails', async ({ page 
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.goto('/?menu=1&quality=low&mediaTest=missing-intro');
   const title = page.locator('[data-rww-title-screen]');
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
 
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: unknown }).RWW));
   await expect(title).toHaveCount(0);
@@ -172,7 +284,7 @@ test('removes a failed optional menu poster and preserves the CSS fallback', asy
   const title = page.locator('[data-rww-title-screen]');
   await expect(title.locator('.rww-title-media')).toHaveCount(0);
   await expect(title.locator('.rww-title-fallback')).toBeVisible();
-  await expect(title.getByRole('button', { name: 'New Campaign' })).toBeVisible();
+  await expect(title.getByRole('button', { name: 'New Skirmish' })).toBeVisible();
 });
 
 test('plays the reviewed intro with captions and skips into gameplay', async ({ page }) => {
@@ -180,7 +292,7 @@ test('plays the reviewed intro with captions and skips into gameplay', async ({ 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/?menu=1&quality=low');
   const title = page.locator('[data-rww-title-screen]');
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
   const intro = title.getByRole('dialog', { name: 'The Last Rotation introduction' });
   await expect(intro).toBeVisible();
   const video = intro.locator('video');
@@ -217,7 +329,7 @@ test('skips cinematic media when reduced motion is requested', async ({ page }) 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/?menu=1&quality=high');
   const title = page.locator('[data-rww-title-screen]');
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
 
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: unknown }).RWW));
   await expect(title).toHaveCount(0);
@@ -227,7 +339,7 @@ test('skips cinematic media when reduced motion is requested', async ({ page }) 
 test('stops an active cinematic when reduced motion becomes enabled', async ({ page }) => {
   await page.goto('/?menu=1&quality=high');
   const title = page.locator('[data-rww-title-screen]');
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
   await expect(title.getByRole('dialog', { name: 'The Last Rotation introduction' })).toBeVisible();
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
@@ -235,10 +347,12 @@ test('stops an active cinematic when reduced motion becomes enabled', async ({ p
   await expect(title).toHaveCount(0);
 });
 
-test('supports keyboard-only campaign start and Escape-to-skip', async ({ page }) => {
+test('supports keyboard-only skirmish start and Escape-to-skip', async ({ page }) => {
   await page.goto('/?menu=1&quality=low');
   const title = page.locator('[data-rww-title-screen]');
-  await expect(title.getByRole('button', { name: 'New Campaign' })).toBeFocused();
+  await expect(title.getByLabel('Player faction')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(title.getByRole('button', { name: 'New Skirmish' })).toBeFocused();
   await page.keyboard.press('Enter');
   const intro = title.getByRole('dialog', { name: 'The Last Rotation introduction' });
   await expect(intro).toBeVisible();
@@ -255,7 +369,7 @@ test('skips the disabled mute control in the zero-volume focus loop', async ({ p
   await title.getByRole('button', { name: 'Settings' }).click();
   await title.getByLabel('Master volume').fill('0');
   await title.getByRole('button', { name: 'Close settings' }).click();
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
   const intro = title.getByRole('dialog', { name: 'The Last Rotation introduction' });
   await expect(intro.getByRole('button', { name: 'Volume 0%' })).toBeDisabled();
   await expect(intro.getByRole('button', { name: 'Skip intro' })).toBeFocused();
@@ -270,7 +384,7 @@ test('skips the disabled mute control in the zero-volume focus loop', async ({ p
 test('keeps Fight again on the immediate restart path', async ({ page }) => {
   await page.goto('/?menu=1&quality=low');
   const title = page.locator('[data-rww-title-screen]');
-  await title.getByRole('button', { name: 'New Campaign' }).click();
+  await title.getByRole('button', { name: 'New Skirmish' }).click();
   await title.getByRole('dialog', { name: 'The Last Rotation introduction' })
     .getByRole('button', { name: 'Skip intro' }).click();
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: unknown }).RWW));
@@ -289,7 +403,7 @@ test('keeps the command deck contained on a narrow screen', async ({ page }) => 
   await page.goto('/?menu=1&quality=low');
   const title = page.locator('[data-rww-title-screen]');
   await expect(title).toBeVisible();
-  await expect(title.getByRole('button', { name: 'New Campaign' })).toBeVisible();
+  await expect(title.getByRole('button', { name: 'New Skirmish' })).toBeVisible();
   await expect(title.getByRole('button', { name: 'Settings' })).toBeVisible();
 
   const bounds = await title.evaluate((element) => {

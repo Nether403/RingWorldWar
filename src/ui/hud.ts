@@ -329,7 +329,10 @@ export class Hud {
     return !this.helpEl.hidden;
   }
 
-  constructor(private readonly media: PresentationMedia = PRESENTATION_MEDIA) {
+  constructor(
+    private readonly playerFaction: Faction = Faction.Compact,
+    private readonly media: PresentationMedia = PRESENTATION_MEDIA,
+  ) {
     this.style = document.createElement('style');
     this.style.textContent = CSS;
     document.head.appendChild(this.style);
@@ -514,7 +517,7 @@ export class Hud {
   consumePresentation(events: readonly SimEvent[]): void {
     let changed = false;
     for (const event of events) {
-      const text = hudEventText(event);
+      const text = hudEventText(event, this.playerFaction);
       if (!text) continue;
       const key = `${event.kind}:${event.id}:${event.faction}:${event.scale}:${event.entityKind ?? ''}`;
       const existing = this.recentEvents.find((item) => item.key === key);
@@ -1477,21 +1480,23 @@ function formatOrder(kind: Unit['order']['kind']): string {
   }
 }
 
-function hudEventText(event: SimEvent): string | null {
+export function hudEventText(event: SimEvent, playerFaction: Faction): string | null {
   switch (event.kind) {
-    case 'unitComplete': return `${event.faction === Faction.Compact ? 'FRIENDLY' : 'HOSTILE'} ` +
+    case 'unitComplete': return `${event.faction === playerFaction ? 'FRIENDLY' : 'HOSTILE'} ` +
       `${event.entityKind ? String(event.entityKind).toUpperCase() : 'UNIT'} READY`;
-    case 'structureComplete': return `${event.faction === Faction.Compact ? 'FRIENDLY' : 'HOSTILE'} ` +
+    case 'structureComplete': return `${event.faction === playerFaction ? 'FRIENDLY' : 'HOSTILE'} ` +
       `${event.entityKind ? String(event.entityKind).toUpperCase() : 'STRUCTURE'} ONLINE`;
-    case 'nodeCaptured': return event.faction === Faction.Compact ? 'SPINAL NODE SECURED' : 'SPINAL NODE LOST';
-    case 'intercepted': return event.faction === Faction.Compact
+    case 'nodeCaptured': return event.faction === playerFaction ? 'SPINAL NODE SECURED' : 'SPINAL NODE LOST';
+    case 'intercepted': return event.faction === playerFaction
       ? 'HOSTILE ORDNANCE INTERCEPTED'
       : 'FRIENDLY ORDNANCE INTERCEPTED';
     case 'damageStateChanged': return event.scale >= 2
-      ? `${event.faction === Faction.Compact ? 'FRIENDLY' : 'HOSTILE'} UNIT CRITICAL`
+      ? `${event.faction === playerFaction ? 'FRIENDLY' : 'HOSTILE'} UNIT CRITICAL`
       : null;
-    case 'unitDied': return event.faction === Faction.Compact ? 'FRIENDLY UNIT LOST' : 'HOSTILE UNIT DESTROYED';
-    case 'structureDied': return event.faction === Faction.Compact ? 'FRIENDLY STRUCTURE LOST' : 'HOSTILE STRUCTURE DESTROYED';
+    case 'unitDied': return event.faction === playerFaction ? 'FRIENDLY UNIT LOST' : 'HOSTILE UNIT DESTROYED';
+    case 'structureDied': return event.faction === playerFaction
+      ? 'FRIENDLY STRUCTURE LOST'
+      : 'HOSTILE STRUCTURE DESTROYED';
     default: return null;
   }
 }
