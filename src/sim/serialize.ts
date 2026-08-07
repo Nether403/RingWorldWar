@@ -1,9 +1,12 @@
 import type { Terrain } from '@gen/terrain';
-import { SIM_DT } from '@core/constants';
+import { RING_CIRCUMFERENCE, SIM_DT } from '@core/constants';
+import { deltaS } from '@core/ringMath';
 import { ABILITIES, type AbilityId, type AbilityState } from './abilities';
 import {
   Faction,
   canFactionFieldUnit,
+  COMMAND_PER_NODE,
+  STARTING_COMMAND,
   STRUCTURES,
   UNITS,
   WEAPONS,
@@ -18,6 +21,7 @@ import {
   type Order,
   type OrderKind,
   type Projectile,
+  type SpinalPair,
   type Structure,
   type Unit,
   type WorldPersistenceState,
@@ -26,7 +30,7 @@ import {
 } from './world';
 
 export const WORLD_SNAPSHOT_SCHEMA = 'ring-world-war/world';
-export const WORLD_SNAPSHOT_VERSION = 1;
+export const WORLD_SNAPSHOT_VERSION = 2;
 
 export interface WorldSnapshot {
   schema: typeof WORLD_SNAPSHOT_SCHEMA;
@@ -59,13 +63,14 @@ export function parseWorldSnapshot(input: unknown): WorldSnapshot {
   if (root.schema !== WORLD_SNAPSHOT_SCHEMA) {
     fail('$.schema', `expected ${WORLD_SNAPSHOT_SCHEMA}`);
   }
-  if (root.version !== WORLD_SNAPSHOT_VERSION) {
-    fail('$.version', `expected version ${WORLD_SNAPSHOT_VERSION}`);
+  if (root.version !== 1 && root.version !== WORLD_SNAPSHOT_VERSION) {
+    fail('$.version', `expected version 1 or ${WORLD_SNAPSHOT_VERSION}`);
   }
+  const version = root.version;
   return {
     schema: WORLD_SNAPSHOT_SCHEMA,
     version: WORLD_SNAPSHOT_VERSION,
-    world: readWorld(root.world, '$.world'),
+    world: readWorld(root.world, '$.world', version),
   };
 }
 
@@ -83,7 +88,7 @@ export function loadWorldSnapshot(world: World, input: unknown): void {
   world.restorePersistenceState(snapshot.world);
 }
 
-function readWorld(value: unknown, path: string): WorldPersistenceState {
+function readWorld(value: unknown, path: string, version: 1 | 2): WorldPersistenceState {
   const state = object(value, path, [
     'worldSeed',
     'terrainSeed',
@@ -101,6 +106,7 @@ function readWorld(value: unknown, path: string): WorldPersistenceState {
     'projectiles',
     'deposits',
     'wreckages',
+    ...(version === 2 ? ['spinalPairs'] : []),
   ]);
   const players = array(state.players, `${path}.players`);
   if (players.length !== 2) fail(`${path}.players`, 'expected exactly two players');
@@ -121,6 +127,22 @@ function readWorld(value: unknown, path: string): WorldPersistenceState {
     ...wreckages.map((entity) => entity.id),
   );
   if (nextId <= highestId) fail(`${path}.nextId`, 'must be greater than every entity id');
+  const spinalPairs = version === 2
+    ? readSpinalPairs(state.spinalPairs, `${path}.spinalPairs`, structures)
+    : migrateLegacySpinalState(structures);
+  const parsedPlayers: [WorldPlayerPersistenceState, WorldPlayerPersistenceState] = [
+    readPlayer(players[0], `${path}.players[0]`),
+    readPlayer(players[1], `${path}.players[1]`),
+  ];
+  if (version === 1) {
+    parsedPlayers[Faction.Compact].commandCap = STARTING_COMMAND;
+    parsedPlayers[Faction.Choir].commandCap = STARTING_COMMAND;
+    for (const structure of structures) {
+      if (structure.alive && structure.progress >= 1 && structure.kind === 'spinalNode' && structure.faction >= 0) {
+        parsedPlayers[structure.faction as Faction].commandCap += COMMAND_PER_NODE;
+      }
+    }
+  }
 
   return {
     worldSeed: integer(state.worldSeed, `${path}.worldSeed`, Number.MIN_SAFE_INTEGER),
@@ -133,17 +155,90 @@ function readWorld(value: unknown, path: string): WorldPersistenceState {
     victoryArmed: boolean(state.victoryArmed, `${path}.victoryArmed`),
     lastBastionAggressor: nullableFaction(state.lastBastionAggressor, `${path}.lastBastionAggressor`),
     result: readResult(state.result, `${path}.result`),
-    players: [
-      readPlayer(players[0], `${path}.players[0]`),
-      readPlayer(players[1], `${path}.players[1]`),
-    ],
+    players: parsedPlayers,
     units,
     structures,
     projectiles,
     deposits: boundedArray(state.deposits, `${path}.deposits`, 256).map((deposit, index) =>
       readDeposit(deposit, `${path}.deposits[${index}]`)),
     wreckages,
+    spinalPairs,
   };
+}
+
+function readSpinalPairs(value: unknown, path: string, structures: readonly Structure[]): SpinalPair[] {
+  const pairIds = new Set<string>();
+  const memberIds = new Set<number>();
+  const pairs = boundedArray(value, path, 128).map((entry, index) => {
+    const pairPath = `${path}[${index}]`;
+    const pair = object(entry, pairPath, ['id', 'members']);
+    const id = symbolicId(pair.id, `${pairPath}.id`);
+    if (pairIds.has(id)) fail(`${pairPath}.id`, `duplicate pair id ${id}`);
+    pairIds.add(id);
+    const members = array(pair.members, `${pairPath}.members`);
+    if (members.length !== 2) fail(`${pairPath}.members`, 'expected exactly two members');
+    const resolved = members.map((member, memberIndex) =>
+      integer(member, `${pairPath}.members[${memberIndex}]`, 1)) as [number, number];
+    if (resolved[0] >= resolved[1]) {
+      fail(`${pairPath}.members`, 'members must be distinct and in numeric order');
+    }
+    for (let memberIndex = 0; memberIndex < resolved.length; memberIndex++) {
+      const memberId = resolved[memberIndex]!;
+      if (memberIds.has(memberId)) fail(`${pairPath}.members[${memberIndex}]`, 'node belongs to more than one pair');
+      const structure = structures.find((candidate) => candidate.id === memberId);
+      if (!structure) fail(`${pairPath}.members[${memberIndex}]`, 'references a missing member');
+      if (!structure.alive) fail(`${pairPath}.members[${memberIndex}]`, 'references a non-live member');
+      if (structure.kind !== 'spinalNode') fail(`${pairPath}.members[${memberIndex}]`, 'references a non-Node member');
+      if (structure.progress < 1) fail(`${pairPath}.members[${memberIndex}]`, 'references an unfinished member');
+      memberIds.add(memberId);
+    }
+    return { id, members: resolved };
+  });
+  return pairs.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function migrateLegacySpinalState(structures: Structure[]): SpinalPair[] {
+  const nodes = structures.filter((structure) =>
+    structure.alive && structure.kind === 'spinalNode' && structure.progress >= 1);
+  for (const node of nodes) {
+    if (node.faction === Faction.Compact) {
+      if (node.capture > 0) {
+        node.faction = -1;
+        node.capture = 0;
+      } else if (node.capture === 0) node.capture = -1;
+    } else if (node.faction === Faction.Choir) {
+      if (node.capture < 0) {
+        node.faction = -1;
+        node.capture = 0;
+      } else if (node.capture === 0) node.capture = 1;
+    }
+  }
+  const candidates: Array<{ error: number; lower: number; higher: number }> = [];
+  for (let firstIndex = 0; firstIndex < nodes.length; firstIndex++) {
+    for (let secondIndex = firstIndex + 1; secondIndex < nodes.length; secondIndex++) {
+      const first = nodes[firstIndex]!;
+      const second = nodes[secondIndex]!;
+      const arcError = Math.abs(Math.abs(deltaS(first.s, second.s)) - RING_CIRCUMFERENCE * 0.5);
+      const axialError = Math.abs(first.z + second.z);
+      const error = Math.hypot(arcError, axialError);
+      if (error <= 1) {
+        candidates.push({ error, lower: Math.min(first.id, second.id), higher: Math.max(first.id, second.id) });
+      }
+    }
+  }
+  candidates.sort((a, b) => a.error - b.error || a.lower - b.lower || a.higher - b.higher);
+  const paired = new Set<number>();
+  const result: SpinalPair[] = [];
+  for (const candidate of candidates) {
+    if (paired.has(candidate.lower) || paired.has(candidate.higher)) continue;
+    paired.add(candidate.lower);
+    paired.add(candidate.higher);
+    result.push({
+      id: `legacy-${candidate.lower}-${candidate.higher}`,
+      members: [candidate.lower, candidate.higher],
+    });
+  }
+  return result.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function readResult(value: unknown, path: string): WorldPersistenceState['result'] {
@@ -463,6 +558,18 @@ function boolean(value: unknown, path: string): boolean {
 function string(value: unknown, path: string): string {
   if (typeof value !== 'string') fail(path, 'expected a string');
   return value;
+}
+
+function symbolicId(value: unknown, path: string): string {
+  const id = string(value, path);
+  if (
+    id.length === 0 || id.length > 64 ||
+    !/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(id) ||
+    id === 'constructor' || id === 'prototype'
+  ) {
+    fail(path, 'expected a safe symbolic id');
+  }
+  return id;
 }
 
 function faction(value: unknown, path: string): Faction {

@@ -241,6 +241,12 @@ function cueForEvent(seed: number, event: SimEvent, frame: AudioFrame): AudioCue
       return cue('completion', spatial, 0.28, 330 * variation, 0.45);
     case 'nodeCaptured':
       return cue('capture', spatial, 0.5, event.faction === 0 ? 220 : 294, 0.8);
+    case 'nodeNeutralized':
+      return cue('warning', spatial, 0.42, 148 * variation, 0.62);
+    case 'alignmentStarted':
+      return cue('capture', spatial, 0.62, event.faction === 0 ? 246 : 330, 1.05);
+    case 'alignmentBroken':
+      return cue('warning', spatial, 0.52, 118 * variation, 0.9);
     case 'damageStateChanged':
       return event.scale > 0 ? cue('warning', spatial, 0.3, 180 * variation, 0.42) : null;
     case 'footfall':

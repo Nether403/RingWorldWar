@@ -59,20 +59,12 @@ The following are present-day gameplay facts and may be used by narrative materi
 - The ring is a 3.6 km-radius rotating habitat whose map wraps around the spin axis.
 - The Meridian Compact and Axiom Choir have implemented mechanical asymmetry: Compact forces favor durability and cheaper ballistic structures; Choir forces favor vision and faster construction or production.
 - Bastion destruction wins the current skirmish; Dominance resolves the hard time cap.
-- Spinal Nodes provide Command capacity and contribute to Dominance.
+- Individual Spinal Nodes provide Command capacity.
+- Surviving routing records identify some Spinal Nodes as authenticated operational pairs. Controlling both members establishes local Spinal Alignment; losing either member breaks it. Completed pairs, rather than individual Nodes, generate Dominance.
 - Scrith Salvage, energy production and draw, fabrication, mechs, wrecks, and damage states support the war economy.
 - In the authoritative coordinate convention, **antispinward fire is the long-range artillery direction** and spinward fire is the short-range direction.
 - Standard rockets, cruise missiles, Chord Shots, counter-battery reveal, point defence, and Laser Grid interception are part of the current arsenal.
 - The Shadow-Square Network produces visible moving day and night conditions; not every proposed systemic consequence of those conditions exists yet.
-
-## Approved Canon Pending Implementation
-
-The following LS-07 facts are approved canon but must not be described as current player capabilities until the slice qualifies:
-
-- Surviving routing records identify some Spinal Nodes as authenticated operational pairs.
-- A faction establishes local Spinal Alignment while it controls both members of a pair; that Alignment ends when it no longer controls both.
-- Individual Nodes provide local Command access. Alignment is a reversible theater-level state, not execution of Anchor or Migration and not a victory condition by itself.
-- The approved launch implementation makes completed pairs, rather than individual Nodes, generate the existing Dominance tiebreak score.
 
 ## Proposed Future Mechanics
 

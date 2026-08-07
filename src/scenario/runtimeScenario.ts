@@ -10,7 +10,7 @@ import {
 } from '@sim/data';
 
 export const RUNTIME_SCENARIO_SCHEMA = 'ring-world-war/runtime-scenario';
-export const RUNTIME_SCENARIO_VERSION = 1;
+export const RUNTIME_SCENARIO_VERSION = 2;
 
 export interface RuntimeScenarioPlayer {
   faction: Faction;
@@ -72,6 +72,11 @@ export interface RuntimeScenarioBinding {
   entity: string;
 }
 
+export interface RuntimeScenarioSpinalPair {
+  id: string;
+  members: [string, string];
+}
+
 export interface RuntimeScenario {
   schema: typeof RUNTIME_SCENARIO_SCHEMA;
   version: typeof RUNTIME_SCENARIO_VERSION;
@@ -85,6 +90,7 @@ export interface RuntimeScenario {
   units: RuntimeScenarioUnit[];
   deposits: RuntimeScenarioDeposit[];
   bindings: RuntimeScenarioBinding[];
+  spinalPairs: RuntimeScenarioSpinalPair[];
 }
 
 export class RuntimeScenarioValidationError extends TypeError {
@@ -96,6 +102,8 @@ export class RuntimeScenarioValidationError extends TypeError {
 
 export function parseRuntimeScenario(input: unknown): RuntimeScenario {
   const value = typeof input === 'string' ? parseJson(input) : input;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) fail('$', 'expected an object');
+  const inputVersion = (value as Record<string, unknown>).version;
   const root = object(value, '$', [
     'schema',
     'version',
@@ -109,12 +117,13 @@ export function parseRuntimeScenario(input: unknown): RuntimeScenario {
     'units',
     'deposits',
     'bindings',
+    ...(inputVersion === 1 ? [] : ['spinalPairs']),
   ]);
   if (root.schema !== RUNTIME_SCENARIO_SCHEMA) {
     fail('$.schema', `expected ${RUNTIME_SCENARIO_SCHEMA}`);
   }
-  if (root.version !== RUNTIME_SCENARIO_VERSION) {
-    fail('$.version', `expected version ${RUNTIME_SCENARIO_VERSION}`);
+  if (root.version !== 1 && root.version !== RUNTIME_SCENARIO_VERSION) {
+    fail('$.version', `expected version 1 or ${RUNTIME_SCENARIO_VERSION}`);
   }
 
   const playerValues = boundedArray(root.players, '$.players', 2);
@@ -133,9 +142,13 @@ export function parseRuntimeScenario(input: unknown): RuntimeScenario {
     readDeposit(deposit, `$.deposits[${index}]`));
   const bindings = boundedArray(root.bindings, '$.bindings', 128).map((binding, index) =>
     readBinding(binding, `$.bindings[${index}]`));
+  const spinalPairs = root.version === 1
+    ? []
+    : boundedArray(root.spinalPairs, '$.spinalPairs', 128).map((pair, index) =>
+        readSpinalPair(pair, `$.spinalPairs[${index}]`)).sort((a, b) => a.id.localeCompare(b.id));
   const openingView = readOpeningView(root.openingView, '$.openingView');
 
-  validateReferences(structures, units, deposits, bindings, openingView);
+  validateReferences(structures, units, deposits, bindings, spinalPairs, openingView);
 
   return {
     schema: RUNTIME_SCENARIO_SCHEMA,
@@ -150,6 +163,7 @@ export function parseRuntimeScenario(input: unknown): RuntimeScenario {
     units,
     deposits,
     bindings,
+    spinalPairs,
   };
 }
 
@@ -304,11 +318,25 @@ function readBinding(value: unknown, path: string): RuntimeScenarioBinding {
   };
 }
 
+function readSpinalPair(value: unknown, path: string): RuntimeScenarioSpinalPair {
+  const pair = object(value, path, ['id', 'members']);
+  const members = boundedArray(pair.members, `${path}.members`, 2);
+  if (members.length !== 2) fail(`${path}.members`, 'expected exactly two members');
+  return {
+    id: symbolicId(pair.id, `${path}.id`),
+    members: [
+      symbolicId(members[0], `${path}.members[0]`),
+      symbolicId(members[1], `${path}.members[1]`),
+    ],
+  };
+}
+
 function validateReferences(
   structures: readonly RuntimeScenarioStructure[],
   units: readonly RuntimeScenarioUnit[],
   deposits: readonly RuntimeScenarioDeposit[],
   bindings: readonly RuntimeScenarioBinding[],
+  spinalPairs: readonly RuntimeScenarioSpinalPair[],
   openingView: RuntimeScenarioOpeningView,
 ): void {
   const entities = new Map<string, RuntimeScenarioStructure | RuntimeScenarioUnit>();
@@ -354,6 +382,31 @@ function validateReferences(
     bindingIds.add(binding.id);
     if (!entities.has(binding.entity)) {
       fail(`$.bindings[${index}].entity`, 'must reference a declared entity');
+    }
+  }
+
+
+  const pairIds = new Set<string>();
+  const pairMembers = new Set<string>();
+  for (let index = 0; index < spinalPairs.length; index++) {
+    const pair = spinalPairs[index]!;
+    if (pairIds.has(pair.id)) fail(`$.spinalPairs[${index}].id`, `duplicate pair id ${pair.id}`);
+    pairIds.add(pair.id);
+    if (pair.members[0] === pair.members[1]) {
+      fail(`$.spinalPairs[${index}].members`, 'members must be distinct');
+    }
+    for (let memberIndex = 0; memberIndex < pair.members.length; memberIndex++) {
+      const memberId = pair.members[memberIndex]!;
+      if (pairMembers.has(memberId)) {
+        fail(`$.spinalPairs[${index}].members[${memberIndex}]`, 'node belongs to more than one pair');
+      }
+      const member = entities.get(memberId);
+      if (!member) fail(`$.spinalPairs[${index}].members[${memberIndex}]`, 'must reference a declared entity');
+      if (!('progress' in member) || member.kind !== 'spinalNode') {
+        fail(`$.spinalPairs[${index}].members[${memberIndex}]`, 'must reference a Spinal Node');
+      }
+      if (member.progress < 1) fail(`$.spinalPairs[${index}].members[${memberIndex}]`, 'must reference a completed Node');
+      pairMembers.add(memberId);
     }
   }
 

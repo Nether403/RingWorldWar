@@ -26,13 +26,18 @@ import {
   canFactionFieldUnit,
   COMMAND_PER_NODE,
   DAMAGE_TABLE,
-  DOMINANCE_PER_NODE_PER_SEC,
+  DOMINANCE_PER_ALIGNED_PAIR_PER_SEC,
   Faction,
   FIRING_REVEAL_TIME,
   MATCH_TIME_LIMIT,
   other,
   STARTING_COMMAND,
   STARTING_SALVAGE,
+  SPINAL_CAPTURE_ENDPOINT_EPSILON,
+  SPINAL_CAPTURE_QUERY_RADIUS,
+  SPINAL_CAPTURE_RADIUS,
+  SPINAL_CAPTURE_RATE_PER_UNIT,
+  SPINAL_CAPTURE_STRENGTH_CAP,
   STRUCTURES,
   UNITS,
   WEAPONS,
@@ -207,6 +212,11 @@ export interface Deposit {
   claimedBy: number;
 }
 
+export interface SpinalPair {
+  id: string;
+  members: [number, number];
+}
+
 export type SimEventKind =
   | 'weaponFired'
   | 'impact'
@@ -217,6 +227,9 @@ export type SimEventKind =
   | 'intercepted'
   | 'footfall'
   | 'nodeCaptured'
+  | 'nodeNeutralized'
+  | 'alignmentStarted'
+  | 'alignmentBroken'
   | 'damageStateChanged';
 
 export interface SimEvent {
@@ -233,6 +246,7 @@ export interface SimEvent {
   sourceFaction?: Faction;
   actorId?: number;
   projectileId?: number;
+  pairId?: string;
 }
 
 export const DEPOSIT_PLACEMENT_RADIUS = 70;
@@ -288,6 +302,7 @@ export interface WorldPersistenceState {
   projectiles: Projectile[];
   deposits: Deposit[];
   wreckages: Wreck[];
+  spinalPairs: SpinalPair[];
 }
 
 interface BallisticSource {
@@ -367,6 +382,7 @@ export class World {
   projectiles: Projectile[] = [];
   wreckages: Wreck[] = [];
   deposits: Deposit[] = [];
+  spinalPairs: SpinalPair[] = [];
 
   players: Record<Faction, PlayerState>;
 
@@ -448,11 +464,14 @@ export class World {
     }
 
     // Neutral capture points at the quarter marks, plus two mid-field.
-    for (const frac of [0.25, 0.75]) {
-      this.spawnStructure(-1 as Faction, 'spinalNode', C * frac, 0, 1);
-    }
-    this.spawnStructure(-1 as Faction, 'spinalNode', C * 0.125, RING_HALF_WIDTH * 0.6, 1);
-    this.spawnStructure(-1 as Faction, 'spinalNode', C * 0.625, -RING_HALF_WIDTH * 0.6, 1);
+    const quarter = this.spawnStructure(-1 as Faction, 'spinalNode', C * 0.25, 0, 1);
+    const threeQuarter = this.spawnStructure(-1 as Faction, 'spinalNode', C * 0.75, 0, 1);
+    const upperRim = this.spawnStructure(-1 as Faction, 'spinalNode', C * 0.125, RING_HALF_WIDTH * 0.6, 1);
+    const lowerRim = this.spawnStructure(-1 as Faction, 'spinalNode', C * 0.625, -RING_HALF_WIDTH * 0.6, 1);
+    this.setSpinalPairs([
+      { id: 'standard-axis', members: [quarter.id, threeQuarter.id] },
+      { id: 'standard-rim', members: [upperRim.id, lowerRim.id] },
+    ]);
 
     // Salvage deposits: a guaranteed pair near each base, the rest contested.
     const depositAt = (s: number, z: number, amount: number): void => {
@@ -558,7 +577,9 @@ export class World {
       revealed: 0,
       queue: [],
       queueTimer: 0,
-      capture: 0,
+      capture: kind === 'spinalNode' && faction >= 0
+        ? faction === Faction.Compact ? -1 : 1
+        : 0,
     };
     this.structures.push(st);
     this.entitiesById.set(st.id, st);
@@ -935,6 +956,70 @@ export class World {
         this.players[st.faction as Faction].commandCap += COMMAND_PER_NODE;
       }
     }
+  }
+
+  setSpinalPairs(pairs: readonly SpinalPair[]): void {
+    const canonical = pairs.map((pair) => ({
+      id: validateSpinalPairId(pair.id),
+      members: [...pair.members].sort((a, b) => a - b) as [number, number],
+    })).sort((a, b) => a.id.localeCompare(b.id));
+    const pairIds = new Set<string>();
+    const memberIds = new Set<number>();
+    for (const pair of canonical) {
+      if (pairIds.has(pair.id)) throw new Error(`Duplicate Spinal pair id: ${pair.id}`);
+      pairIds.add(pair.id);
+      if (pair.members.length !== 2 || pair.members[0] === pair.members[1]) {
+        throw new Error(`Spinal pair ${pair.id} must contain two distinct members`);
+      }
+      for (const memberId of pair.members) {
+        if (!Number.isSafeInteger(memberId) || memberId <= 0) {
+          throw new Error(`Spinal pair ${pair.id} has an invalid member id`);
+        }
+        if (memberIds.has(memberId)) throw new Error(`Spinal Node ${memberId} belongs to more than one pair`);
+        const member = this.structureById(memberId);
+        if (!member) throw new Error(`Spinal pair ${pair.id} references a missing or non-live member ${memberId}`);
+        if (member.kind !== 'spinalNode') throw new Error(`Spinal pair ${pair.id} member ${memberId} is not a Spinal Node`);
+        if (member.progress < 1) throw new Error(`Spinal pair ${pair.id} member ${memberId} is unfinished`);
+        memberIds.add(memberId);
+      }
+    }
+    this.spinalPairs = canonical;
+  }
+
+  spinalPairForNode(nodeId: number): SpinalPair | undefined {
+    return this.spinalPairs.find((pair) => pair.members[0] === nodeId || pair.members[1] === nodeId);
+  }
+
+  spinalPairMate(nodeId: number): Structure | undefined {
+    const pair = this.spinalPairForNode(nodeId);
+    if (!pair) return undefined;
+    return this.structureById(pair.members[0] === nodeId ? pair.members[1] : pair.members[0]);
+  }
+
+  spinalAlignmentOwner(pair: SpinalPair): Faction | null {
+    const first = this.structureById(pair.members[0]);
+    const second = this.structureById(pair.members[1]);
+    if (!first || !second || first.kind !== 'spinalNode' || second.kind !== 'spinalNode' ||
+        first.progress < 1 || second.progress < 1 || first.faction < 0 || first.faction !== second.faction) {
+      return null;
+    }
+    return first.faction as Faction;
+  }
+
+  alignedPairCount(faction: Faction): number {
+    return this.spinalPairs.reduce(
+      (count, pair) => count + Number(this.spinalAlignmentOwner(pair) === faction),
+      0,
+    );
+  }
+
+  visibleAlignedPairCount(viewer: Faction): number {
+    return this.spinalPairs.reduce((count, pair) => {
+      const owner = this.spinalAlignmentOwner(pair);
+      if (owner === null) return count;
+      if (owner === viewer) return count + 1;
+      return pair.members.every((id) => this.isEntityVisible(viewer, id)) ? count + 1 : count;
+    }, 0);
   }
 
   // ---- Production ---------------------------------------------------------
@@ -2411,10 +2496,8 @@ export class World {
     if (st.kind === 'spinalNode') {
       // Nodes are captured, never destroyed; knock it back to neutral instead.
       st.hp = st.maxHp * 0.35;
-      st.faction = -1;
       st.capture = 0;
-      this.clearVisibilityCache();
-      this.recomputeCommandCaps();
+      if (st.faction >= 0) this.changeNodeOwner(st, -1);
       return;
     }
     st.alive = false;
@@ -2467,7 +2550,7 @@ export class World {
   private stepCapture(dt: number): void {
     for (const st of this.structures) {
       if (!st.alive || st.kind !== 'spinalNode') continue;
-      const near = this.nearby(st.s, st.z, 130);
+      const near = this.nearby(st.s, st.z, SPINAL_CAPTURE_QUERY_RADIUS);
 
       let compact = 0;
       let choir = 0;
@@ -2475,38 +2558,75 @@ export class World {
         const entity = this.entitiesById.get(id);
         if (!entity?.alive || !('order' in entity)) continue;
         const u = entity;
-        if (surfaceDistSq(u.s, u.z, st.s, st.z) > 110 * 110) continue;
+        if (surfaceDistSq(u.s, u.z, st.s, st.z) > SPINAL_CAPTURE_RADIUS * SPINAL_CAPTURE_RADIUS) continue;
         if (u.faction === Faction.Compact) compact++;
         else choir++;
       }
 
-      // Contested nodes freeze; a lone unit takes about twenty seconds.
-      const net = Math.sign(choir - compact) * Math.min(3, Math.abs(choir - compact));
-      if (net !== 0) {
-        st.capture = clamp(st.capture + net * dt * 0.05, -1, 1);
-        const owner: Faction | -1 =
-          st.capture >= 1 ? Faction.Choir : st.capture <= -1 ? Faction.Compact : st.faction;
-        if (owner !== st.faction) {
-          st.faction = owner;
-          this.clearVisibilityCache();
-          this.recomputeCommandCaps();
-          this.emit('nodeCaptured', st.s, st.z, 0, owner, 1, st.id);
+      const net = Math.sign(choir - compact) *
+        Math.min(SPINAL_CAPTURE_STRENGTH_CAP, Math.abs(choir - compact));
+      if (net === 0) continue;
+      const delta = net * dt * SPINAL_CAPTURE_RATE_PER_UNIT;
+      if (st.faction < 0) {
+        st.capture = clamp(st.capture + delta, -1, 1);
+        if (st.capture >= 1 - SPINAL_CAPTURE_ENDPOINT_EPSILON) {
+          st.capture = 1;
+          this.changeNodeOwner(st, Faction.Choir);
+        } else if (st.capture <= -1 + SPINAL_CAPTURE_ENDPOINT_EPSILON) {
+          st.capture = -1;
+          this.changeNodeOwner(st, Faction.Compact);
+        }
+        continue;
+      }
+      const owner = st.faction as Faction;
+      const friendlyPressure = owner === Faction.Compact ? net < 0 : net > 0;
+      if (friendlyPressure) {
+        st.capture = owner === Faction.Compact
+          ? Math.max(-1, st.capture + delta)
+          : Math.min(1, st.capture + delta);
+      } else {
+        st.capture = owner === Faction.Compact
+          ? Math.min(0, st.capture + delta)
+          : Math.max(0, st.capture + delta);
+        if (Math.abs(st.capture) <= SPINAL_CAPTURE_ENDPOINT_EPSILON) {
+          st.capture = 0;
+          this.changeNodeOwner(st, -1);
         }
       }
     }
 
-    // Dominance: whoever holds more nodes accrues score. This is the anti-stall
-    // valve -- turtling forever loses on the clock.
-    let cCount = 0;
-    let hCount = 0;
-    for (const st of this.structures) {
-      if (st.alive && st.kind === 'spinalNode') {
-        if (st.faction === Faction.Compact) cCount++;
-        else if (st.faction === Faction.Choir) hCount++;
-      }
+    this.players[Faction.Compact].dominance +=
+      this.alignedPairCount(Faction.Compact) * DOMINANCE_PER_ALIGNED_PAIR_PER_SEC * dt;
+    this.players[Faction.Choir].dominance +=
+      this.alignedPairCount(Faction.Choir) * DOMINANCE_PER_ALIGNED_PAIR_PER_SEC * dt;
+  }
+
+  private changeNodeOwner(node: Structure, nextOwner: Faction | -1): void {
+    if (node.kind !== 'spinalNode' || node.faction === nextOwner) return;
+    const pair = this.spinalPairForNode(node.id);
+    const oldAlignment = pair ? this.spinalAlignmentOwner(pair) : null;
+    const previousOwner = node.faction;
+    node.faction = nextOwner;
+    const newAlignment = pair ? this.spinalAlignmentOwner(pair) : null;
+    this.clearVisibilityCache();
+    this.recomputeCommandCaps();
+    if (oldAlignment !== null && oldAlignment !== newAlignment) {
+      this.emit(
+        'alignmentBroken', node.s, node.z, 0, oldAlignment, 1, node.id,
+        undefined, 'spinalNode', undefined, undefined, undefined, pair!.id,
+      );
     }
-    this.players[Faction.Compact].dominance += cCount * DOMINANCE_PER_NODE_PER_SEC * dt;
-    this.players[Faction.Choir].dominance += hCount * DOMINANCE_PER_NODE_PER_SEC * dt;
+    if (nextOwner < 0) {
+      this.emit('nodeNeutralized', node.s, node.z, 0, previousOwner, 1, node.id, undefined, 'spinalNode');
+    } else {
+      this.emit('nodeCaptured', node.s, node.z, 0, nextOwner, 1, node.id, undefined, 'spinalNode');
+    }
+    if (newAlignment !== null && oldAlignment !== newAlignment) {
+      this.emit(
+        'alignmentStarted', node.s, node.z, 0, newAlignment, 1, node.id,
+        undefined, 'spinalNode', undefined, undefined, undefined, pair!.id,
+      );
+    }
   }
 
   // ---- Cleanup and victory ------------------------------------------------
@@ -2611,9 +2731,10 @@ export class World {
     sourceFaction?: Faction,
     actorId?: number,
     projectileId?: number,
+    pairId?: string,
   ): void {
     this.events.push({
-      kind, s, z, h, faction, scale, id, weapon, entityKind, sourceFaction, actorId, projectileId,
+      kind, s, z, h, faction, scale, id, weapon, entityKind, sourceFaction, actorId, projectileId, pairId,
     });
   }
 
@@ -2665,6 +2786,7 @@ export class World {
       })),
       deposits: this.deposits.map((deposit) => ({ ...deposit })),
       wreckages: this.wreckages.map((wreck) => ({ ...wreck })),
+      spinalPairs: this.spinalPairs.map((pair) => ({ id: pair.id, members: [...pair.members] })),
     };
   }
 
@@ -2700,6 +2822,10 @@ export class World {
     }));
     const deposits = state.deposits.map((deposit) => ({ ...deposit }));
     const wreckages = state.wreckages.map((wreck) => ({ ...wreck }));
+    const spinalPairs = state.spinalPairs.map((pair) => ({
+      id: pair.id,
+      members: [...pair.members] as [number, number],
+    }));
 
     this.rng.restore(state.rngState);
     this.worldSeed = state.worldSeed;
@@ -2720,6 +2846,7 @@ export class World {
     this.deposits = deposits;
     this.wreckages = wreckages;
     this.rebuildEntityIndex();
+    this.setSpinalPairs(spinalPairs);
     this.events = [];
     for (const index of this.usedBuckets) this.buckets[index]!.length = 0;
     this.usedBuckets.length = 0;
@@ -2974,6 +3101,20 @@ export function resolveTerrainSeed(terrain: Terrain, worldSeed: number): number 
 
 function validateSeed(seed: number, label: string): void {
   if (!Number.isSafeInteger(seed)) throw new TypeError(`${label} must be a safe integer`);
+}
+
+function validateSpinalPairId(value: string): string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 64 ||
+    !/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(value) ||
+    value === 'constructor' ||
+    value === 'prototype'
+  ) {
+    throw new Error('Spinal pair id must be a safe non-empty symbolic id');
+  }
+  return value;
 }
 
 function clamp(v: number, lo: number, hi: number): number {

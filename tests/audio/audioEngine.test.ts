@@ -166,6 +166,19 @@ describe('ProceduralAudio', () => {
     expect(backend.cues.map((cue) => cue.kind)).toEqual(['chord-impact', 'chord-launch']);
     expect(backend.cues[0]!.durationSeconds).toBeGreaterThan(backend.cues[1]!.durationSeconds);
   });
+
+  it('maps Node neutralization and Alignment lifecycle events to presentation cues', async () => {
+    const backend = new RecordingBackend();
+    const audio = new ProceduralAudio(33, () => backend);
+    await audio.resumeFromGesture();
+    audio.consume([
+      event('nodeNeutralized', Faction.Compact, { id: 301 }),
+      event('alignmentStarted', Faction.Compact, { id: 302, pairId: 'test-axis' }),
+      event('alignmentBroken', Faction.Compact, { id: 303, pairId: 'test-axis' }),
+    ], frame(), true);
+
+    expect(backend.cues.map((cue) => cue.kind)).toEqual(['capture', 'warning', 'warning']);
+  });
 });
 
 class RecordingBackend implements AudioBackend {

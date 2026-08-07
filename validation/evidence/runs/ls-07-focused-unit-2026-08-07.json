@@ -1,0 +1,27 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-unit",
+  "command": "npx vitest run tests/sim/spinalAlignment.test.ts tests/sim/serialize.test.ts tests/ai/strategist.test.ts tests/scenario/runtimeScenario.test.ts",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "efa09267ae8e84182d629136f7b4f7fec7d9c0a53a706a6bc341445b7e8c8c5d",
+  "passedTestIds": [
+    "canonical-pair-topology",
+    "scenario-pair-identity",
+    "two-phase-capture-timing",
+    "contested-freeze-friendly-repair",
+    "damage-neutralization",
+    "alignment-event-order",
+    "unpaired-node-behavior",
+    "pair-only-dominance",
+    "existing-victory-outcomes",
+    "ai-pair-completion",
+    "ai-pair-denial-defense",
+    "world-v2-round-trip",
+    "world-v1-pair-migration",
+    "legacy-game-save-compatibility",
+    "ls07-scope-exclusions"
+  ],
+  "summary": "Four focused Vitest files passed all 76 LS-07 simulation, persistence, AI, scenario, and scope tests."
+}

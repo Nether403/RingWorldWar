@@ -15,6 +15,10 @@ import {
 } from '@sim/serialize';
 import { World } from '@sim/world';
 import {
+  createGameSaveSnapshot,
+  deserializeGameSave,
+} from '../../src/gameSave';
+import {
   createMatchSessionSnapshot,
   deserializeMatchSession,
   matchSessionStateHash,
@@ -30,7 +34,7 @@ const terrain = {
 } as unknown as Terrain;
 
 describe('world snapshots', () => {
-  it('round-trips every authoritative world field into JSON-safe data', () => {
+  it('[world-v2-round-trip] round-trips every authoritative world field into JSON-safe data', () => {
     const world = createWorld(81);
     world.players[Faction.Compact].unlocked.add('fabricator');
     const vanguard = world.spawnUnit(Faction.Compact, 'vanguard', 120, 0);
@@ -45,7 +49,7 @@ describe('world snapshots', () => {
     loadWorldSnapshot(restored, json);
 
     expect(snapshot.schema).toBe('ring-world-war/world');
-    expect(snapshot.version).toBe(1);
+    expect(snapshot.version).toBe(2);
     expect(snapshot.world.worldSeed).toBe(81);
     expect(snapshot.world.terrainSeed).toBe(81);
     expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot);
@@ -55,6 +59,7 @@ describe('world snapshots', () => {
     expect(restored.players[Faction.Compact].unlocked).toBeInstanceOf(Set);
     expect(restored.players[Faction.Compact].unlocked.has('fabricator')).toBe(true);
     expect(restored.events).toEqual([]);
+    expect(restored.spinalPairs).toEqual(world.spinalPairs);
   });
 
   it('rejects version mismatches and malformed nested state without mutating the target', () => {
@@ -62,7 +67,7 @@ describe('world snapshots', () => {
     for (let tick = 0; tick < 30; tick++) world.step();
     world.drainEvents();
     const before = world.stateHash();
-    const wrongVersion: unknown = { ...createWorldSnapshot(world), version: 2 };
+    const wrongVersion: unknown = { ...createWorldSnapshot(world), version: 3 };
     const malformed = JSON.parse(serializeWorld(world)) as {
       world: { units: Array<{ cd: unknown }> };
     };
@@ -152,6 +157,59 @@ describe('world snapshots', () => {
       expect(restored.stateHash()).toBe(world.stateHash());
     }
     expect(restored.players[Faction.Compact].weaponEnergyLoad).toBe(0);
+  });
+
+  it('[world-v1-pair-migration] migrates exact antipodal candidates and repairs legacy capture ownership', () => {
+    const world = createWorld(861);
+    const snapshot = createWorldSnapshot(world) as unknown as {
+      version: number;
+      world: { spinalPairs?: unknown; structures: Array<{ id: number; kind: string; faction: number; capture: number }> };
+    };
+    snapshot.version = 1;
+    delete snapshot.world.spinalPairs;
+    const nodes = snapshot.world.structures.filter((structure) => structure.kind === 'spinalNode');
+    nodes[0]!.faction = Faction.Compact;
+    nodes[0]!.capture = 0;
+    nodes[1]!.faction = Faction.Choir;
+    nodes[1]!.capture = -0.25;
+
+    const restored = deserializeWorld(snapshot, terrain);
+
+    expect(restored.spinalPairs).toEqual([
+      { id: `legacy-${nodes[2]!.id}-${nodes[3]!.id}`, members: [nodes[2]!.id, nodes[3]!.id] },
+      { id: `legacy-${nodes[0]!.id}-${nodes[1]!.id}`, members: [nodes[0]!.id, nodes[1]!.id] },
+    ]);
+    expect(restored.structureById(nodes[0]!.id)).toMatchObject({ faction: Faction.Compact, capture: -1 });
+    expect(restored.structureById(nodes[1]!.id)).toMatchObject({ faction: -1, capture: 0 });
+  });
+
+  it('[legacy-game-save-compatibility] loads a game-save envelope containing a version-1 world', () => {
+    const world = createWorld(862);
+    const controllers = [
+      new AiOpponent(Faction.Compact, 'veteran', 1862),
+      new AiOpponent(Faction.Choir, 'veteran', 2862),
+    ] as const;
+    const save = createGameSaveSnapshot(
+      world,
+      controllers,
+      true,
+      null,
+      Faction.Compact,
+      Faction.Choir,
+    ) as unknown as {
+      session: { world: { version: number; world: { spinalPairs?: unknown } } };
+    };
+    save.session.world.version = 1;
+    delete save.session.world.world.spinalPairs;
+
+    const restored = deserializeGameSave(save, terrain);
+
+    expect(restored.world.spinalPairs.map((pair) => pair.id)).toEqual([
+      'legacy-11-12',
+      'legacy-9-10',
+    ]);
+    expect(restored.playerFaction).toBe(Faction.Compact);
+    expect(restored.controllers.map((controller) => controller.exportPersistenceState().faction)).toEqual([0, 1]);
   });
 });
 

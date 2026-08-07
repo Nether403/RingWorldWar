@@ -1,0 +1,40 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-07-initial-implementation-review-2026-08-07",
+  "claimId": "LS-07",
+  "contractSha256": "3d5062081a59f8cb89d8caa8533ee0de7fe539c4a440d39a524a1a5871772fac",
+  "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
+  "reviewRound": 1,
+  "reviewType": "gameplay-system-acceptance",
+  "independentContext": true,
+  "reviewer": {
+    "role": "independent-critic",
+    "taskId": "ses_0235015fbffeuUWJmk19g8XfTf",
+    "model": "azure/gpt-5.6-sol",
+    "completedAt": "2026-08-07T15:28:39.039Z",
+    "sourceSnapshotSha256": "efa09267ae8e84182d629136f7b4f7fec7d9c0a53a706a6bc341445b7e8c8c5d"
+  },
+  "scores": {
+    "topology": { "score": 4, "checkId": "topology", "rationale": "Canonical pair and member ordering, standard pair identity, scenario resolution, and malformed-topology rejection satisfy the frozen topology contract." },
+    "capture": { "score": 4, "checkId": "capture", "rationale": "Neutral capture, contested freeze, friendly repair, two-stage takeover, exact timing, and damage neutralization match the approved state machine." },
+    "alignment": { "score": 4, "checkId": "alignment", "rationale": "Alignment remains derived and reversible with deterministic begin and break ordering, no duplicate events, and no persisted activation state." },
+    "gameplay-consequence": { "score": 4, "checkId": "gameplay-consequence", "rationale": "Command remains per Node, Dominance is exactly pair-only at two per second, and the existing Bastion and time-cap outcomes remain authoritative." },
+    "ai": { "score": 4, "checkId": "ai", "rationale": "Scout completion and denial priorities, main-force bonuses, visible-threat defense, stable tie-breaks, and timed Bastion commitment satisfy both factions deterministically." },
+    "persistence": { "score": 4, "checkId": "persistence", "rationale": "World v2 pair persistence, strict runtime scenario v2, deterministic v1 migration, partial-state continuation, and legacy envelope compatibility all pass." },
+    "presentation": { "score": 3, "checkId": "presentation", "rationale": "HUD summary and Node details, visibility-safe mate state, minimap indices and outlines, ARIA text, alerts, desktop Low, and narrow containment are ship-ready." },
+    "regression": { "score": 4, "checkId": "regression", "rationale": "Focused tests, full lint and build checks, 438 unit tests, and the fresh veteran-mirror core-match cohort pass against the same source snapshot." },
+    "scope": { "score": 4, "checkId": "scope", "rationale": "No chord bonus, overhead intelligence, transport, stabilization, alternate victory, strategic annulus, shadow expansion, or campaign-finale behavior was introduced." }
+  },
+  "dependencyReady": true,
+  "blockers": [],
+  "requiredQualityFindings": [],
+  "humanValidation": [],
+  "polish": [
+    {
+      "id": "LS-07-P01",
+      "summary": "At the 1280x720 desktop target, the compact ALIGN label and value may wrap onto separate lines while remaining legible and correctly announced.",
+      "reopenTrigger": "Reopen only if milestone HUD qualification finds the wrapping obscures another resource or reduces the Alignment task below ship-ready."
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "core-match",
+  "command": "npm run validate:core-match",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "efa09267ae8e84182d629136f7b4f7fec7d9c0a53a706a6bc341445b7e8c8c5d",
+  "passedTestIds": [
+    "core-match-cohorts"
+  ],
+  "summary": "The veteran-mirror core-match validation completed its 20-match cohort and passed every configured gameplay gate in 366 seconds."
+}

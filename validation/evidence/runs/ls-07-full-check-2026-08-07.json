@@ -1,0 +1,13 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "full-check",
+  "command": "npm run check",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "efa09267ae8e84182d629136f7b4f7fec7d9c0a53a706a6bc341445b7e8c8c5d",
+  "passedTestIds": [
+    "full-check"
+  ],
+  "summary": "Lint, TypeScript validation, 438 unit tests, and the Vite production build passed; one opt-in performance profile remained intentionally skipped."
+}

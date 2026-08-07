@@ -9,7 +9,7 @@ import {
 import { RING_CIRCUMFERENCE, SIM_DT } from '@core/constants';
 import { surfaceDist, wrapS } from '@core/ringMath';
 import type { Terrain } from '@gen/terrain';
-import { Faction, UNITS } from '@sim/data';
+import { Faction, other, UNITS } from '@sim/data';
 import { World } from '@sim/world';
 
 const BASE_STATE: StrategicState = {
@@ -145,7 +145,7 @@ describe('strategist production planning', () => {
   it('queues only the faction-exclusive unit for each faction', () => {
     for (const faction of [Faction.Compact, Faction.Choir]) {
       const world = emptyWorld();
-      const foundries = Array.from({ length: 4 }, (_, index) =>
+      const foundries = Array.from({ length: 5 }, (_, index) =>
         world.spawnStructure(faction, 'mechFoundry', index * 100, 0, 1));
       world.players[faction].salvage = 10_000;
       world.players[faction].commandCap = 20;
@@ -250,6 +250,78 @@ describe('strategist production planning', () => {
 });
 
 describe('strategist objective assignment and recovery', () => {
+  it.each([Faction.Compact, Faction.Choir])(
+    '[ai-pair-completion] faction %s prioritizes completing its friendly pair before a nearer generic Node',
+    (faction) => {
+      const world = emptyWorld();
+      const scout = world.spawnUnit(faction, 'wisp', 0, 0);
+      const ownedMate = world.spawnStructure(faction, 'spinalNode', 700, 0, 1);
+      ownedMate.capture = faction === Faction.Compact ? -1 : 1;
+      const completion = world.spawnStructure(-1, 'spinalNode', 800, 0, 1);
+      world.spawnStructure(-1, 'spinalNode', 100, 0, 1);
+      world.setSpinalPairs([{ id: 'completion-axis', members: [ownedMate.id, completion.id] }]);
+      world.players[faction].salvage = 0;
+
+      new AiOpponent(faction, 'commander', 740 + faction).update(world, SIM_DT);
+
+      expect(scout.order).toMatchObject({ kind: 'attackMove', s: completion.s, z: completion.z });
+    },
+  );
+
+  it.each([Faction.Compact, Faction.Choir])(
+    '[ai-pair-denial-defense] faction %s denies enemy pairs, scores them for its line, and defends visible threats',
+    (faction) => {
+      const enemy = other(faction);
+      const denialWorld = emptyWorld();
+      const scout = denialWorld.spawnUnit(faction, 'wisp', 0, 0);
+      const enemyMate = denialWorld.spawnStructure(enemy, 'spinalNode', 700, 0, 1);
+      enemyMate.capture = enemy === Faction.Compact ? -1 : 1;
+      const denial = denialWorld.spawnStructure(-1, 'spinalNode', 800, 0, 1);
+      denialWorld.spawnStructure(-1, 'spinalNode', 100, 0, 1);
+      denialWorld.setSpinalPairs([{ id: 'denial-axis', members: [enemyMate.id, denial.id] }]);
+      denialWorld.players[faction].salvage = 0;
+      new AiOpponent(faction, 'commander', 750 + faction).update(denialWorld, SIM_DT);
+      expect(scout.order).toMatchObject({ kind: 'attackMove', s: denial.s, z: denial.z });
+
+      const activeWorld = emptyWorld();
+      const activeScout = activeWorld.spawnUnit(faction, 'wisp', 0, 0);
+      const activeFirst = activeWorld.spawnStructure(enemy, 'spinalNode', 900, 0, 1);
+      const activeSecond = activeWorld.spawnStructure(enemy, 'spinalNode', 1_000, 0, 1);
+      const completionMate = activeWorld.spawnStructure(faction, 'spinalNode', 200, 0, 1);
+      const completionTarget = activeWorld.spawnStructure(-1, 'spinalNode', 300, 0, 1);
+      activeWorld.setSpinalPairs([
+        { id: 'active-axis', members: [activeFirst.id, activeSecond.id] },
+        { id: 'completion-axis', members: [completionMate.id, completionTarget.id] },
+      ]);
+      activeWorld.players[faction].salvage = 0;
+      new AiOpponent(faction, 'commander', 760 + faction).update(activeWorld, SIM_DT);
+      expect([activeFirst.s, activeSecond.s]).toContain(activeScout.order.s);
+
+      const scoringWorld = emptyWorld();
+      scoringWorld.spawnStructure(faction, 'bastion', 0, 0, 1);
+      scoringWorld.spawnStructure(faction, 'radarMast', 600, 0, 1);
+      const scoredFirst = scoringWorld.spawnStructure(enemy, 'spinalNode', 800, 0, 1);
+      const scoredSecond = scoringWorld.spawnStructure(enemy, 'spinalNode', 900, 0, 1);
+      scoringWorld.spawnStructure(-1, 'spinalNode', 100, 0, 1);
+      scoringWorld.setSpinalPairs([{ id: 'scored-axis', members: [scoredFirst.id, scoredSecond.id] }]);
+      for (let index = 0; index < 3; index++) scoringWorld.spawnUnit(faction, 'vanguard', 20 + index * 10, 0);
+      scoringWorld.players[faction].salvage = 0;
+      const scoringAi = new AiOpponent(faction, 'commander', 765 + faction);
+      scoringAi.update(scoringWorld, SIM_DT);
+      expect([scoredFirst.s, scoredSecond.s]).toContain(scoringAi.exportPersistenceState().pushTarget?.s);
+
+      const defenseWorld = emptyWorld();
+      const first = defenseWorld.spawnStructure(faction, 'spinalNode', 2_000, 0, 1);
+      const second = defenseWorld.spawnStructure(faction, 'spinalNode', 2_300, 0, 1);
+      defenseWorld.setSpinalPairs([{ id: 'defense-axis', members: [first.id, second.id] }]);
+      const line = defenseWorld.spawnUnit(faction, faction === Faction.Compact ? 'vanguard' : 'needle', 0, 0);
+      defenseWorld.spawnUnit(enemy, 'vanguard', first.s + 180, 0);
+      defenseWorld.players[faction].salvage = 0;
+      new AiOpponent(faction, 'commander', 770 + faction).update(defenseWorld, SIM_DT);
+      expect(line.order).toMatchObject({ kind: 'attackMove', s: second.s, z: second.z });
+    },
+  );
+
   it('assigns stable-ID scouts to nearest distinct reachable non-owned nodes', () => {
     const world = emptyWorld();
     world.spawnStructure(Faction.Compact, 'bastion', 0, 0, 1);
@@ -334,6 +406,14 @@ describe('strategist objective assignment and recovery', () => {
     const recurringNode = world.structures.find(
       (structure) => structure.kind === 'spinalNode' && structure.faction !== Faction.Compact,
     )!;
+    const defendedPair = world.spinalPairs[0]!;
+    for (const nodeId of defendedPair.members) {
+      const pairedNode = world.structureById(nodeId)!;
+      pairedNode.faction = Faction.Compact;
+      pairedNode.capture = -1;
+    }
+    const threatenedNode = world.structureById(defendedPair.members[0])!;
+    world.spawnUnit(Faction.Choir, 'vanguard', threatenedNode.s + 180, threatenedNode.z);
     world.time = 15 * 60;
     world.players[Faction.Compact].salvage = 0;
     const initial = new AiOpponent(Faction.Compact, 'veteran', 771).exportPersistenceState();
@@ -417,7 +497,7 @@ describe('strategist objective assignment and recovery', () => {
 });
 
 describe('bounded deterministic AI progression', () => {
-  it('reserves one scout, takes a reachable node, expands command, and gives its line a live push', () => {
+  it('reserves distinct scouts, takes a reachable node, expands command, and gives its line a live push', () => {
     const world = emptyWorld();
     world.spawnStructure(Faction.Compact, 'bastion', 0, 0, 1);
     world.spawnStructure(Faction.Choir, 'bastion', RING_CIRCUMFERENCE * 0.5, 0, 1);
@@ -473,7 +553,7 @@ describe('bounded deterministic AI progression', () => {
       (total, structure) => total + structure.queue.filter((kind) => kind === 'wisp').length,
       0,
     );
-    expect(plannedWisps).toBe(1);
+    expect(plannedWisps).toBe(2);
     expect(node.faction).toBe(Faction.Compact);
     expect(objectiveTick).toBeGreaterThan(0);
     expect(commandExpansionTick).toBeGreaterThan(0);

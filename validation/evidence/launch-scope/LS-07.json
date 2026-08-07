@@ -1,0 +1,32 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-07",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-07T15:28:39.039Z",
+  "sourceRefs": [
+    {
+      "path": "validation/evidence/ls-07-paired-nodes-2026-08-07.json",
+      "sha256": "7d95a9a469a424bbba09211ee3d55c0bd1f7a970dd59783e730d2f11c74ab731"
+    },
+    {
+      "path": "validation/evidence/reviews/ls-07-criterion-review-2026-08-07.json",
+      "sha256": "afb7c221bebaca19d33ef4fb34b4b875efbbfcf75b4c9faeade9884e5c8902b4"
+    },
+    {
+      "path": "docs/launch-scope/ls-07-paired-spinal-nodes.md",
+      "sha256": "3d5062081a59f8cb89d8caa8533ee0de7fe539c4a440d39a524a1a5871772fac"
+    },
+    {
+      "path": "docs/launch-scope-execution-policy.md",
+      "sha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c"
+    }
+  ],
+  "checks": [
+    {
+      "id": "paired-spinal-node-alignment",
+      "result": "passed",
+      "summary": "All nine bounded LS-07 categories pass against one source snapshot: explicit pair topology, two-stage capture, reversible Alignment, pair-only Dominance, AI completion/denial/defense, v1/v2 persistence, visibility-safe presentation, regressions, and exclusions."
+    }
+  ]
+}

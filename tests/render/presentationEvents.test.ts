@@ -50,6 +50,23 @@ describe('presentation event eligibility', () => {
     )).toBe(false);
   });
 
+  it('does not disclose a hostile Alignment event until both pair members are visible', () => {
+    const visible = new Set<number>([7]);
+    const world = {
+      spinalPairs: [{ id: 'hidden-axis', members: [7, 8] }],
+      isEntityVisible: (_viewer: Faction, id: number) => visible.has(id),
+      isVisible: () => true,
+    } as unknown as World;
+    const alignment: SimEvent = {
+      kind: 'alignmentStarted', faction: Faction.Choir, id: 7, s: 100, z: 0, h: 0, scale: 1,
+      pairId: 'hidden-axis',
+    };
+
+    expect(isPresentationEventEligible(alignment, world, 0, Faction.Compact)).toBe(false);
+    visible.add(8);
+    expect(isPresentationEventEligible(alignment, world, 0, Faction.Compact)).toBe(true);
+  });
+
   it('classifies Chord presentation without changing simulation event kinds', () => {
     expect(combatPresentationKind({ ...event(Faction.Compact, 1, 0, 0), kind: 'weaponFired', weapon: 'chordShot' }))
       .toBe('chordLaunch');

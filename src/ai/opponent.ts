@@ -498,6 +498,7 @@ export class AiOpponent {
     // what nobody can see.
     if (n('wisp') < 1) return 'wisp';
     if (n('vanguard') < 2) return 'vanguard';
+    if (n('wisp') < 2) return 'wisp';
     if (this.faction === Faction.Compact && n('bulwark') < 1 && salvage > 850) return 'bulwark';
     if (this.faction === Faction.Choir && n('needle') < 1 && salvage > 550) return 'needle';
     if (n('longbow') < 1 && salvage > 700) return 'longbow';
@@ -650,10 +651,8 @@ export class AiOpponent {
     for (const scout of scouts) {
       if (scout.order.kind !== 'attackMove') continue;
       const objective = nodes.find((node) =>
-        node.faction !== this.faction &&
-        !assignedNodes.has(node.id) &&
-        samePoint(node, scout.order) &&
-        isReachable(world, scout, node));
+        node.faction !== this.faction && !assignedNodes.has(node.id) &&
+        samePoint(node, scout.order) && isReachable(world, scout, node));
       if (!objective) continue;
       assignedNodes.add(objective.id);
       preservedScouts.add(scout.id);
@@ -661,13 +660,22 @@ export class AiOpponent {
     for (const scout of scouts) {
       if (preservedScouts.has(scout.id)) continue;
       let objective: Structure | null = null;
+      let objectivePriority = -Infinity;
       let objectiveDistance = Infinity;
       for (const node of nodes) {
         if (node.faction === this.faction || assignedNodes.has(node.id)) continue;
         if (!isReachable(world, scout, node)) continue;
+        const priority = spinalNodePriority(world, node, this.faction);
         const distance = surfaceDist(scout.s, scout.z, node.s, node.z);
-        if (distance < objectiveDistance || (distance === objectiveDistance && node.id < (objective?.id ?? Infinity))) {
+        if (
+          priority > objectivePriority ||
+          (priority === objectivePriority && (
+            distance < objectiveDistance ||
+            (distance === objectiveDistance && node.id < (objective?.id ?? Infinity))
+          ))
+        ) {
           objective = node;
+          objectivePriority = priority;
           objectiveDistance = distance;
         }
       }
@@ -708,10 +716,26 @@ export class AiOpponent {
     const strength = line.length;
     const home = this.myStructures(world).find((structure) => structure.kind === 'bastion');
     const emergencyDefense = home !== undefined && this.nearestEnemy(world, home.s, home.z, 700) !== null;
-    if (
-      this.activeGoal === 'defend' &&
-      (world.time < BASTION_ASSAULT_TIME || emergencyDefense)
-    ) {
+    if (emergencyDefense) {
+      this.pushTarget = null;
+      if (home) {
+        for (const unit of line) {
+          if (unit.order.kind === 'idle' || unit.order.kind === 'move') {
+            issueAttackMove(unit, { s: wrapS(home.s + 90), z: home.z });
+          }
+        }
+      }
+      return;
+    }
+    const pairDefense = world.time < BASTION_ASSAULT_TIME ? this.pairDefenseTarget(world) : null;
+    if (pairDefense) {
+      const availableLine = line.filter((unit) => unit.order.kind === 'idle' || unit.order.kind === 'move');
+      if (availableLine.length > 0) {
+        for (const unit of availableLine) issueAttackMove(unit, pairDefense);
+        return;
+      }
+    }
+    if (this.activeGoal === 'defend' && world.time < BASTION_ASSAULT_TIME) {
       this.pushTarget = null;
       if (home) {
         for (const unit of line) {
@@ -977,6 +1001,7 @@ export class AiOpponent {
       let score = 100 - (d / RING_CIRCUMFERENCE) * 160;
 
       if (c.kind === 'spinalNode') score += this.activeGoal === 'harass' ? 52 : 40;
+      if (c.kind === 'spinalNode') score += spinalMainForceBonus(world, c, this.faction);
       if (c.kind === 'extractor') score += this.activeGoal === 'harass' ? 44 : 25;
       if (c.kind === 'mechFoundry') score += 35;
       if (c.kind === 'bastion') {
@@ -1032,6 +1057,34 @@ export class AiOpponent {
     return best;
   }
 
+  private pairDefenseTarget(world: World): Structure | null {
+    let selected: { node: Structure; hostileDistance: number; pairId: string } | null = null;
+    for (const pair of world.spinalPairs) {
+      if (world.spinalAlignmentOwner(pair) !== this.faction) continue;
+      for (const nodeId of pair.members) {
+        const node = world.structureById(nodeId);
+        if (!node) continue;
+        let nearest = Infinity;
+        for (const hostile of world.units) {
+          if (!hostile.alive || hostile.faction === this.faction || !UNITS[hostile.kind].isMech) continue;
+          if (!world.isEntityVisible(this.faction, hostile.id)) continue;
+          nearest = Math.min(nearest, surfaceDist(node.s, node.z, hostile.s, hostile.z));
+        }
+        if (nearest > 600) continue;
+        if (
+          !selected || nearest < selected.hostileDistance ||
+          (nearest === selected.hostileDistance && (
+            pair.id.localeCompare(selected.pairId) < 0 ||
+            (pair.id === selected.pairId && node.id < selected.node.id)
+          ))
+        ) {
+          selected = { node, hostileDistance: nearest, pairId: pair.id };
+        }
+      }
+    }
+    return selected?.node ?? null;
+  }
+
   private myUnits(world: World): Unit[] {
     return world.units.filter((u) => u.alive && u.faction === this.faction);
   }
@@ -1053,6 +1106,25 @@ function unitStrength(unit: Unit): number {
 
 function artilleryTargetValue(target: Unit | Structure): number {
   return target.maxHp + target.salvageCost;
+}
+
+function spinalNodePriority(world: World, node: Structure, faction: Faction): number {
+  const pair = world.spinalPairForNode(node.id);
+  if (!pair) return 100;
+  const owner = world.spinalAlignmentOwner(pair);
+  if (owner === other(faction)) return 300;
+  const mate = world.spinalPairMate(node.id);
+  if (mate?.faction === faction) return 200;
+  if (mate?.faction === other(faction)) return 150;
+  return 100;
+}
+
+function spinalMainForceBonus(world: World, node: Structure, faction: Faction): number {
+  const priority = spinalNodePriority(world, node, faction);
+  if (priority === 300) return 120;
+  if (priority === 200) return 80;
+  if (priority === 150) return 50;
+  return 0;
 }
 
 function createBallisticPlanState(source: Structure, target: Unit | Structure): BallisticPlanKeyState {

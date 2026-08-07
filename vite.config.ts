@@ -209,6 +209,33 @@ export const LS07_CHECK_POLICY = Object.freeze({
   }),
 } as const);
 
+export const LS07_RUN_TEST_IDS = Object.freeze({
+  'focused-unit': Object.freeze([
+    'canonical-pair-topology',
+    'scenario-pair-identity',
+    'two-phase-capture-timing',
+    'contested-freeze-friendly-repair',
+    'damage-neutralization',
+    'alignment-event-order',
+    'unpaired-node-behavior',
+    'pair-only-dominance',
+    'existing-victory-outcomes',
+    'ai-pair-completion',
+    'ai-pair-denial-defense',
+    'world-v2-round-trip',
+    'world-v1-pair-migration',
+    'legacy-game-save-compatibility',
+    'ls07-scope-exclusions',
+  ]),
+  'focused-browser': Object.freeze([
+    'hud-minimap-pair-state',
+    'alignment-accessible-events',
+    'hidden-mate-no-leak',
+  ]),
+  'full-check': Object.freeze(['full-check']),
+  'core-match': Object.freeze(['core-match-cohorts']),
+} as const);
+
 function evidencePolicy(claimId: string) {
   return Object.prototype.hasOwnProperty.call(CLAIM_EVIDENCE_POLICY, claimId)
     ? CLAIM_EVIDENCE_POLICY[claimId as ClaimEvidenceId]
@@ -369,16 +396,8 @@ export function validateLS07EvidenceShape(
     if (new Set(passedTestIds).size !== passedTestIds.length) throw new Error(`LS-07 run artifact ${id} has duplicate test IDs`);
     passedTestIdsByRun.set(id, new Set(passedTestIds));
   }
-  const expectedTestIdsByRun = new Map<string, string[]>();
-  for (const policy of Object.values(LS07_CHECK_POLICY)) {
-    for (const runId of policy.runIds) {
-      const expected = expectedTestIdsByRun.get(runId) ?? [];
-      for (const testId of policy.testIds) if (!expected.includes(testId)) expected.push(testId);
-      expectedTestIdsByRun.set(runId, expected);
-    }
-  }
   for (const runId of Object.keys(LS07_RUN_POLICY)) {
-    if (JSON.stringify([...passedTestIdsByRun.get(runId)!]) !== JSON.stringify(expectedTestIdsByRun.get(runId) ?? [])) {
+    if (JSON.stringify([...passedTestIdsByRun.get(runId)!]) !== JSON.stringify(LS07_RUN_TEST_IDS[runId as LS07RunId])) {
       throw new Error(`LS-07 run artifact ${runId} does not contain the exact predeclared test IDs`);
     }
   }

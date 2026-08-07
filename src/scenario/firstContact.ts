@@ -7,7 +7,7 @@ const C = RING_CIRCUMFERENCE;
 /** Production-authored setup. Validation browser scenarios remain separate fixtures. */
 export const FIRST_CONTACT_RUNTIME_SCENARIO = parseRuntimeScenario({
   schema: 'ring-world-war/runtime-scenario',
-  version: 1,
+  version: 2,
   id: 'first-contact',
   worldSeed: 20260803,
   playerFaction: 'compact',
@@ -63,6 +63,9 @@ export const FIRST_CONTACT_RUNTIME_SCENARIO = parseRuntimeScenario({
   bindings: [
     { id: 'tutorial-node', entity: 'tutorial-node' },
     { id: 'artillery-target', entity: 'choir-power-core' },
+  ],
+  spinalPairs: [
+    { id: 'quarter-axis', members: ['quarter-node', 'three-quarter-node'] },
   ],
 });
 

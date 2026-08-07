@@ -178,6 +178,9 @@ const PROGRESS_EVENTS = new Set<SimEvent['kind']>([
   'unitComplete',
   'intercepted',
   'nodeCaptured',
+  'nodeNeutralized',
+  'alignmentStarted',
+  'alignmentBroken',
   'damageStateChanged',
 ]);
 

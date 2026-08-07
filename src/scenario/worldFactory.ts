@@ -45,6 +45,11 @@ export function createRuntimeScenarioWorld(
     entityIds.set(declaration.id, structure.id);
   }
 
+  world.setSpinalPairs(scenario.spinalPairs.map((pair) => ({
+    id: pair.id,
+    members: [requiredId(entityIds, pair.members[0]), requiredId(entityIds, pair.members[1])],
+  })));
+
   for (const declaration of scenario.units) {
     const unit = world.spawnUnit(declaration.faction, declaration.kind, declaration.s, declaration.z);
     if (declaration.yawRadians !== undefined) {

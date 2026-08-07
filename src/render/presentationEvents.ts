@@ -31,5 +31,9 @@ export function isPresentationEventInRange(event: SimEvent, anchorS: number): bo
 
 export function isPresentationEventVisible(event: SimEvent, world: World, viewer: Faction): boolean {
   if (event.faction < 0 || event.faction === viewer) return true;
+  if ((event.kind === 'alignmentStarted' || event.kind === 'alignmentBroken') && event.pairId) {
+    const pair = world.spinalPairs.find((candidate) => candidate.id === event.pairId);
+    return Boolean(pair && pair.members.every((id) => world.isEntityVisible(viewer, id)));
+  }
   return world.isEntityVisible(viewer, event.id) || world.isVisible(viewer, event.s, event.z);
 }

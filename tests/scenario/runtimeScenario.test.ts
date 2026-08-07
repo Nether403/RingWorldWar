@@ -22,11 +22,11 @@ const terrain = {
 } as unknown as Terrain;
 
 describe('runtime scenario parsing', () => {
-  it('strictly parses the versioned production envelope', () => {
+  it('[scenario-pair-identity] strictly parses canonical v2 pair identity and migrates v1 to no pairs', () => {
     const scenario = parseRuntimeScenario(JSON.stringify(validScenario()));
 
     expect(scenario.schema).toBe('ring-world-war/runtime-scenario');
-    expect(scenario.version).toBe(1);
+    expect(scenario.version).toBe(2);
     expect(scenario.playerFaction).toBe(Faction.Choir);
     expect(scenario.ai).toEqual({ enabled: false, difficulty: 'commander' });
     expect(scenario.openingView).toEqual({
@@ -40,6 +40,12 @@ describe('runtime scenario parsing', () => {
     });
     expect(scenario.units[0]!.faction).toBe(Faction.Choir);
     expect(scenario.structures.find((structure) => structure.id === 'forward-node')!.faction).toBe(Faction.Compact);
+    expect(scenario.spinalPairs).toEqual([{ id: 'forward-axis', members: ['forward-node', 'rear-node'] }]);
+
+    const legacy = validScenario();
+    legacy.version = 1;
+    delete legacy.spinalPairs;
+    expect(parseRuntimeScenario(legacy)).toMatchObject({ version: 2, spinalPairs: [] });
   });
 
   it.each(['benchmark', 'camera', 'observationRegions'])('rejects browser-only %s data', (field) => {
@@ -117,6 +123,34 @@ describe('runtime scenario parsing', () => {
     malformedBinding.bindings[0]!.entity = 'missing';
     expect(() => parseRuntimeScenario(malformedBinding)).toThrow(/bindings\[0\]\.entity.*declared entity/i);
   });
+
+  it('rejects duplicate, overlapping, repeated, missing, non-Node, and unfinished pair members', () => {
+    const duplicateId = validScenario();
+    duplicateId.spinalPairs.push({ ...duplicateId.spinalPairs[0], members: ['rear-node', 'extra-node'] });
+    duplicateId.structures.push({ id: 'extra-node', faction: 'neutral', kind: 'spinalNode', s: 900, z: 0, progress: 1 });
+    expect(() => parseRuntimeScenario(duplicateId)).toThrow(/duplicate pair id/i);
+
+    const repeated = validScenario();
+    repeated.spinalPairs[0].members = ['forward-node', 'forward-node'];
+    expect(() => parseRuntimeScenario(repeated)).toThrow(/distinct/i);
+
+    const missing = validScenario();
+    missing.spinalPairs[0].members[1] = 'missing-node';
+    expect(() => parseRuntimeScenario(missing)).toThrow(/declared entity/i);
+
+    const nonNode = validScenario();
+    nonNode.spinalPairs[0].members[1] = 'compact-bastion';
+    expect(() => parseRuntimeScenario(nonNode)).toThrow(/Spinal Node/i);
+
+    const unfinished = validScenario();
+    unfinished.structures.find((structure: any) => structure.id === 'rear-node').progress = 0.5;
+    expect(() => parseRuntimeScenario(unfinished)).toThrow(/completed Node/i);
+
+    const overlapping = validScenario();
+    overlapping.structures.push({ id: 'extra-node', faction: 'neutral', kind: 'spinalNode', s: 900, z: 0, progress: 1 });
+    overlapping.spinalPairs.push({ id: 'second-axis', members: ['rear-node', 'extra-node'] });
+    expect(() => parseRuntimeScenario(overlapping)).toThrow(/more than one pair/i);
+  });
 });
 
 describe('runtime scenario world factory', () => {
@@ -159,6 +193,10 @@ describe('runtime scenario world factory', () => {
     expect(raider.targetId).toBe(bastion.id);
     expect(created.bindings.get('primary-target')).toBe(raider.id);
     expect(created.world.deposits[0]!.claimedBy).toBe(extractor.id);
+    expect(created.world.structureById(created.entityIds.get('forward-node')!)).toMatchObject({
+      faction: Faction.Compact,
+      capture: -1,
+    });
     expect(created.openingView).toEqual({
       focusS: 55,
       focusZ: 0,
@@ -168,6 +206,10 @@ describe('runtime scenario world factory', () => {
       contextEntityIds: [bastion.id],
       highlightDeposits: true,
     });
+    expect(created.world.spinalPairs).toEqual([{
+      id: 'forward-axis',
+      members: [created.entityIds.get('forward-node'), created.entityIds.get('rear-node')],
+    }]);
   });
 
   it('provides a distinct, playable authored First Contact setup', () => {
@@ -199,6 +241,12 @@ describe('runtime scenario world factory', () => {
     expect(created.openingView.contextEntityIds).toEqual([
       created.entityIds.get('compact-bastion'),
     ]);
+    expect(created.world.spinalPairs).toEqual([{
+      id: 'quarter-axis',
+      members: [created.entityIds.get('quarter-node'), created.entityIds.get('three-quarter-node')],
+    }]);
+    expect(created.world.spinalPairForNode(created.entityIds.get('tutorial-node')!)).toBeUndefined();
+    expect(created.world.spinalPairForNode(created.entityIds.get('rim-node')!)).toBeUndefined();
   });
 
   it('lets the authored raider threat reach and fail an ignored First Contact deterministically', () => {
@@ -282,7 +330,7 @@ describe('standard skirmish regression', () => {
 function validScenario(): any {
   return {
     schema: 'ring-world-war/runtime-scenario',
-    version: 1,
+    version: 2,
     id: 'factory-contract',
     worldSeed: 73,
     playerFaction: 'choir',
@@ -303,6 +351,7 @@ function validScenario(): any {
     structures: [
       { id: 'compact-bastion', faction: 'compact', kind: 'bastion', s: 0, z: 0, progress: 1 },
       { id: 'forward-node', faction: 'compact', kind: 'spinalNode', s: 400, z: 0, progress: 1 },
+      { id: 'rear-node', faction: 'neutral', kind: 'spinalNode', s: 800, z: 0, progress: 1 },
       { id: 'compact-extractor', faction: 'compact', kind: 'extractor', s: 180, z: 120, progress: 1 },
     ],
     units: [
@@ -320,6 +369,9 @@ function validScenario(): any {
     ],
     bindings: [
       { id: 'primary-target', entity: 'choir-raider' },
+    ],
+    spinalPairs: [
+      { id: 'forward-axis', members: ['forward-node', 'rear-node'] },
     ],
   };
 }

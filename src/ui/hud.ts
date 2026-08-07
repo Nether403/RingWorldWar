@@ -343,12 +343,12 @@ export class Hud {
     this.root = el('div', 'rww-root');
 
     const top = el('div', 'rww-top rww-panel');
-    for (const key of ['salvage', 'power', 'command', 'clock']) {
+    for (const key of ['salvage', 'power', 'command', 'alignment', 'clock']) {
       const root = el('div', 'rww-res');
       root.dataset.resource = key;
       const value = document.createElement('b');
       const label = document.createElement('span');
-      label.textContent = key;
+      label.textContent = key === 'alignment' ? '' : key;
       root.append(value, label);
       this.resourceNodes.set(key, { root, value });
       top.appendChild(root);
@@ -380,7 +380,7 @@ export class Hud {
     this.map.height = 160;
     this.map.tabIndex = 0;
     this.map.setAttribute('role', 'application');
-    this.map.setAttribute('aria-label', minimapAriaLabel('Ring minimap with nominal sensor coverage.'));
+    this.map.setAttribute('aria-label', minimapAriaLabel('Ring minimap with nominal sensor coverage.', 0, 0));
     mapWrap.appendChild(this.map);
     const mapLegend = el('div', 'rww-map-legend');
     mapLegend.innerHTML = '<span>● friendly</span><span>◆ hostile</span><span>□ camera</span><span>○ sensor</span>';
@@ -760,6 +760,9 @@ export class Hud {
     const committedCommand = p.commandUsed + world.queuedCommand(player);
     patch('command', `${committedCommand}/${p.commandCap}`, committedCommand >= p.commandCap,
       `Command: ${committedCommand} of ${p.commandCap}, including queued units`);
+    const alignedPairs = world.alignedPairCount(player);
+    patch('alignment', `ALIGN ${alignedPairs}/${world.spinalPairs.length}`, false,
+      `Alignment: ${alignedPairs} of ${world.spinalPairs.length} Spinal pairs controlled`);
 
     const mins = Math.floor(world.time / 60);
     const secs = Math.floor(world.time % 60);
@@ -809,7 +812,8 @@ export class Hud {
         .map((structure) =>
           `${structure.id}:${Math.ceil(structure.hp / 50)}:${Math.ceil(structure.progress * 20)}:` +
           `${structure.progress >= 1 ? 1 : 0}:${structure.queue.length}:` +
-          `${structure.cd.map((cooldown) => Math.ceil(cooldown * 10)).join(',')}`,
+          `${structure.cd.map((cooldown) => Math.ceil(cooldown * 10)).join(',')}:` +
+          `${Math.round(structure.capture * 100)}:${this.spinalSelectionSignature(world, player, structure)}`,
         )
         .join('|'),
     ].join(';');
@@ -853,9 +857,10 @@ export class Hud {
       const def = STRUCTURES[st.kind];
       const pct = Math.round((st.hp / st.maxHp) * 100);
       const faction = st.faction < 0 ? 'Inherited infrastructure' : FACTION_NAME[st.faction as Faction];
+      const spinalCopy = st.kind === 'spinalNode' ? this.spinalSelectionCopy(world, player, st) : '';
       this.selEl.innerHTML =
         `<div class="rww-eyebrow">${faction} · Structure</div>` +
-        `<h3>${def.name}</h3><p>${def.role}</p>${sensorCopy}${rangeCopy}` +
+        `<h3>${def.name}</h3><p>${def.role}</p>${spinalCopy}${sensorCopy}${rangeCopy}` +
         (st.progress < 1
           ? `<p style="opacity:.8;color:#f0b26e">Under construction — ${Math.round(st.progress * 100)}%</p>`
           : '') +
@@ -916,6 +921,37 @@ export class Hud {
         this.addArtilleryButton(first, 'siegeMortar');
       }
     }
+  }
+
+  private spinalSelectionSignature(world: World, player: Faction, node: Structure): string {
+    if (node.kind !== 'spinalNode') return '';
+    const pair = world.spinalPairForNode(node.id);
+    if (!pair) return 'unpaired';
+    const mate = world.spinalPairMate(node.id);
+    const mateVisible = Boolean(mate && (mate.faction === player || world.isEntityVisible(player, mate.id)));
+    const alignment = world.spinalAlignmentOwner(pair);
+    const alignmentVisible = alignment === player || pair.members.every((id) => world.isEntityVisible(player, id));
+    return `${pair.id}:${mateVisible ? mate?.faction : 'unknown'}:${alignmentVisible ? alignment : 'hidden'}`;
+  }
+
+  private spinalSelectionCopy(world: World, player: Faction, node: Structure): string {
+    const pair = world.spinalPairForNode(node.id);
+    const capture = Math.round(Math.abs(node.capture) * 100);
+    if (!pair) {
+      return `<p class="rww-order" data-spinal-pair="unpaired" data-capture-percent="${capture}">` +
+        `UNPAIRED · CAPTURE ${capture}% · ALIGNMENT BROKEN</p>`;
+    }
+    const mate = world.spinalPairMate(node.id);
+    const mateVisible = Boolean(mate && (mate.faction === player || world.isEntityVisible(player, mate.id)));
+    const mateState = mateVisible && mate
+      ? mate.faction < 0 ? 'NEUTRAL' : mate.faction === Faction.Compact ? 'COMPACT' : 'CHOIR'
+      : 'UNKNOWN';
+    const owner = world.spinalAlignmentOwner(pair);
+    const alignmentVisible = owner === player || pair.members.every((id) => world.isEntityVisible(player, id));
+    const alignmentState = owner !== null && alignmentVisible ? 'ACTIVE' : 'BROKEN';
+    return `<p class="rww-order" data-spinal-pair="${pair.id}" data-mate-state="${mateState}" ` +
+      `data-capture-percent="${capture}" data-alignment-state="${alignmentState}">` +
+      `PAIR ${pair.id} · MATE ${mateState} · CAPTURE ${capture}% · ALIGNMENT ${alignmentState}</p>`;
   }
 
   private sensorRangeCopy(world: World, player: Faction, source: Unit | Structure): string {
@@ -1075,6 +1111,18 @@ export class Hud {
     const g = this.mapCtx;
     const W = this.map.width;
     const H = this.map.height;
+    const declaredPairs = world.spinalPairs.length;
+    const friendlyAlignedPairs = world.alignedPairCount(player);
+    const visibleAlignedPairs = world.visibleAlignedPairCount(player);
+    this.map.dataset.declaredPairCount = String(declaredPairs);
+    this.map.dataset.friendlyAlignedPairCount = String(friendlyAlignedPairs);
+    this.map.dataset.visibleAlignedPairCount = String(visibleAlignedPairs);
+    const pairIndices = new Map<number, number>();
+    const visiblePairIndices = new Set<number>();
+    const outlinedPairIndices = new Set<number>();
+    for (let index = 0; index < world.spinalPairs.length; index++) {
+      for (const memberId of world.spinalPairs[index]!.members) pairIndices.set(memberId, index + 1);
+    }
 
     g.fillStyle = '#0a0e14';
     g.fillRect(0, 0, W, H);
@@ -1109,7 +1157,6 @@ export class Hud {
       delete this.map.dataset.spinwardRange;
       delete this.map.dataset.antispinwardRange;
       delete this.map.dataset.wrapCopies;
-      this.map.setAttribute('aria-label', minimapAriaLabel('Ring minimap with nominal sensor coverage.'));
     }
 
     this.drawTargetStatus(artilleryTargeting, artilleryResult);
@@ -1151,8 +1198,30 @@ export class Hud {
         st.faction < 0 ? '#9fb0c0' : `#${FACTION_COLOR[st.faction as Faction].toString(16).padStart(6, '0')}`;
       g.fillStyle = col;
       const r = st.kind === 'bastion' ? 5 : st.kind === 'spinalNode' ? 4 : 2.5;
-      g.fillRect(X(st.s) - r, Y(st.z) - r, r * 2, r * 2);
+      const x = X(st.s);
+      const y = Y(st.z);
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+      const pair = st.kind === 'spinalNode' ? world.spinalPairForNode(st.id) : undefined;
+      if (pair) {
+        const pairIndex = pairIndices.get(st.id)!;
+        visiblePairIndices.add(pairIndex);
+        const owner = world.spinalAlignmentOwner(pair);
+        const observableAlignment = owner === player ||
+          (owner !== null && pair.members.every((id) => world.isEntityVisible(player, id)));
+        if (observableAlignment) {
+          outlinedPairIndices.add(pairIndex);
+          g.strokeStyle = col;
+          g.lineWidth = 1;
+          g.strokeRect(x - r - 2, y - r - 2, r * 2 + 4, r * 2 + 4);
+          g.strokeRect(x - r - 4, y - r - 4, r * 2 + 8, r * 2 + 8);
+        }
+        g.fillStyle = '#ffffff';
+        g.font = '600 11px Rajdhani, sans-serif';
+        g.fillText(String(pairIndex), x + r + 3, y - r - 1);
+      }
     }
+    this.map.dataset.visiblePairIndices = [...visiblePairIndices].sort((a, b) => a - b).join(',');
+    this.map.dataset.outlinedPairIndices = [...outlinedPairIndices].sort((a, b) => a - b).join(',');
 
     // Units.
     for (const u of world.units) {
@@ -1191,6 +1260,14 @@ export class Hud {
       cameraCopies++;
     }
     this.map.dataset.cameraWrapCopies = String(cameraCopies);
+    const minimapDescription = directional
+      ? `Ring minimap. Directional artillery range: antispinward ${formatRange(directional.profile.antispinward)}, ` +
+        `spinward ${formatRange(directional.profile.spinward)}. Antispinward equals long shot.`
+      : 'Ring minimap with nominal sensor coverage.';
+    this.map.setAttribute(
+      'aria-label',
+      minimapAriaLabel(minimapDescription, friendlyAlignedPairs, declaredPairs),
+    );
   }
 
   private drawSensorCoverage(
@@ -1350,13 +1427,6 @@ export class Hud {
     this.map.dataset.spinwardRange = profile.spinward.toFixed(0);
     this.map.dataset.antispinwardRange = profile.antispinward.toFixed(0);
     this.map.dataset.wrapCopies = String(copies);
-    this.map.setAttribute(
-      'aria-label',
-      minimapAriaLabel(
-        `Ring minimap. Directional artillery range: antispinward ${formatRange(profile.antispinward)}, ` +
-        `spinward ${formatRange(profile.spinward)}. Antispinward equals long shot.`,
-      ),
-    );
   }
 
   private drawEnd(world: World, player: Faction, debrief: MissionDebriefModel | null): void {
@@ -1508,6 +1578,15 @@ export function hudEventText(event: SimEvent, playerFaction: Faction): string | 
     case 'structureComplete': return `${event.faction === playerFaction ? 'FRIENDLY' : 'HOSTILE'} ` +
       `${event.entityKind ? String(event.entityKind).toUpperCase() : 'STRUCTURE'} ONLINE`;
     case 'nodeCaptured': return event.faction === playerFaction ? 'SPINAL NODE SECURED' : 'SPINAL NODE LOST';
+    case 'nodeNeutralized': return event.faction === playerFaction
+      ? 'FRIENDLY SPINAL NODE NEUTRALIZED'
+      : 'HOSTILE SPINAL NODE NEUTRALIZED';
+    case 'alignmentStarted': return event.faction === playerFaction
+      ? 'SPINAL ALIGNMENT ESTABLISHED'
+      : 'HOSTILE SPINAL ALIGNMENT ESTABLISHED';
+    case 'alignmentBroken': return event.faction === playerFaction
+      ? 'SPINAL ALIGNMENT BROKEN'
+      : 'HOSTILE SPINAL ALIGNMENT BROKEN';
     case 'intercepted': return event.faction === playerFaction
       ? 'HOSTILE ORDNANCE INTERCEPTED'
       : 'FRIENDLY ORDNANCE INTERCEPTED';
@@ -1546,8 +1625,9 @@ export function ballisticFireMessage(result: BallisticFireResult): string {
   }
 }
 
-function minimapAriaLabel(description: string): string {
-  return `${description} Arrow keys move camera focus. Enter centers or fires. M moves selected units. ` +
+function minimapAriaLabel(description: string, friendlyAligned: number, declaredPairs: number): string {
+  return `${description} Friendly Alignment: ${friendlyAligned} of ${declaredPairs} Spinal pairs controlled. ` +
+    'Arrow keys move camera focus. Enter centers or fires. M moves selected units. ' +
     'A attack-moves selected units. Escape cancels artillery targeting.';
 }
 

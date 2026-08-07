@@ -8,6 +8,7 @@ import {
   LS07_CHECK_POLICY,
   LS07_REQUIRED_SOURCE_PATHS,
   LS07_RUN_POLICY,
+  LS07_RUN_TEST_IDS,
   ls07SourceSnapshotSha256,
   validateClaimEvidenceReceipt,
   validateLS07EvidenceShape,
@@ -80,18 +81,18 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(copyManifest())).resolves.toMatchObject({
       schema: 'rww.launch-scope-progress',
       version: 2,
-      activeSlice: 'LS-07',
+      activeSlice: 'LS-08',
       reviewPolicy: { maxRemediationRounds: 2, maxVisualRemediationRounds: 1 },
     });
   });
 
   it('rejects a false completion without evidence references', async () => {
     const candidate = copyManifest();
-    candidate.slices[6].state = 'complete';
-    candidate.slices[6].qualification = 'automation-passed';
-    candidate.slices[6].disposition = 'clean';
+    candidate.slices[7].state = 'complete';
+    candidate.slices[7].qualification = 'automation-passed';
+    candidate.slices[7].disposition = 'clean';
 
-    await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-07.*evidenceRefs/i);
+    await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-08.*evidenceRefs/i);
   });
 
   it('rejects duplicate slice IDs', async () => {
@@ -117,8 +118,8 @@ describe('launch progress manifest integrity', () => {
 
   it('rejects an activeSlice whose slice is not the sole active entry', async () => {
     const candidate = copyManifest();
-    candidate.slices[6].state = 'queued';
-    candidate.slices[6].qualification = 'not-run';
+    candidate.slices[7].state = 'queued';
+    candidate.slices[7].qualification = 'not-run';
 
     await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/exactly one active slice/i);
   });
@@ -146,8 +147,8 @@ describe('launch progress manifest integrity', () => {
 
   it('rejects invalid states and decreasing milestones', async () => {
     const invalidState = copyManifest();
-    invalidState.slices[6].state = 'done';
-    await expect(validateLaunchProgressManifest(invalidState)).rejects.toThrow(/LS-07.*invalid state/i);
+    invalidState.slices[7].state = 'done';
+    await expect(validateLaunchProgressManifest(invalidState)).rejects.toThrow(/LS-08.*invalid state/i);
 
     const decreasingMilestone = copyManifest();
     decreasingMilestone.slices[11].milestone = 1;
@@ -160,7 +161,7 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(completePolish)).resolves.toBeDefined();
 
     const activePending = copyManifest();
-    activePending.slices[6].qualification = 'pending';
+    activePending.slices[7].qualification = 'pending';
     await expect(validateLaunchProgressManifest(activePending)).resolves.toBeDefined();
 
     for (const qualification of ['not-run', 'pending']) {
@@ -174,27 +175,27 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(completePending)).rejects.toThrow(/LS-01.*disposition.*complete/i);
 
     const activeNotRun = copyManifest();
-    activeNotRun.slices[6].qualification = 'not-run';
-    await expect(validateLaunchProgressManifest(activeNotRun)).rejects.toThrow(/LS-07.*qualification.*active/i);
-
-    for (const disposition of ['clean', 'polish-backlog']) {
-      const candidate = copyManifest();
-      candidate.slices[6].disposition = disposition;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-07.*disposition.*active/i);
-    }
-
-    for (const qualification of ['pending', 'automation-passed']) {
-      const candidate = copyManifest();
-      candidate.slices[7].qualification = qualification;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-08.*qualification.*queued/i);
-    }
+    activeNotRun.slices[7].qualification = 'not-run';
+    await expect(validateLaunchProgressManifest(activeNotRun)).rejects.toThrow(/LS-08.*qualification.*active/i);
 
     for (const disposition of ['clean', 'polish-backlog']) {
       const candidate = copyManifest();
       candidate.slices[7].disposition = disposition;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-08.*disposition.*queued/i);
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-08.*disposition.*active/i);
     }
-  });
+
+    for (const qualification of ['pending', 'automation-passed']) {
+      const candidate = copyManifest();
+      candidate.slices[8].qualification = qualification;
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-09.*qualification.*queued/i);
+    }
+
+    for (const disposition of ['clean', 'polish-backlog']) {
+      const candidate = copyManifest();
+      candidate.slices[8].disposition = disposition;
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-09.*disposition.*queued/i);
+    }
+  }, 15_000);
 
   it('rejects undeclared values and changes to the bounded review policy', async () => {
     const invalidQualifications = copyManifest();
@@ -228,20 +229,20 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/unsafe evidence reference/i);
   });
 
-  it('rejects LS-07 false promotion using LS-01 receipt or roadmap evidence', async () => {
+  it('rejects LS-08 false promotion using LS-01 receipt or roadmap evidence', async () => {
     const reusedReceipt = copyManifest();
-    reusedReceipt.slices[6].state = 'complete';
-    reusedReceipt.slices[6].qualification = 'automation-passed';
-    reusedReceipt.slices[6].disposition = 'clean';
-    reusedReceipt.slices[6].evidenceRefs = ['validation/evidence/launch-scope/LS-01.json'];
-    await expect(validateLaunchProgressManifest(reusedReceipt)).rejects.toThrow(/LS-07.*exact claim receipt/i);
+    reusedReceipt.slices[7].state = 'complete';
+    reusedReceipt.slices[7].qualification = 'automation-passed';
+    reusedReceipt.slices[7].disposition = 'clean';
+    reusedReceipt.slices[7].evidenceRefs = ['validation/evidence/launch-scope/LS-01.json'];
+    await expect(validateLaunchProgressManifest(reusedReceipt)).rejects.toThrow(/LS-08.*exact claim receipt/i);
 
     const directRoadmap = copyManifest();
-    directRoadmap.slices[6].state = 'complete';
-    directRoadmap.slices[6].qualification = 'automation-passed';
-    directRoadmap.slices[6].disposition = 'clean';
-    directRoadmap.slices[6].evidenceRefs = ['docs/roadmap.md'];
-    await expect(validateLaunchProgressManifest(directRoadmap)).rejects.toThrow(/LS-07.*exact claim receipt/i);
+    directRoadmap.slices[7].state = 'complete';
+    directRoadmap.slices[7].qualification = 'automation-passed';
+    directRoadmap.slices[7].disposition = 'clean';
+    directRoadmap.slices[7].evidenceRefs = ['docs/roadmap.md'];
+    await expect(validateLaunchProgressManifest(directRoadmap)).rejects.toThrow(/LS-08.*exact claim receipt/i);
   });
 
   it('rejects G-01 false promotion using G-07 receipt or roadmap evidence', async () => {
@@ -277,7 +278,7 @@ describe('launch progress manifest integrity', () => {
     const extraSource = structuredClone(ls01Receipt) as Record<string, any>;
     extraSource.sourceRefs.push({
       path: 'docs/roadmap.md',
-      sha256: '07e1231f464b4b8e9fc046ea18030b9a32e8bb18e7f3a2b9d78f3637314ba6a0',
+      sha256: 'aa193398433241ce7c5ab919cca56b49a260e3e52ec1cd1ab6360a001066462d',
     });
     await expect(validateClaimEvidenceReceipt(copyManifest().slices[0], extraSource))
       .rejects.toThrow(/source paths.*policy/i);
@@ -339,14 +340,6 @@ function ls07MachineEvidence(): Record<string, any> {
 }
 
 function ls07RunArtifacts(): Record<string, any> {
-  const testIdsByRun = new Map<string, string[]>();
-  for (const policy of Object.values(LS07_CHECK_POLICY)) {
-    for (const runId of policy.runIds) {
-      const ids = testIdsByRun.get(runId) ?? [];
-      for (const testId of policy.testIds) if (!ids.includes(testId)) ids.push(testId);
-      testIdsByRun.set(runId, ids);
-    }
-  }
   const sourceSnapshotSha256 = ls07SourceSnapshotSha256(
     LS07_REQUIRED_SOURCE_PATHS.map((path) => ({ path, sha256: 'b'.repeat(64) })),
   );
@@ -358,7 +351,7 @@ function ls07RunArtifacts(): Record<string, any> {
     result: 'passed',
     exitCode: 0,
     sourceSnapshotSha256,
-    passedTestIds: testIdsByRun.get(id) ?? [],
+    passedTestIds: [...LS07_RUN_TEST_IDS[id as keyof typeof LS07_RUN_TEST_IDS]],
     summary: `${id} completed successfully`,
   }]));
 }

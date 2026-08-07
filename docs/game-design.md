@@ -86,7 +86,7 @@ Mechs are the tactical layer and the game's muscle fantasy. Few, expensive, pers
 
 ## 9. Victory, Loss & Match Pacing
 - **Win:** destroy the enemy Bastion.
-- **Anti-stall:** Spinal Nodes trickle a "Dominance" score; at a hard time cap (45 min), higher Dominance wins. Turtling forever is not viable — the map decides.
+- **Anti-stall:** Controlling both members of an authenticated Spinal pair establishes Alignment and generates Dominance; at the 45-minute hard cap, higher Dominance wins. Individual Nodes still grant Command, but divided control does not score.
 - **Comeback lever:** losing your army but not your Bastion leaves you rocket options; a well-read chord volley can decapitate an overextended winner.
 
 ## 10. AI Opponent (single-player)
