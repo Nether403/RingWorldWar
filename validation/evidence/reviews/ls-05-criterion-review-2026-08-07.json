@@ -1,0 +1,32 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-05-final-criterion-review-2026-08-07",
+  "claimId": "LS-05",
+  "policy": "docs/launch-scope-execution-policy.md",
+  "reviewRound": 3,
+  "reviewType": "absolute-quality",
+  "independentContext": true,
+  "scores": {
+    "actionClarity": 3,
+    "missionStateClarity": 3,
+    "progressionComprehension": 3,
+    "accessibilityKeyboardSemantics": 3,
+    "viewportUse": 3,
+    "campaignIdentity": 3
+  },
+  "dependencyReady": true,
+  "blockers": [],
+  "requiredQualityFindings": [],
+  "humanValidation": [
+    "Physical-device touch scrolling and named-screen-reader announcement order remain milestone validation targets."
+  ],
+  "polish": [
+    {
+      "id": "LS-05-P01",
+      "summary": "The mission listbox remains keyboard-operable through Tab but does not implement conventional Arrow, Home, and End navigation.",
+      "reopenTrigger": "Reopen only if keyboard qualification finds the current interaction unusable or the campaign archive receives a dedicated accessibility revision."
+    }
+  ],
+  "advisoryReferenceDelta": "Wings of Liberty provides richer mission-specific stakes, rewards, contacts, technology, and difficulty context. This is milestone polish and does not lower any LS-05 critical dimension below ship-ready."
+}

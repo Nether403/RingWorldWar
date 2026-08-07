@@ -18,6 +18,35 @@ const terrain = {
 } as unknown as Terrain;
 
 describe('First Contact mission', () => {
+  it('fails visibly when ordinary damage kills every Compact engineer before completion and restores the failure', () => {
+    const world = new World(terrain, 40);
+    const engineerA = world.spawnUnit(Faction.Compact, 'engineer', 0, 0);
+    const engineerB = world.spawnUnit(Faction.Compact, 'engineer', 20, 0);
+    const node = world.spawnStructure(-1 as Faction, 'spinalNode', 20_000, 0, 1);
+    const target = world.spawnStructure(Faction.Choir, 'fusionCore', 19_500, 0, 1);
+    const mission = MissionController.start('first-contact', world.tick, {
+      tutorialNode: node.id,
+      artilleryTarget: target.id,
+    });
+
+    world.applyDamage(engineerA.id, engineerA.maxHp * 10, 'explosive', Faction.Choir);
+    mission.advanceTick(world, world.drainEvents());
+    expect(mission.hudModel().status).toBe('active');
+    world.applyDamage(engineerB.id, engineerB.maxHp * 10, 'explosive', Faction.Choir);
+    mission.advanceTick(world, world.drainEvents());
+
+    expect(mission.hudModel()).toMatchObject({
+      status: 'failed',
+      objectiveTitle: 'Construction crew lost',
+    });
+    expect(mission.debriefModel()).toMatchObject({
+      outcome: 'failure',
+      title: 'Mission failed',
+    });
+    expect(mission.snapshot().milestones.firstContactFailureReason).toBe('engineers-lost');
+    expect(MissionController.fromSnapshot(mission.snapshot(), world).snapshot()).toEqual(mission.snapshot());
+  });
+
   it('advances from real player actions and simulation events without losing early milestones', () => {
     const world = new World(terrain, 41);
     const engineer = world.spawnUnit(Faction.Compact, 'engineer', 0, 0);
@@ -94,9 +123,11 @@ describe('First Contact mission', () => {
     const restored = MissionController.fromSnapshot(parseMissionSnapshot(JSON.stringify(snapshot)), world);
     const legacySnapshot = JSON.parse(JSON.stringify(snapshot));
     delete legacySnapshot.milestones.breakLine;
+    delete legacySnapshot.milestones.firstContactFailureReason;
 
     expect(restored.snapshot()).toEqual(snapshot);
     expect(parseMissionSnapshot(legacySnapshot).milestones.breakLine).toBeNull();
+    expect(parseMissionSnapshot(legacySnapshot).milestones.firstContactFailureReason).toBeNull();
     expect(() => parseMissionSnapshot({ ...snapshot, objectiveIndex: 99 })).toThrow(/objectiveIndex/i);
     expect(() => parseMissionSnapshot({
       ...snapshot,
@@ -144,6 +175,7 @@ describe('First Contact mission', () => {
 
   it('restores retained out-of-order milestones after their bound entities change', () => {
     const world = new World(terrain, 45);
+    world.spawnUnit(Faction.Compact, 'engineer', 0, 0);
     const node = world.spawnStructure(-1 as Faction, 'spinalNode', 20_000, 0, 1);
     const target = world.spawnStructure(Faction.Choir, 'fusionCore', 19_500, 0, 1);
     const snapshot = MissionController.start('first-contact', world.tick, {
@@ -321,6 +353,9 @@ function event(
 }
 
 function missionAtFinalObjective(world: World, bindings: MissionBindings): MissionController {
+  if (!world.units.some((unit) => unit.alive && unit.faction === Faction.Compact && unit.kind === 'engineer')) {
+    world.spawnUnit(Faction.Compact, 'engineer', 0, 50);
+  }
   const snapshot = MissionController.start('first-contact', world.tick, bindings).snapshot();
   return MissionController.fromSnapshot({
     ...snapshot,
@@ -332,6 +367,7 @@ function missionAtFinalObjective(world: World, bindings: MissionBindings): Missi
       capturedNodeIds: [bindings.tutorialNode],
       deployedLongbow: true,
       firedAntispinward: false,
+      firstContactFailureReason: null,
       breakLine: null,
       counterfire: null,
       signalInSpine: null,

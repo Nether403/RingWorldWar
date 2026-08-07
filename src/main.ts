@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { RING_CIRCUMFERENCE } from '@core/constants';
 import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
+import { CameraController } from '@render/cameraController';
 import { Environment } from '@render/environment';
 import { InputController } from '@render/input';
 import { BASE_EXPOSURE, QUALITY, Renderer, type QualityLevel } from '@render/renderer';
@@ -26,6 +27,30 @@ import { VoiceDirector } from './audio/voiceDirector';
 import { REVIEWED_VOICE_CLIPS } from './presentation/voiceMedia';
 import { PRESENTATION_MEDIA, type PresentationMedia } from './presentation/media';
 import { parseGameSaveSnapshot } from './gameSave';
+import {
+  resolveFirstContactMissionBindings,
+} from './scenario/firstContact';
+import { runtimeScenarioById, runtimeScenarioFromParams } from './scenario/route';
+import type { RuntimeScenario } from './scenario/runtimeScenario';
+import {
+  completeCampaignMission,
+  continueCampaign,
+  loadCampaignProfile,
+  recordCampaignFailure,
+  recordCampaignReplayResult,
+  replayCampaignMission,
+  retryCampaignMission,
+  saveCampaignProfile,
+  startCampaignMission,
+  type CampaignTransition,
+} from './campaign/campaignProfile';
+import { campaignMission } from './campaign/missionRegistry';
+import {
+  applyCampaignRouteContext,
+  campaignRouteContextFromParams,
+  type CampaignRouteContext,
+  type CampaignRouteIntent,
+} from './campaign/campaignRoute';
 
 const boot = {
   el: document.getElementById('boot')!,
@@ -86,6 +111,7 @@ class CleanupStack {
 
 async function start(): Promise<void> {
   const params = new URLSearchParams(location.search);
+  const routedRuntimeScenario = runtimeScenarioFromParams(params);
   const settings = new Settings({ search: params });
   const navigation = performance.getEntriesByType('navigation')[0];
   const startup: StartupMetrics = {
@@ -97,17 +123,42 @@ async function start(): Promise<void> {
   let titleError = '';
   while (true) {
     const cleanup = new CleanupStack();
-    const titleScreenShown = shouldShowTitleScreen(params);
+    const titleScreenShown = routedRuntimeScenario === null && shouldShowTitleScreen(params);
+    const campaignProfile = loadCampaignProfile(localStorage).profile;
+    const routedCampaignSession = campaignRouteContextFromParams(
+      params,
+      routedRuntimeScenario?.id ?? null,
+      campaignProfile,
+    );
     const titleAction = titleScreenShown
-      ? await showTitleScreen(settings, params, titleError)
+      ? await showTitleScreen(settings, params, titleError, campaignProfile)
       : { kind: 'new-skirmish' as const, playerFaction: factionFromParams(params) };
     if (titleScreenShown) startup.startedAt = performance.now();
     try {
-      await startSession(cleanup, startup, params, settings, titleAction);
+      let runtimeScenario = routedRuntimeScenario;
+      let campaignSession = routedCampaignSession;
+      if (titleAction.kind === 'campaign') {
+        const transition = titleAction.intent === 'replay'
+          ? replayCampaignMission(campaignProfile, titleAction.missionId)
+          : titleAction.intent === 'continue'
+            ? continueCampaign(campaignProfile)
+            : startCampaignMission(campaignProfile, titleAction.missionId);
+        saveCampaignProfile(localStorage, transition.profile);
+        runtimeScenario = runtimeScenarioById(transition.launch.runtimeScenarioId);
+        campaignSession = { missionId: transition.launch.missionId, intent: titleAction.intent };
+        const route = new URL(location.href);
+        route.searchParams.set('menu', '0');
+        route.searchParams.set('scenario', transition.launch.runtimeScenarioId);
+        applyCampaignRouteContext(route.searchParams, transition.launch, titleAction.intent);
+        route.searchParams.delete('campaign');
+        route.searchParams.delete('campaignMessage');
+        history.replaceState(null, '', route);
+      }
+      await startSession(cleanup, startup, params, settings, titleAction, runtimeScenario, campaignSession);
       return;
     } catch (error) {
       cleanup.dispose();
-      if (titleScreenShown && titleAction.kind === 'continue') {
+      if (titleScreenShown && (titleAction.kind === 'continue' || titleAction.kind === 'campaign')) {
         titleError = error instanceof Error ? error.message : String(error);
         continue;
       }
@@ -122,28 +173,50 @@ async function startSession(
   params: URLSearchParams,
   settings: Settings,
   titleAction: TitleAction,
+  runtimeScenario: RuntimeScenario | null,
+  campaignSession: CampaignRouteContext | null,
 ): Promise<void> {
   const container = document.getElementById('app')!;
   const scenarioDriverEnabled = import.meta.env.DEV && params.get('scenarioDriver') === '1';
-  const seed = Number(params.get('seed') ?? '20260731') || 20260731;
-  const playerFaction = titleAction.kind === 'continue'
+  const requestedSeed = Number(params.get('seed') ?? '20260731') || 20260731;
+  const seed = runtimeScenario?.worldSeed ?? requestedSeed;
+  const playerFaction = runtimeScenario?.playerFaction ?? (titleAction.kind === 'continue'
     ? savedPlayerFaction()
-    : titleAction.playerFaction;
+    : titleAction.kind === 'campaign'
+      ? campaignMission(titleAction.missionId).faction
+      : titleAction.playerFaction);
   const startS = playerFaction === Faction.Compact ? 0 : RING_CIRCUMFERENCE * 0.5;
 
   await boot.step(0.08, 'surveying the ring');
   const anchor = new RenderAnchor();
   const rig = new CameraRig(container.clientWidth / container.clientHeight);
-  rig.setFocus(startS, 0);
-  anchor.set(startS, 0);
+  const cameraController = new CameraController(rig);
+  if (runtimeScenario) {
+    const view = runtimeScenario.openingView;
+    rig.setView(view.focusS, view.focusZ, view.yawRadians, view.zoom);
+  } else {
+    rig.setFocus(startS, 0);
+  }
+  anchor.set(rig.s, rig.z);
 
   const renderer = new Renderer(container, rig.camera, settings.quality);
   cleanup.defer(() => renderer.dispose());
+  cleanup.defer(() => cameraController.dispose());
+  cameraController.resize(container.clientWidth, container.clientHeight);
   renderer.autoQuality = settings.adaptiveQuality;
 
   await boot.step(0.3, 'generating terrain');
-  const game = new Game(seed, anchor, rig, playerFaction);
+  const game = runtimeScenario
+    ? Game.fromRuntimeScenario(runtimeScenario, anchor, rig, cameraController)
+    : new Game(seed, anchor, rig, cameraController, playerFaction);
   cleanup.defer(() => game.dispose());
+  if (runtimeScenario) {
+    if (runtimeScenario.id !== 'first-contact') {
+      throw new Error(`Runtime scenario has no mission bootstrap: ${runtimeScenario.id}`);
+    }
+    game.startMission('first-contact', resolveFirstContactMissionBindings(game.scenarioBindings));
+  }
+  if (campaignSession) wireCampaignSession(game, campaignSession);
   const audio = new ProceduralAudio(seed, createWebAudioBackend);
   cleanup.defer(() => audio.dispose());
   audio.setMasterVolume(settings.volume);
@@ -226,7 +299,7 @@ async function startSession(
   await boot.step(0.94, 'prewarming combat shaders');
   startup.shaderPrewarmMilliseconds = (await renderer.prewarmActiveQuality()).durationMilliseconds;
 
-  const input = new InputController(renderer.gl.domElement, rig);
+  const input = new InputController(renderer.gl.domElement, cameraController);
   cleanup.defer(() => input.dispose());
   const overlay = new DebugOverlay();
   cleanup.defer(() => overlay.dispose());
@@ -258,7 +331,11 @@ async function startSession(
   await boot.step(1.0, 'ready');
   cleanup.defer(armAudioUnlock(window, audio));
   boot.hide();
-  if (!scenarioDriverEnabled) game.hud.alert('Select an engineer — build extractors, then a Fabricator');
+  if (!scenarioDriverEnabled) {
+    game.hud.alert(runtimeScenario
+      ? 'First Contact: Choir raiders inbound — keep one engineer alive'
+      : 'Select an engineer — build extractors, then a Fabricator');
+  }
 
   // ---------------------------------------------------------------- loop ----
   let last = performance.now();
@@ -280,10 +357,9 @@ async function startSession(
     advanceSimulation = true,
   ): void {
     input.setEnabled(!menu.isOpen && !game.hud.blocksGameplayInput);
-    input.setDirectMode(game.directControlActive);
     input.update(dt);
     if (advanceSimulation) game.updateDirectControl(input.moveForward, input.moveRight);
-    rig.update(dt, anchor, game.terrain);
+    cameraController.update(dt, { anchor, terrain: game.terrain });
 
     // Re-base the floating origin onto the camera when it drifts far enough.
     const prevS = anchor.s;
@@ -291,7 +367,7 @@ async function startSession(
     if (anchor.update(rig.s, rig.z)) {
       ringMesh.syncToAnchor(anchor);
       game.onRebase(prevS, prevZ);
-      rig.update(0, anchor, game.terrain);
+      cameraController.update(0, { anchor, terrain: game.terrain });
     }
     dressing.update(anchor, game.terrain);
 
@@ -311,7 +387,7 @@ async function startSession(
 
     renderer.gl.toneMappingExposure = BASE_EXPOSURE + Math.min(0.38, game.effects.flash * 0.22);
     renderer.render(dt);
-    overlay.update(dt, renderer, game, rig, environment);
+    overlay.update(dt, renderer, game, rig, cameraController, environment);
     markFirstPlayable();
 
     if (game.hud.restartRequested) {
@@ -422,6 +498,7 @@ async function startSession(
   const exposed: Record<string, unknown> = {
     game,
     rig,
+    cameraController,
     anchor,
     renderer,
     settings,
@@ -440,10 +517,15 @@ async function startSession(
       fov: rig.camera.fov,
       dist: rig.distance,
       pitch: rig.pitch,
+      cameraMode: cameraController.mode,
       anchorS: anchor.s,
       focusS: rig.s,
       ringPos: ringMesh.object.position.toArray(),
       ringRotZ: ringMesh.object.rotation.z,
+      runtimeScenario: runtimeScenario?.id ?? null,
+      scenarioBindings: game.scenarioBindings.size,
+      mission: game.missionHudModel?.missionId ?? null,
+      aiEnabled: game.isAiEnabled,
       units: game.world.units.length,
       structures: game.world.structures.length,
     }),
@@ -545,7 +627,12 @@ async function startSession(
   ringMesh.syncToAnchor(anchor);
   frame();
 
-  const onResize = (): void => renderer.resize(container.clientWidth, container.clientHeight);
+  const onResize = (): void => {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    renderer.resize(width, height);
+    cameraController.resize(width, height);
+  };
   window.addEventListener('resize', onResize);
   cleanup.defer(() => window.removeEventListener('resize', onResize));
   const onPageHide = (event: PageTransitionEvent): void => {
@@ -559,23 +646,91 @@ async function showTitleScreen(
   settings: Settings,
   params: URLSearchParams,
   errorMessage: string,
+  campaignProfile: ReturnType<typeof loadCampaignProfile>['profile'],
 ): Promise<TitleAction> {
   boot.msg.textContent = 'awaiting command';
   boot.el.setAttribute('aria-hidden', 'true');
   const title = new TitleScreen({
     settings,
     hasSave: hasSavedGame() && !errorMessage,
+    campaignProfile,
     media: presentationMediaForSession(params),
     statusMessage: errorMessage,
+    campaignStatusMessage: params.get('campaignMessage') ?? undefined,
+    openCampaign: params.get('campaign') === '1',
   });
   const action = await title.show();
   boot.el.removeAttribute('aria-hidden');
   return action;
 }
 
+function wireCampaignSession(game: Game, session: CampaignRouteContext): void {
+  game.onMissionResult = (result) => {
+    if (result.missionId !== 'first-contact' || session.missionId !== 'compact-01') return;
+    try {
+      const profile = loadCampaignProfile(localStorage).profile;
+      const updated = session.intent === 'replay'
+        ? recordCampaignReplayResult(profile, session.missionId, result.status === 'completed' ? 'completed' : 'failed')
+        : result.status === 'completed'
+          ? completeCampaignMission(profile, session.missionId)
+          : recordCampaignFailure(profile, session.missionId);
+      saveCampaignProfile(localStorage, updated);
+    } catch (error) {
+      game.hud.alert(`Campaign profile update failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  game.hud.onMissionDebriefAction = (action) => {
+    try {
+      const profile = loadCampaignProfile(localStorage).profile;
+      const transition = action === 'replay'
+        ? replayCampaignMission(profile, session.missionId)
+        : action === 'retry'
+          ? session.intent === 'replay'
+            ? replayCampaignMission(profile, session.missionId)
+            : retryCampaignMission(profile)
+          : continueCampaign(profile);
+      const intent: CampaignRouteIntent = action === 'replay'
+        ? 'replay'
+        : action === 'retry' ? session.intent === 'replay' ? 'replay' : 'retry' : 'continue';
+      navigateToCampaignLaunch(transition, intent);
+    } catch (error) {
+      navigateToCampaignBrowser(error instanceof Error ? error.message : String(error));
+    }
+  };
+}
+
+function navigateToCampaignLaunch(transition: CampaignTransition, intent: CampaignRouteIntent): void {
+  saveCampaignProfile(localStorage, transition.profile);
+  const route = new URL(location.href);
+  route.search = '';
+  route.searchParams.set('menu', '0');
+  route.searchParams.set('scenario', transition.launch.runtimeScenarioId);
+  applyCampaignRouteContext(route.searchParams, transition.launch, intent);
+  location.assign(route);
+}
+
+function navigateToCampaignBrowser(message: string): void {
+  const route = new URL(location.href);
+  route.search = '';
+  route.searchParams.set('menu', '1');
+  route.searchParams.set('campaign', '1');
+  route.searchParams.set('campaignMessage', message);
+  location.assign(route);
+}
+
 function presentationMediaForSession(params: URLSearchParams): PresentationMedia {
   if (import.meta.env.DEV && params.get('mediaTest') === 'missing-intro') {
     return { ...PRESENTATION_MEDIA, introVideo: '/media/presentation/missing-intro.mp4' };
+  }
+  if (import.meta.env.DEV && params.get('mediaTest') === 'missing-campaign') {
+    return {
+      ...PRESENTATION_MEDIA,
+      menuPoster: '/media/presentation/missing-campaign-backdrop.webp',
+      campaignMissionArt: {
+        ...PRESENTATION_MEDIA.campaignMissionArt,
+        'compact-01': '/media/presentation/missing-campaign-mission.webp',
+      },
+    };
   }
   return PRESENTATION_MEDIA;
 }
@@ -793,7 +948,6 @@ function wireKeys(
         menu.close();
       } else {
         game.cancelInteractions();
-        input.setDirectMode(false);
         menu.open();
       }
       return;
@@ -801,7 +955,6 @@ function wireKeys(
     if (e.code === 'KeyV' && !e.ctrlKey && !e.shiftKey && !game.directControlActive) {
       if (game.enterDirectControl()) {
         input.consume(e.code);
-        input.setDirectMode(true);
         e.preventDefault();
         return;
       }

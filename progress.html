@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>Ring World War | Launch Scope Control</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        --ink: #070a0c;
+        --surface: #0d1215;
+        --surface-raised: #12191d;
+        --line: #263137;
+        --line-bright: #42515a;
+        --text: #d8e0e4;
+        --muted: #849198;
+        --amber: #e79a38;
+        --cyan: #54b8c7;
+        --red: #d86456;
+        --green: #80aa86;
+        --font-display: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+        --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      html {
+        min-width: 320px;
+        background: var(--ink);
+        color: var(--text);
+        font-family: var(--font-display);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        background:
+          linear-gradient(rgba(84, 184, 199, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(84, 184, 199, 0.025) 1px, transparent 1px),
+          radial-gradient(circle at 78% -20%, rgba(84, 184, 199, 0.12), transparent 38rem),
+          var(--ink);
+        background-size: 36px 36px, 36px 36px, auto, auto;
+      }
+
+      a { color: inherit; }
+
+      .shell {
+        width: min(100%, 1560px);
+        margin: 0 auto;
+        padding: 18px clamp(14px, 2.2vw, 34px) 44px;
+      }
+
+      .masthead {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: 18px;
+        min-height: 72px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--line-bright);
+      }
+
+      .eyebrow,
+      .section-code,
+      .metric-label,
+      .sync,
+      .state,
+      .slice-id,
+      .receipt-meta {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow { margin: 0 0 5px; color: var(--cyan); }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.65rem, 3vw, 2.65rem);
+        font-weight: 620;
+        letter-spacing: 0.055em;
+        line-height: 0.95;
+        text-transform: uppercase;
+      }
+
+      .sync {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .telemetry {
+        display: grid;
+        justify-items: end;
+        gap: 6px;
+      }
+
+      .sync::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--amber);
+        box-shadow: 0 0 10px rgba(231, 154, 56, 0.65);
+        content: "";
+      }
+
+      .sync.connected { color: var(--green); }
+      .sync.connected::before { background: var(--green); box-shadow: 0 0 10px rgba(128, 170, 134, 0.7); }
+      .sync.error { color: var(--red); }
+      .sync.error::before { background: var(--red); }
+
+      .freshness {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        text-align: right;
+        text-transform: uppercase;
+      }
+
+      .freshness.current { color: var(--cyan); }
+      .freshness.stale { color: var(--red); font-weight: 700; }
+      .plan-stale .active-band { border-color: rgba(216, 100, 86, 0.7); }
+      .plan-stale .active-band::before { background: var(--red); }
+
+      .active-band {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 22px;
+        margin: 16px 0;
+        padding: 18px 20px 17px 24px;
+        overflow: hidden;
+        border: 1px solid #604724;
+        background: linear-gradient(100deg, rgba(231, 154, 56, 0.11), rgba(18, 25, 29, 0.92) 45%);
+      }
+
+      .active-band::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        background: var(--amber);
+        content: "";
+      }
+
+      .active-kicker {
+        margin: 0 0 7px;
+        color: var(--amber);
+        font-family: var(--font-mono);
+        font-size: 0.69rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .active-band h2 {
+        margin: 0;
+        font-size: clamp(1.1rem, 2vw, 1.5rem);
+        font-weight: 560;
+        letter-spacing: 0.025em;
+      }
+
+      .active-band p { max-width: 78ch; margin: 7px 0 0; color: #aab4b9; line-height: 1.4; }
+
+      .active-ordinal {
+        align-self: center;
+        color: var(--amber);
+        font-family: var(--font-mono);
+        font-size: clamp(1.6rem, 4vw, 3.2rem);
+        font-weight: 700;
+        letter-spacing: -0.08em;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-bottom: 16px;
+        border: 1px solid var(--line);
+        background: rgba(13, 18, 21, 0.8);
+      }
+
+      .metric { min-width: 0; padding: 11px 14px; border-right: 1px solid var(--line); }
+      .metric:last-child { border-right: 0; }
+      .metric-value { display: block; font-family: var(--font-mono); font-size: 1.08rem; }
+      .metric-label { display: block; margin-top: 3px; color: var(--muted); }
+
+      .console-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.8fr);
+        align-items: start;
+        gap: 16px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        background: rgba(13, 18, 21, 0.94);
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: #10171a;
+      }
+
+      .panel h2 { margin: 0; font-size: 0.9rem; font-weight: 650; letter-spacing: 0.11em; text-transform: uppercase; }
+      .section-code { color: var(--muted); }
+
+      .slices {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .slice {
+        display: grid;
+        grid-template-columns: 4.1rem minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 45px;
+        padding: 8px 11px;
+        border-bottom: 1px solid #1c252a;
+      }
+
+      .slice:nth-child(odd) { border-right: 1px solid #1c252a; }
+      .slice.active { background: rgba(231, 154, 56, 0.085); }
+      .slice-id { color: var(--muted); }
+      .slice-title { overflow: hidden; font-size: 0.79rem; letter-spacing: 0.018em; line-height: 1.2; text-overflow: ellipsis; }
+
+      .state {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--muted);
+        letter-spacing: 0.07em;
+      }
+
+      .state::before { width: 6px; height: 6px; border: 1px solid currentColor; content: ""; }
+      .state.complete, .state.passed, .state.success { color: var(--green); }
+      .state.automation-passed, .state.clean { color: var(--green); }
+      .state.polish-backlog { color: var(--cyan); }
+      .state.pending { color: var(--amber); }
+      .state.error, .state.failed, .state.failure { color: var(--red); }
+      .state.active, .state.in-progress { color: var(--amber); }
+      .state.active::before, .state.in-progress::before { background: currentColor; }
+      .slice-statuses { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 9px; }
+
+      .stack { display: grid; gap: 16px; min-width: 0; }
+      .gates, .references, .receipts, .sources { margin: 0; padding: 0; list-style: none; }
+
+      .gate {
+        padding: 12px 14px;
+        border-bottom: 1px solid #1c252a;
+      }
+
+      .gate:last-child, .reference:last-child, .receipt:last-child { border-bottom: 0; }
+      .gate-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .gate h3 { margin: 0; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.025em; }
+      .gate p { margin: 6px 0 0; color: var(--muted); font-size: 0.73rem; line-height: 1.38; }
+
+      .reference, .receipt {
+        padding: 11px 14px;
+        border-bottom: 1px solid #1c252a;
+      }
+
+      .reference a {
+        display: inline-block;
+        color: #b9dfe5;
+        font-size: 0.79rem;
+        line-height: 1.3;
+        text-decoration: none;
+      }
+
+      .reference a:hover, .reference a:focus-visible { color: white; text-decoration: underline; text-underline-offset: 3px; }
+      .reference p { margin: 5px 0 0; color: var(--muted); font-size: 0.72rem; line-height: 1.35; }
+
+      .receipt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+      .receipt-name { overflow: hidden; font-family: var(--font-mono); font-size: 0.7rem; text-overflow: ellipsis; white-space: nowrap; }
+      .receipt-meta { margin-top: 5px; color: var(--muted); letter-spacing: 0.06em; }
+      .receipt .state { align-self: start; }
+
+      .source-strip {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .source {
+        min-width: 0;
+        padding: 9px 11px;
+        background: var(--surface);
+      }
+
+      .source strong { display: block; overflow: hidden; font-size: 0.75rem; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+      .source small { color: var(--muted); font-family: var(--font-mono); font-size: 0.62rem; }
+      .empty { padding: 16px 14px; color: var(--muted); font-family: var(--font-mono); font-size: 0.7rem; }
+
+      @media (max-width: 900px) {
+        .console-grid { grid-template-columns: 1fr; }
+        .slices { grid-template-columns: 1fr; }
+        .slice:nth-child(odd) { border-right: 0; }
+      }
+
+      @media (max-width: 560px) {
+        .shell { padding: 12px 10px 30px; }
+        .masthead { grid-template-columns: 1fr; align-items: start; gap: 11px; }
+        .telemetry { justify-items: start; }
+        .sync { white-space: normal; }
+        .freshness { text-align: left; white-space: normal; }
+        .active-band { grid-template-columns: 1fr; gap: 12px; padding: 15px 14px 14px 18px; }
+        .active-ordinal { font-size: 1rem; letter-spacing: 0.02em; }
+        .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .metric { border-bottom: 1px solid var(--line); }
+        .metric:nth-child(2) { border-right: 0; }
+        .metric:nth-child(n + 3) { border-bottom: 0; }
+        .slice { grid-template-columns: 3.7rem minmax(0, 1fr); }
+        .slice-statuses { grid-column: 2; justify-content: flex-start; }
+        .source-strip { grid-template-columns: 1fr; }
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .sync.connected::before { animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: 0.45; } }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">Spinal Network / Local Run Telemetry / Advisory</p>
+          <h1>Launch Scope Control</h1>
+        </div>
+        <div class="telemetry">
+          <div class="sync" data-testid="sync-state" role="status" aria-live="polite">CONNECTING</div>
+          <div class="freshness" data-testid="plan-freshness">PLAN SOURCE / AWAITING VALIDATION</div>
+        </div>
+      </header>
+
+      <section class="active-band" data-testid="active-slice" aria-labelledby="active-title">
+        <div>
+          <p class="active-kicker">Current Active Slice</p>
+          <h2 id="active-title">Awaiting progress manifest</h2>
+          <p id="active-evidence">The control page is establishing a local development link.</p>
+        </div>
+        <div class="active-ordinal" id="active-ordinal">-- / 37</div>
+      </section>
+
+      <section class="metrics" aria-label="Launch progress summary">
+        <div class="metric"><span class="metric-value" id="metric-complete">--</span><span class="metric-label">Dependency Ready</span></div>
+        <div class="metric"><span class="metric-value" id="metric-open">--</span><span class="metric-label">Slices Remaining</span></div>
+        <div class="metric"><span class="metric-value" id="metric-gates">--</span><span class="metric-label">Gates Passed</span></div>
+        <div class="metric"><span class="metric-value" id="metric-receipts">--</span><span class="metric-label">Claim Receipts Verified</span></div>
+      </section>
+
+      <div class="console-grid">
+        <section class="panel" aria-labelledby="slices-title">
+          <div class="panel-head"><h2 id="slices-title">Launch Slices</h2><span class="section-code">37 / dependency ordered</span></div>
+          <div class="slices" id="slices"></div>
+        </section>
+
+        <div class="stack">
+          <section class="panel" aria-labelledby="gates-title">
+            <div class="panel-head"><h2 id="gates-title">Validation Gates</h2><span class="section-code">8 / release authority</span></div>
+            <ol class="gates" id="gates"></ol>
+          </section>
+
+          <section class="panel" aria-labelledby="references-title">
+            <div class="panel-head"><h2 id="references-title">Reference Manifest</h2><span class="section-code">SC2 / milestone-only advisory</span></div>
+            <ul class="references" id="references"></ul>
+          </section>
+
+          <section class="panel" aria-labelledby="receipts-title">
+            <div class="panel-head"><h2 id="receipts-title">Local Run Telemetry</h2><span class="section-code">advisory / newest 8 / sanitized</span></div>
+            <ul class="receipts" id="receipts"></ul>
+          </section>
+
+          <section class="panel" aria-labelledby="sources-title">
+            <div class="panel-head"><h2 id="sources-title">Source Monitor</h2><span class="section-code">fixed allowlist</span></div>
+            <div class="source-strip" id="sources"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const endpoint = '/__rww/progress';
+      const staleAfterMilliseconds = 24 * 60 * 60 * 1000;
+      const byId = (id) => document.getElementById(id);
+      let requestActive = false;
+      let lastKnownGood = null;
+      let lastResponseAt = null;
+      let connectionDegraded = false;
+
+      function element(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function replaceChildren(id, children) {
+        byId(id).replaceChildren(...children);
+      }
+
+      function stateBadge(state) {
+        return element('span', `state ${state}`, state.replace(/-/g, ' '));
+      }
+
+      function renderSlices(plan) {
+        replaceChildren('slices', plan.slices.map((slice) => {
+          const row = element('article', `slice${slice.id === plan.activeSlice ? ' active' : ''}`);
+          row.dataset.slice = slice.id;
+          row.title = slice.evidence;
+          row.append(element('span', 'slice-id', `${slice.id} / M${slice.milestone}`));
+          row.append(element('span', 'slice-title', slice.title));
+          const statuses = element('div', 'slice-statuses');
+          statuses.append(
+            stateBadge(slice.state),
+            stateBadge(slice.qualification),
+            stateBadge(slice.disposition),
+          );
+          row.append(statuses);
+          return row;
+        }));
+      }
+
+      function renderGates(gates) {
+        replaceChildren('gates', gates.map((gate) => {
+          const item = element('li', 'gate');
+          item.dataset.gate = gate.id;
+          const top = element('div', 'gate-top');
+          top.append(element('h3', '', `${gate.id} / ${gate.title}`), stateBadge(gate.state));
+          item.append(top, element('p', '', gate.evidence));
+          return item;
+        }));
+      }
+
+      function renderReferences(references) {
+        replaceChildren('references', references.map((reference) => {
+          const item = element('li', 'reference');
+          const link = element('a', '', reference.label);
+          link.href = reference.url;
+          link.target = '_blank';
+          link.rel = 'noreferrer';
+          item.append(link, element('p', '', reference.use));
+          return item;
+        }));
+      }
+
+      function renderReceipts(receipts) {
+        if (receipts.length === 0) {
+          replaceChildren('receipts', [element('li', 'empty', 'No local run receipts available.')]);
+          return;
+        }
+        replaceChildren('receipts', receipts.map((receipt) => {
+          const item = element('li', 'receipt');
+          const copy = element('div');
+          copy.append(element('div', 'receipt-name', `${receipt.command} / ${receipt.runId}`));
+          const details = [receipt.durationMilliseconds === null ? null : `${(receipt.durationMilliseconds / 1000).toFixed(1)}s`]
+            .filter(Boolean).join(' / ');
+          copy.append(element('div', 'receipt-meta', details || receipt.path));
+          item.append(copy, stateBadge(receipt.status));
+          return item;
+        }));
+      }
+
+      function renderSources(data) {
+        const sources = data.roadmaps.map((roadmap) => ({
+          title: roadmap.path,
+          detail: `${roadmap.sections} sections / ${roadmap.status || 'tracked'}`,
+        }));
+        sources.push({
+          title: 'OpenCode goal telemetry (advisory)',
+          detail: data.goals.available ? `${data.goals.active} active / ${data.goals.total} total` : 'not present',
+        });
+        sources.push({
+          title: 'OpenCode loop telemetry (advisory)',
+          detail: data.loops.available ? `${data.loops.running} running / ${data.loops.sessions} sessions read` : 'not present',
+        });
+        replaceChildren('sources', sources.map((source) => {
+          const item = element('div', 'source');
+          item.append(element('strong', '', source.title), element('small', '', source.detail));
+          return item;
+        }));
+      }
+
+      function ageLabel(timestamp) {
+        const milliseconds = Math.max(0, Date.now() - timestamp);
+        const seconds = Math.floor(milliseconds / 1000);
+        if (seconds < 60) return `${seconds}s ago`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 48) return `${hours}h ago`;
+        return `${Math.floor(hours / 24)}d ago`;
+      }
+
+      function updateTelemetry() {
+        const sync = document.querySelector('[data-testid="sync-state"]');
+        if (lastResponseAt === null) {
+          sync.className = 'sync';
+          sync.textContent = 'LOCAL RUN TELEMETRY / ADVISORY / CONNECTING';
+        } else if (connectionDegraded) {
+          sync.className = 'sync error';
+          sync.textContent = `LOCAL RUN TELEMETRY / ADVISORY / LINK DEGRADED / LAST RESPONSE ${ageLabel(lastResponseAt)}`;
+        } else {
+          sync.className = 'sync connected';
+          sync.textContent = `LOCAL RUN TELEMETRY / ADVISORY / CONNECTED / CHECKED ${ageLabel(lastResponseAt)}`;
+        }
+
+        const freshness = document.querySelector('[data-testid="plan-freshness"]');
+        const modifiedAt = Date.parse(lastKnownGood?.planModifiedAt ?? '');
+        if (Number.isNaN(modifiedAt)) {
+          freshness.className = 'freshness';
+          freshness.textContent = 'PLAN SOURCE / AWAITING VALIDATION';
+          document.documentElement.classList.remove('plan-stale');
+          return;
+        }
+        const stale = Date.now() - modifiedAt > staleAfterMilliseconds;
+        freshness.className = `freshness ${stale ? 'stale' : 'current'}`;
+        const planWatermark = `PLAN ${stale ? 'STALE' : 'CURRENT'} / UPDATED ${ageLabel(modifiedAt)} / ${new Date(modifiedAt).toLocaleString()}`;
+        freshness.textContent = connectionDegraded
+          ? `EVIDENCE FAILURE / LAST VERIFIED ${ageLabel(lastResponseAt)} / ${planWatermark}`
+          : planWatermark;
+        document.documentElement.classList.toggle('plan-stale', stale);
+      }
+
+      function render(data) {
+        const plan = data.plan;
+        const active = plan.slices.find((slice) => slice.id === plan.activeSlice);
+        if (!active) throw new Error('Active slice is missing');
+        byId('active-title').textContent = active.title;
+        byId('active-evidence').textContent = active.evidence;
+        byId('active-ordinal').textContent = `${String(plan.slices.indexOf(active) + 1).padStart(2, '0')} / ${plan.slices.length}`;
+        byId('metric-complete').textContent = String(plan.slices.filter((slice) => slice.state === 'complete').length).padStart(2, '0');
+        byId('metric-open').textContent = String(plan.slices.filter((slice) => slice.state !== 'complete').length).padStart(2, '0');
+        byId('metric-gates').textContent = `${plan.gates.filter((gate) => gate.state === 'passed').length} / ${plan.gates.length}`;
+        const verifiedClaims = [
+          ...plan.slices.filter((slice) => slice.state === 'complete' && slice.evidenceRefs?.length === 1),
+          ...plan.gates.filter((gate) => gate.state === 'passed' && gate.evidenceRefs?.length === 1),
+        ];
+        byId('metric-receipts').textContent = String(verifiedClaims.length).padStart(2, '0');
+        renderSlices(plan);
+        renderGates(plan.gates);
+        renderReferences(plan.references);
+        renderReceipts(data.receipts);
+        renderSources(data);
+        lastKnownGood = data;
+        const generatedAt = Date.parse(data.generatedAt);
+        lastResponseAt = Number.isNaN(generatedAt) ? Date.now() : generatedAt;
+        connectionDegraded = false;
+        updateTelemetry();
+      }
+
+      async function refresh() {
+        if (requestActive) return;
+        requestActive = true;
+        try {
+          const response = await fetch(endpoint, {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          });
+          if (!response.ok) throw new Error(`Progress endpoint returned ${response.status}`);
+          render(await response.json());
+        } catch (error) {
+          connectionDegraded = true;
+          updateTelemetry();
+          console.warn(error);
+        } finally {
+          requestActive = false;
+        }
+      }
+
+      void refresh();
+      window.setInterval(refresh, 2000);
+    </script>
+  </body>
+</html>

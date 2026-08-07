@@ -24,6 +24,7 @@ import { World, type BallisticFireResult, type SimEvent, type Unit } from '@sim/
 import type { TrajectorySample } from '@sim/ballistics';
 import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
+import { CameraController } from '@render/cameraController';
 import { EntityRenderer } from '@render/entityRenderer';
 import { Effects } from '@render/effects';
 import { isPresentationEventVisible } from '@render/presentationEvents';
@@ -42,6 +43,9 @@ import {
 } from './tutorial/mission';
 import type { NarrativeHudModel } from './tutorial/narrative';
 import type { VoiceUnitRef } from './audio/voiceDirector';
+import type { RuntimeScenario } from './scenario/runtimeScenario';
+import { createRuntimeScenarioWorld } from './scenario/worldFactory';
+import type { RuntimeScenarioResolvedOpeningView } from './scenario/worldFactory';
 
 export const SAVE_SLOT_KEY = 'ring-world-war/save-slot';
 const MAX_PENDING_PRESENTATION_EVENTS = 4_096;
@@ -64,6 +68,10 @@ export class Game {
   readonly hud: Hud;
   readonly playerFaction: Faction;
   readonly opponentFaction: Faction;
+  readonly scenarioBindings: ReadonlyMap<string, number>;
+  readonly scenarioOpeningView: RuntimeScenarioResolvedOpeningView | null;
+  private readonly seed: number;
+  private readonly difficulty: Difficulty;
   private ai: AiOpponent;
   private aiEnabled = true;
   private mission: MissionController | null = null;
@@ -71,6 +79,8 @@ export class Game {
   onPresentationEvents: ((events: readonly SimEvent[]) => void) | null = null;
   onTransientReset: (() => void) | null = null;
   onPlayerVoiceAction: ((action: PlayerVoiceAction) => void) | null = null;
+  onMissionResult: ((result: { missionId: MissionId; status: 'completed' | 'failed' }) => void) | null = null;
+  private notifiedMissionResultKey = '';
 
   selection = new Set<number>();
   /** Ground point under the cursor, in surface coordinates. */
@@ -100,24 +110,39 @@ export class Game {
   private readonly _v = new THREE.Vector3();
 
   constructor(
-    private readonly seed: number,
+    seed: number,
     private readonly anchor: RenderAnchor,
     private readonly rig: CameraRig,
+    private readonly cameraController: CameraController,
     playerFaction: Faction = Faction.Compact,
-    private readonly difficulty: Difficulty = 'veteran',
+    difficulty: Difficulty = 'veteran',
+    runtimeScenario?: RuntimeScenario,
   ) {
+    this.seed = runtimeScenario?.worldSeed ?? seed;
+    this.difficulty = runtimeScenario?.ai.difficulty ?? difficulty;
+    playerFaction = runtimeScenario?.playerFaction ?? playerFaction;
     if (playerFaction !== Faction.Compact && playerFaction !== Faction.Choir) {
       throw new Error('invalid player faction');
     }
     this.playerFaction = playerFaction;
     this.opponentFaction = other(playerFaction);
-    this.terrain = createTerrain(seed);
-    this.world = new World(this.terrain, seed);
-    this.world.setup();
-    this.ai = new AiOpponent(this.opponentFaction, difficulty, seed);
+    this.terrain = createTerrain(this.seed);
+    if (runtimeScenario) {
+      const created = createRuntimeScenarioWorld(this.terrain, runtimeScenario);
+      this.world = created.world;
+      this.scenarioBindings = created.bindings;
+      this.scenarioOpeningView = created.openingView;
+      this.aiEnabled = created.ai.enabled;
+    } else {
+      this.world = new World(this.terrain, this.seed);
+      this.world.setup();
+      this.scenarioBindings = new Map();
+      this.scenarioOpeningView = null;
+    }
+    this.ai = new AiOpponent(this.opponentFaction, this.difficulty, this.seed);
 
-    this.entities = new EntityRenderer(seed);
-    this.effects = new Effects(seed);
+    this.entities = new EntityRenderer(this.seed);
+    this.effects = new Effects(this.seed);
     this.markers = new Markers();
     this.hud = new Hud(this.playerFaction);
     this.entities.onFootfall = (event) => {
@@ -145,6 +170,23 @@ export class Game {
     this.hud.onAbilityToggle = (unitId) => this.toggleAbility(unitId);
     this.hud.onBuildRequest = (kind) => this.setBuild(kind);
     this.hud.onNarrativeAcknowledge = () => this.acknowledgeNarrative();
+  }
+
+  static fromRuntimeScenario(
+    scenario: RuntimeScenario,
+    anchor: RenderAnchor,
+    rig: CameraRig,
+    cameraController: CameraController,
+  ): Game {
+    return new Game(
+      scenario.worldSeed,
+      anchor,
+      rig,
+      cameraController,
+      scenario.playerFaction,
+      scenario.ai.difficulty,
+      scenario,
+    );
   }
 
   get objects(): THREE.Object3D[] {
@@ -194,6 +236,7 @@ export class Game {
       this.artilleryTargeting,
       this.artilleryResult,
       this.rig.camera,
+      this.missionHudModel?.objectiveId === 'select-engineer' ? this.scenarioOpeningView : null,
     );
     // Drop dead entities before HUD rendering so selection never shows ghosts.
     for (const id of [...this.selection]) {
@@ -228,6 +271,7 @@ export class Game {
     if (this.aiEnabled) this.ai.update(this.world, SIM_DT);
     const events = this.world.drainEvents();
     this.mission?.advanceTick(this.world, events);
+    this.notifyMissionResult();
     for (const event of events) {
       if (isPresentationEventVisible(event, this.world, this.playerFaction)) this.presentationEvents.push(event);
     }
@@ -261,6 +305,7 @@ export class Game {
           ? MissionController.start(id, this.world.tick, bindings as CounterfireBindings)
           : MissionController.start(id, this.world.tick, bindings as SignalInSpineBindings);
     this.mission = MissionController.fromSnapshot(started.snapshot(), this.world);
+    this.notifiedMissionResultKey = '';
     this.hud.invalidate();
   }
 
@@ -401,11 +446,12 @@ export class Game {
     const id = this.selection.values().next().value as number | undefined;
     const unit = id ? this.world.unitById(id) : undefined;
     if (!unit || unit.faction !== this.playerFaction || !UNITS[unit.kind].isMech) return false;
+    const transition = this.cameraController.requestMode('direct');
+    if (!transition.ok) return false;
     this.cancelArtilleryTarget();
     this.hud.placing = null;
     this.directUnitId = unit.id;
-    this.rig.enterDirect();
-    this.rig.followDirect(unit.s, unit.z, unit.yaw);
+    this.cameraController.followDirect(unit.s, unit.z, unit.yaw);
     this.hud.alert(`Piloting ${UNITS[unit.kind].name} — WASD move, click attack, Esc tactical`);
     return true;
   }
@@ -439,7 +485,7 @@ export class Game {
     if (this.cursor.valid) {
       unit.manualAimYaw = Math.atan2(this.cursor.z - unit.z, deltaS(unit.s, this.cursor.s));
     }
-    this.rig.followDirect(unit.s, unit.z, unit.yaw);
+    this.cameraController.followDirect(unit.s, unit.z, unit.yaw);
   }
 
   directAttack(s: number, z: number): void {
@@ -457,16 +503,21 @@ export class Game {
     this.emitVoiceOrder([unit], 'attack');
   }
 
-  exitDirectControl(): void {
-    if (!this.directUnitId) return;
+  exitDirectControl(): boolean {
+    if (!this.directUnitId) return true;
     const unit = this.world.unitById(this.directUnitId);
+    const transition = this.cameraController.requestMode('tactical');
+    if (!transition.ok) {
+      // Retain direct ownership and retry on the next update if the unit vanished.
+      return false;
+    }
     if (unit) {
       unit.manualAimYaw = null;
       this.rig.setFocus(unit.s, unit.z);
     }
     this.directUnitId = 0;
-    this.rig.exitDirect();
     this.hud.alert('Tactical control restored');
+    return true;
   }
 
   beginArtilleryTarget(sourceId: number, weaponId?: string): void {
@@ -561,6 +612,7 @@ export class Game {
         targetS: this.cursor.s,
         targetZ: this.cursor.z,
       }, this.world);
+      this.notifyMissionResult();
       if (voiceUnit) this.emitVoiceOrder([voiceUnit], 'attack');
       this.cancelArtilleryTarget();
     }
@@ -919,6 +971,10 @@ export class Game {
       this.ai = opponent;
       this.aiEnabled = session.aiEnabled;
       this.mission = session.mission;
+      const restoredMission = this.mission?.snapshot();
+      this.notifiedMissionResultKey = restoredMission && restoredMission.status !== 'active'
+        ? `${restoredMission.missionId}:${restoredMission.status}`
+        : '';
       this.resetTransientState();
       this.hud.alert('Game loaded');
       return { ok: true, message: 'Game loaded' };
@@ -936,8 +992,8 @@ export class Game {
     this.hud.placing = null;
     this.hud.invalidate();
     this.cursor.valid = false;
-    this.directUnitId = 0;
-    this.rig.exitDirect();
+    if (this.directUnitId) this.exitDirectControl();
+    else this.cameraController.requestMode('tactical');
     this.acc = 0;
     this.previewCooldown = 0;
     this.presentationEvents.length = 0;
@@ -952,6 +1008,7 @@ export class Game {
       kind: 'selection-changed',
       selectedIds: [...this.selection],
     }, this.world);
+    this.notifyMissionResult();
     const units = [...this.selection]
       .map((id) => this.world.unitById(id))
       .filter((unit): unit is NonNullable<typeof unit> =>
@@ -972,10 +1029,20 @@ export class Game {
     });
   }
 
+  private notifyMissionResult(): void {
+    const snapshot = this.mission?.snapshot();
+    if (!snapshot || snapshot.status === 'active') return;
+    const key = `${snapshot.missionId}:${snapshot.status}`;
+    if (this.notifiedMissionResultKey === key) return;
+    this.notifiedMissionResultKey = key;
+    this.onMissionResult?.({ missionId: snapshot.missionId, status: snapshot.status });
+  }
+
   dispose(): void {
     this.onPresentationEvents = null;
     this.onTransientReset = null;
     this.onPlayerVoiceAction = null;
+    this.onMissionResult = null;
     this.entities.onFootfall = null;
     this.entities.dispose();
     this.effects.dispose();

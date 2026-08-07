@@ -64,6 +64,39 @@ describe('game saves', () => {
     expect(restored.mission?.hudModel().objectiveId).toBe('build-power');
   });
 
+  it('round-trips a failed First Contact after all Compact engineers are lost', () => {
+    const world = new World(terrain, 77);
+    const engineer = world.spawnUnit(Faction.Compact, 'engineer', 0, 0);
+    const node = world.spawnStructure(-1 as Faction, 'spinalNode', 20_000, 0, 1);
+    const target = world.spawnStructure(Faction.Choir, 'fusionCore', 19_500, 0, 1);
+    const mission = MissionController.start('first-contact', world.tick, {
+      tutorialNode: node.id,
+      artilleryTarget: target.id,
+    });
+    world.applyDamage(engineer.id, engineer.maxHp * 10, 'explosive', Faction.Choir);
+    mission.advanceTick(world, world.drainEvents());
+    const controllers = [
+      new AiOpponent(Faction.Compact, 'veteran', 177),
+      new AiOpponent(Faction.Choir, 'veteran', 277),
+    ] as const;
+
+    const restored = deserializeGameSave(serializeGameSave(
+      world,
+      controllers,
+      false,
+      mission.snapshot(),
+      Faction.Compact,
+      Faction.Choir,
+    ), terrain);
+
+    expect(restored.mission?.hudModel()).toMatchObject({
+      missionId: 'first-contact',
+      status: 'failed',
+      objectiveTitle: 'Construction crew lost',
+    });
+    expect(restored.mission?.snapshot().milestones.firstContactFailureReason).toBe('engineers-lost');
+  });
+
   it('loads legacy match-session saves with no mission and AI enabled', () => {
     const world = new World(terrain, 72);
     world.setup();

@@ -1,0 +1,20 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-03",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "docs/roadmap.md",
+      "sha256": "745c204cc414ae38cb1b418f842141fa4874aedcf31ba517db757a21d961bab0"
+    }
+  ],
+  "checks": [
+    {
+      "id": "faction-perspective-authority",
+      "result": "passed",
+      "summary": "The current roadmap records faction-correct authority across title selection, input, fog, rendering, audio, HUD, AI, camera, restart, and versioned saves."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-06-remediation-1-review-2026-08-07",
+  "claimId": "LS-06",
+  "policy": "docs/launch-scope-execution-policy.md",
+  "reviewRound": 2,
+  "reviewType": "infrastructure-acceptance",
+  "independentContext": true,
+  "scores": {
+    "lifecycleCorrectness": 4,
+    "inputIsolation": 4,
+    "compatibilityRegression": 4,
+    "extensibility": 3
+  },
+  "dependencyReady": true,
+  "blockers": [],
+  "requiredQualityFindings": [],
+  "humanValidation": [],
+  "polish": [
+    {
+      "id": "LS-06-P01",
+      "summary": "A future test may route a genuinely throwing mode controller through Game to consolidate the complementary controller-unit and browser-injection evidence.",
+      "reopenTrigger": "Reopen only if a real camera mode implementation exposes an ownership inconsistency not covered by the current lifecycle contract."
+    }
+  ]
+}

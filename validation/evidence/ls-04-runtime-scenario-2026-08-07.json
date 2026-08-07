@@ -1,0 +1,48 @@
+{
+  "schema": "rww.launch-slice-verification",
+  "version": 1,
+  "sliceId": "LS-04",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "implementation": {
+    "runtimeScenarioSha256": "393158e66ce8e55bb69e1bf7d81a6eba6f664c857becbbd488749d87274e2621",
+    "worldFactorySha256": "6a76afc8ae18a688a67b1a0fd67c3dc4a776d2d0ef43623f25d91d8110fc2abc",
+    "firstContactSha256": "9b2105e25ea9b095c0f16fe6ad2fd1c06d49678d540810f92cc83c1084bd5f05",
+    "routeSha256": "3c3f4238cfd4b7b26d0b01fbc1c8741f5c8d395d836e5e59e302804f6fd91347"
+  },
+  "checks": [
+    {
+      "id": "strict-runtime-contract",
+      "result": "passed",
+      "evidence": "The production parser rejects unknown/browser-only fields, invalid values, duplicate or unsafe IDs, and unresolved or semantically invalid references."
+    },
+    {
+      "id": "deterministic-fresh-world",
+      "result": "passed",
+      "evidence": "Two factories produce identical state hashes and authored entity counts without invoking the standard skirmish setup."
+    },
+    {
+      "id": "production-first-contact-route",
+      "result": "passed",
+      "evidence": "The production URL /?menu=0&scenario=first-contact starts the authored world and mission with two resolved bindings, AI disabled, six engineers, seven structures, six deposits, and no development scenario driver."
+    },
+    {
+      "id": "runtime-scenario-tests",
+      "result": "passed",
+      "evidence": "The focused runtime scenario, tutorial, save, world, and parser suites passed; the production runtime/tutorial browser suite, typecheck, and build passed."
+    },
+    {
+      "id": "blind-onboarding-comparison",
+      "result": "passed",
+      "evidence": "A fresh critic compared randomized unlabeled 1280x720 frames and selected Ring World War over the StarCraft II onboarding/setup reference for immediate action clarity, target isolation, objective readability, and engineer-to-Bastion relationships."
+    }
+  ],
+  "visualComparison": {
+    "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+    "referenceManifest": "validation/references/sc2-wings-of-liberty.json",
+    "referenceMoment": "onboarding-setup",
+    "referenceFrameSha256": "97274a7b06cdf4f43000607418e833a93c9177fbcc3d85da41cbeb2302ca0c40",
+    "candidateFrame": "output/references/rww/ls-04-first-contact-runtime-1280x720.png",
+    "candidateFrameDistribution": "ignored local evidence",
+    "winner": "ring-world-war"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-01",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "docs/publishable-game-roadmap.md",
+      "sha256": "095e79affdc9d2ec5377618c14ebad3a2911cb2682e98cee018e80597f074687"
+    }
+  ],
+  "checks": [
+    {
+      "id": "authoritative-launch-contract",
+      "result": "passed",
+      "summary": "Approved product thesis, launch scope, exclusions, milestones, and validation gates are recorded in one authoritative roadmap."
+    }
+  ]
+}

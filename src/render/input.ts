@@ -6,7 +6,7 @@
  * middle-drag or Q/E to rotate.
  */
 
-import type { CameraRig } from './cameraRig';
+import type { CameraControlSurface } from './cameraController';
 
 /** How close to the edge, in pixels, before edge-panning kicks in. */
 const EDGE_MARGIN = 18;
@@ -21,12 +21,11 @@ export class InputController {
   /** Edge panning is off until the pointer has entered the canvas once, so the
    *  camera does not drift on load while the cursor sits at 0,0. */
   private edgePanArmed = false;
-  private direct = false;
   private enabled = true;
 
   constructor(
     private readonly el: HTMLElement,
-    private readonly rig: CameraRig,
+    private readonly camera: CameraControlSurface,
   ) {
     el.tabIndex = 0;
     el.style.touchAction = 'none';
@@ -72,7 +71,7 @@ export class InputController {
     this.edgePanArmed = true;
 
     if (this.rotating) {
-      this.rig.rotate((e.clientX - this.lastRotateX) * 0.005);
+      if (this.camera.capabilities.rotate) this.camera.rotate((e.clientX - this.lastRotateX) * 0.005);
       this.lastRotateX = e.clientX;
     }
   };
@@ -80,7 +79,7 @@ export class InputController {
   private onPointerDown = (e: PointerEvent): void => {
     if (!this.enabled) return;
     this.el.focus();
-    if (this.direct) return;
+    if (!this.camera.capabilities.rotate) return;
     if (e.button === 1 || (e.button === 2 && e.shiftKey)) {
       this.rotating = true;
       this.lastRotateX = e.clientX;
@@ -95,8 +94,8 @@ export class InputController {
   private onWheel = (e: WheelEvent): void => {
     if (!this.enabled) return;
     e.preventDefault();
-    if (this.direct) return;
-    this.rig.zoom(Math.sign(e.deltaY) * (e.shiftKey ? 3 : 1));
+    if (!this.camera.capabilities.zoom) return;
+    this.camera.zoom(Math.sign(e.deltaY) * (e.shiftKey ? 3 : 1));
   };
 
   update(dt: number): void {
@@ -110,12 +109,11 @@ export class InputController {
     if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) right += 1;
     if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) right -= 1;
 
-    if (this.direct) return;
-
-    if (this.keys.has('KeyQ')) this.rig.rotate(-1.6 * dt);
-    if (this.keys.has('KeyE')) this.rig.rotate(1.6 * dt);
-    if (this.keys.has('KeyR')) this.rig.zoom(-4 * dt);
-    if (this.keys.has('KeyF')) this.rig.zoom(4 * dt);
+    if (this.camera.capabilities.rotate && this.keys.has('KeyQ')) this.camera.rotate(-1.6 * dt);
+    if (this.camera.capabilities.rotate && this.keys.has('KeyE')) this.camera.rotate(1.6 * dt);
+    if (this.camera.capabilities.zoom && this.keys.has('KeyR')) this.camera.zoom(-4 * dt);
+    if (this.camera.capabilities.zoom && this.keys.has('KeyF')) this.camera.zoom(4 * dt);
+    if (!this.camera.capabilities.pan) return;
 
     // Edge panning, only once the pointer has actually been over the canvas.
     if (this.pointerInside && this.edgePanArmed && !this.rotating) {
@@ -129,12 +127,8 @@ export class InputController {
 
     if (right !== 0 || forward !== 0) {
       const len = Math.hypot(right, forward);
-      this.rig.pan((right / len) * speed, (forward / len) * speed);
+      this.camera.pan((right / len) * speed, (forward / len) * speed);
     }
-  }
-
-  setDirectMode(enabled: boolean): void {
-    this.direct = enabled;
   }
 
   setEnabled(enabled: boolean): void {
@@ -149,13 +143,13 @@ export class InputController {
   }
 
   get moveForward(): number {
-    if (!this.enabled) return 0;
+    if (!this.enabled || !this.camera.capabilities.directMovement) return 0;
     return (this.keys.has('KeyW') || this.keys.has('ArrowUp') ? 1 : 0) -
       (this.keys.has('KeyS') || this.keys.has('ArrowDown') ? 1 : 0);
   }
 
   get moveRight(): number {
-    if (!this.enabled) return 0;
+    if (!this.enabled || !this.camera.capabilities.directMovement) return 0;
     return (this.keys.has('KeyD') || this.keys.has('ArrowRight') ? 1 : 0) -
       (this.keys.has('KeyA') || this.keys.has('ArrowLeft') ? 1 : 0);
   }

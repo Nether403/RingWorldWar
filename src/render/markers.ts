@@ -18,6 +18,7 @@ import { DEPOSIT_PLACEMENT_RADIUS, type BallisticFireResult, type World } from '
 import type { TrajectorySample } from '@sim/ballistics';
 import type { RenderAnchor } from './anchor';
 import { disposeObject } from './disposeObject';
+import type { RuntimeScenarioResolvedOpeningView } from '../scenario/worldFactory';
 
 const MAX_RING_SEGMENTS = 3600;
 const MAX_BAR_QUADS = 400;
@@ -98,6 +99,7 @@ export class Markers {
     artilleryTargeting: boolean,
     artilleryResult: BallisticFireResult | null,
     camera: THREE.Camera,
+    openingGuidance: RuntimeScenarioResolvedOpeningView | null = null,
   ): void {
     let rv = 0;
     let bv = 0;
@@ -195,6 +197,48 @@ export class Markers {
       }
     }
     this.object.userData.depositGuidanceCount = depositGuidanceCount;
+
+    let openingDepositCount = 0;
+    if (openingGuidance?.highlightDeposits) {
+      for (const deposit of world.deposits) {
+        if (!world.isDepositAvailable(deposit)) continue;
+        if (!world.isVisible(player, deposit.s, deposit.z)) continue;
+        if (Math.abs(deltaS(anchor.s, deposit.s)) > 500) continue;
+        circle(deposit.s, deposit.z, 32, [1, 0.72, 0.18], true, 4);
+        circle(deposit.s, deposit.z, 10, [1, 0.9, 0.42], false, 4);
+        pushRingSeg(deposit.s - 18, deposit.z, deposit.s + 18, deposit.z, 4, 1, 0.9, 0.42);
+        pushRingSeg(deposit.s, deposit.z - 18, deposit.s, deposit.z + 18, 4, 1, 0.9, 0.42);
+        openingDepositCount++;
+      }
+    }
+    this.object.userData.openingDepositCount = openingDepositCount;
+
+    let openingGuidanceCount = 0;
+    if (openingGuidance) {
+      const context = openingGuidance.contextEntityIds
+        .map((id) => world.unitById(id) ?? world.structureById(id))
+        .filter((entity) => entity !== undefined);
+      for (const entity of context) {
+        const radius = 'progress' in entity
+          ? STRUCTURES[entity.kind].radius * 1.45
+          : UNITS[entity.kind].radius * 2.2;
+        circle(entity.s, entity.z, radius, [1, 0.52, 0.16], true, 3.5);
+        openingGuidanceCount++;
+      }
+      const pulse = 1 + Math.sin(world.time * 4) * 0.12;
+      for (const id of openingGuidance.actionEntityIds) {
+        const entity = world.unitById(id) ?? world.structureById(id);
+        if (!entity) continue;
+        const radius = ('progress' in entity ? STRUCTURES[entity.kind].radius : UNITS[entity.kind].radius) * 2.5;
+        circle(entity.s, entity.z, Math.max(10, radius) * pulse, [0.25, 0.92, 1], false, 4.5);
+        circle(entity.s, entity.z, Math.max(6, radius * 0.55), [0.75, 0.97, 1], true, 4.5);
+        for (const origin of context) {
+          pushRingSeg(origin.s, origin.z, entity.s, entity.z, 2.5, 0.22, 0.58, 0.66);
+        }
+        openingGuidanceCount++;
+      }
+    }
+    this.object.userData.openingGuidanceCount = openingGuidanceCount;
 
     // --- Selection rings -----------------------------------------------------
     for (const id of selection) {

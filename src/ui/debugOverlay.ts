@@ -7,6 +7,7 @@
 
 import { RING_CIRCUMFERENCE, RING_PERIOD, RING_RADIUS } from '@core/constants';
 import type { CameraRig } from '@render/cameraRig';
+import type { CameraController } from '@render/cameraController';
 import type { Environment } from '@render/environment';
 import type { Renderer } from '@render/renderer';
 import type { Game } from '../game';
@@ -71,7 +72,14 @@ export class DebugOverlay {
     this.toastTimer = 1.6;
   }
 
-  update(dt: number, renderer: Renderer, game: Game, rig: CameraRig, env: Environment): void {
+  update(
+    dt: number,
+    renderer: Renderer,
+    game: Game,
+    rig: CameraRig,
+    cameraController: CameraController,
+    env: Environment,
+  ): void {
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toast.style.opacity = '0';
@@ -117,7 +125,7 @@ export class DebugOverlay {
       `programs   ${info.programs?.length ?? 0}   textures ${info.memory.textures}`,
       `quality    ${renderer.quality}   (shift+1..4)`,
       ``,
-      `camera     s ${rig.s.toFixed(0)}m  z ${rig.z.toFixed(0)}m  (${pct}% round)`,
+      `camera     ${cameraController.mode}  s ${rig.s.toFixed(0)}m  z ${rig.z.toFixed(0)}m  (${pct}% round)`,
       `zoom       ${rig.distance.toFixed(0)}m   pitch ${((rig.pitch * 180) / Math.PI).toFixed(0)}deg`,
       ``,
       `daylight   ${(env.cycle.daylight * 100).toFixed(0)}%`,

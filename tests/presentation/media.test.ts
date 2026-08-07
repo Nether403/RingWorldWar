@@ -30,11 +30,16 @@ describe('reviewed Phase 5 delivery media', () => {
     expect(Object.keys(dossiers[Faction.Choir] ?? {})).toHaveLength(6);
     expect(dossiers[Faction.Compact]?.needle).toBeUndefined();
     expect(dossiers[Faction.Choir]?.bulwark).toBeUndefined();
-    const images = [
+    expect(Object.keys(PRESENTATION_MEDIA.campaignMissionArt ?? {})).toEqual([
+      'compact-01', 'compact-02', 'compact-03', 'compact-04', 'compact-05', 'compact-06',
+      'choir-01', 'choir-02', 'choir-03', 'choir-04', 'choir-05', 'choir-06',
+    ]);
+    const images = [...new Set([
       PRESENTATION_MEDIA.menuPoster!,
       ...Object.values(dossiers).flatMap((faction) => Object.values(faction ?? {})),
       ...Object.values(PRESENTATION_MEDIA.narrativePortraits ?? {}),
-    ];
+      ...Object.values(PRESENTATION_MEDIA.campaignMissionArt ?? {}),
+    ])];
     expect(images).toHaveLength(17);
 
     for (const source of images) {

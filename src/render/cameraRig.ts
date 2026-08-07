@@ -105,6 +105,15 @@ export class CameraRig {
     this.yaw += delta;
   }
 
+  /** Apply an authored initial view without a visible interpolation from defaults. */
+  setView(s: number, z: number, yaw: number, distance: number): void {
+    this.setFocus(s, z);
+    this.yaw = yaw;
+    this.smoothYaw = yaw;
+    this.distance = clamp(distance, ZOOM_MIN, ZOOM_MAX);
+    this.targetDistance = this.distance;
+  }
+
   enterDirect(): void {
     if (this.direct) return;
     this.direct = true;

@@ -1,0 +1,28 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-05",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "validation/evidence/ls-05-campaign-platform-2026-08-07.json",
+      "sha256": "770bb511f1e2c5759b4b5dcb30112add68ba4242d01622ab4763eb539b9d6ed2"
+    },
+    {
+      "path": "validation/evidence/reviews/ls-05-criterion-review-2026-08-07.json",
+      "sha256": "e8704f3034a11ff6b2e4b59106be84010ad3e5f7e25ce49ad193b474aac76fbb"
+    },
+    {
+      "path": "docs/launch-scope-execution-policy.md",
+      "sha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c"
+    }
+  ],
+  "checks": [
+    {
+      "id": "campaign-registry-profile-lifecycle",
+      "result": "passed",
+      "summary": "The twelve-mission registry, strict profile lifecycle, production campaign routes, natural failure/retry/replay/continuation, and six absolute-quality criteria pass; one non-blocking keyboard-navigation improvement remains in the polish backlog."
+    }
+  ]
+}

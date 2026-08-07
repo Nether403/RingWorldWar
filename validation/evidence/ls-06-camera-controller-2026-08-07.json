@@ -1,0 +1,36 @@
+{
+  "schema": "rww.launch-slice-verification",
+  "version": 1,
+  "sliceId": "LS-06",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "policyVersion": 1,
+  "implementation": {
+    "cameraControllerSha256": "67fc996570947c12029d5092261b40dc5e46ad2ee53107d42aaf80e9ba921637",
+    "cameraRigSha256": "8ca19909f38535692052b7b82dbca742b42554e167cfcbd296f88640066fc081",
+    "inputSha256": "e35b6788ddfd6dd8b3ddc900ed39468ff30f59e5f47b2dcce635088faa9ced47",
+    "gameSha256": "b79322d721819977178e7689f17fb59a3d62f6576fa6f9c0654a7af8a6950b80",
+    "mainSha256": "a719a3606d634af03818a37f39806c5e9db7c28da1f7c6e8c537b9d315eb5881"
+  },
+  "checks": [
+    {
+      "id": "camera-mode-contract",
+      "result": "passed",
+      "evidence": "The named mode union, registered tactical/direct owners, unsupported-mode result, enter/update/exit/resize/dispose lifecycle, idempotency, and one-owner ordering pass."
+    },
+    {
+      "id": "transactional-transitions",
+      "result": "passed",
+      "evidence": "Failed direct entry preserves tactical Game and HUD state; failed tactical exit remains consistently direct; thrown exits re-enter the previous owner; dead-unit invalidation retries safely."
+    },
+    {
+      "id": "input-capability-isolation",
+      "result": "passed",
+      "evidence": "Pan, zoom, rotation, and direct movement derive exclusively from the active controller capabilities with no independently synchronized direct flag."
+    },
+    {
+      "id": "camera-regression-matrix",
+      "result": "passed",
+      "evidence": "Targeted unit and camera browser tests passed, npm run check passed 418 tests with one intentional skip, and 101 unique Chromium/Chrome/Firefox/WebKit tests passed in bounded split runs."
+    }
+  ]
+}

@@ -160,6 +160,8 @@ const CSS = `
   padding: 12px 34px; background: transparent; border: 1px solid rgba(240,130,30,0.7);
   color: #f0821e; letter-spacing: 0.22em; text-transform: uppercase; font-size: 12px; }
 .rww-end button:hover { background: rgba(240,130,30,0.14); }
+.rww-end-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
+.rww-end-actions button { margin-top:14px; }
 .rww-debrief-rows { display: grid; grid-template-columns: auto auto; gap: 7px 28px;
   min-width: min(420px, calc(100vw - 40px)); padding: 14px 18px;
   border-top: 1px solid rgba(150,180,210,.16); border-bottom: 1px solid rgba(150,180,210,.16); }
@@ -316,6 +318,7 @@ export class Hud {
   onArtilleryTarget: ((sourceId: number, weaponId: string) => void) | null = null;
   /** Toggle the active ability on a single selected mech. */
   onAbilityToggle: ((unitId: number) => void) | null = null;
+  onMissionDebriefAction: ((action: 'continue-campaign' | 'retry' | 'replay') => void) | null = null;
   /** Route build mode changes through the game mode coordinator. */
   onBuildRequest: ((kind: StructureKind | null) => void) | null = null;
   onNarrativeAcknowledge: (() => void) | null = null;
@@ -1396,23 +1399,40 @@ export class Hud {
       value.textContent = row.value;
       rows.append(label, value);
     }
-    const b = document.createElement('button');
-    b.textContent = missionDebrief ? 'Continue' : 'Fight again';
-    b.onclick = (): void => {
-      if (missionDebrief) {
-        this.dismissedDebriefKey = missionDebrief.key;
-        this.endEl?.remove();
-        this.endEl = null;
-        this.releaseModal(true);
-      } else this.restartRequested = true;
-    };
     this.endEl.append(h, p);
     if (missionDebrief) this.endEl.appendChild(rows);
-    this.endEl.appendChild(b);
+    const actions = el('div', 'rww-end-actions');
+    const buttons: HTMLButtonElement[] = [];
+    if (missionDebrief && this.onMissionDebriefAction) {
+      const primaryAction = missionDebrief.outcome === 'success' ? 'continue-campaign' : 'retry';
+      const primary = document.createElement('button');
+      primary.textContent = missionDebrief.outcome === 'success' ? 'Continue Campaign' : 'Retry Mission';
+      primary.onclick = (): void => this.onMissionDebriefAction?.(primaryAction);
+      const secondary = document.createElement('button');
+      secondary.textContent = missionDebrief.outcome === 'success' ? 'Replay Mission' : 'Campaign';
+      secondary.onclick = (): void => this.onMissionDebriefAction?.(
+        missionDebrief.outcome === 'success' ? 'replay' : 'continue-campaign',
+      );
+      buttons.push(primary, secondary);
+    } else {
+      const button = document.createElement('button');
+      button.textContent = missionDebrief ? 'Continue' : 'Fight again';
+      button.onclick = (): void => {
+        if (missionDebrief) {
+          this.dismissedDebriefKey = missionDebrief.key;
+          this.endEl?.remove();
+          this.endEl = null;
+          this.releaseModal(true);
+        } else this.restartRequested = true;
+      };
+      buttons.push(button);
+    }
+    actions.append(...buttons);
+    this.endEl.appendChild(actions);
     this.root.appendChild(this.endEl);
     this.endEl.setAttribute('aria-labelledby', h.id);
     this.endEl.setAttribute('aria-describedby', p.id);
-    this.activateModal(this.endEl, b);
+    this.activateModal(this.endEl, buttons[0]!);
   }
 
   dispose(): void {
@@ -1432,6 +1452,7 @@ export class Hud {
     this.onArtilleryTarget = null;
     this.onAbilityToggle = null;
     this.onBuildRequest = null;
+    this.onMissionDebriefAction = null;
     this.onNarrativeAcknowledge = null;
     this.onBlockingOverlayChange = null;
   }

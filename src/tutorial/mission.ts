@@ -70,6 +70,7 @@ export interface MissionMilestones {
   capturedNodeIds: number[];
   deployedLongbow: boolean;
   firedAntispinward: boolean;
+  firstContactFailureReason: 'engineers-lost' | null;
   breakLine: BreakLineMilestones | null;
   counterfire: CounterfireMilestones | null;
   signalInSpine: SignalInSpineMilestones | null;
@@ -122,8 +123,8 @@ const FIRST_CONTACT_OBJECTIVES: readonly ObjectiveDefinition[] = [
   {
     id: 'select-engineer',
     title: 'Wake the construction crew',
-    body: 'Select one of the Meridian engineers near the Bastion.',
-    hint: 'Left-click an engineer, or drag a selection box around one.',
+    body: 'Select one of the Meridian engineers near the Bastion. Choir raiders are inbound; keep a crew alive.',
+    hint: 'Left-click an engineer or drag a selection box. Move the crew if the raider warning closes in.',
   },
   {
     id: 'build-power',
@@ -280,6 +281,13 @@ export class MissionController {
       this.advanceObjectives(world.tick);
       return;
     }
+    if (!world.units.some((unit) =>
+      unit.alive && unit.faction === Faction.Compact && unit.kind === 'engineer')) {
+      this.state.milestones.firstContactFailureReason = 'engineers-lost';
+      this.state.status = 'failed';
+      this.state.failedAtTick = world.tick;
+      return;
+    }
     for (const event of events) this.recordEvent(event);
     this.state.milestones.deployedLongbow ||= world.units.some((unit) =>
       unit.alive && unit.faction === Faction.Compact && unit.kind === 'longbow' &&
@@ -343,6 +351,7 @@ export class MissionController {
       const reason = this.state.milestones.breakLine?.failureReason;
       const counterfireFailure = this.state.milestones.counterfire?.failureReason;
       const signalFailure = this.state.milestones.signalInSpine?.failureReason;
+      const firstContactFailure = this.state.milestones.firstContactFailureReason;
       return {
         missionId: this.state.missionId,
         title: missionTitle(this.state.missionId),
@@ -350,8 +359,12 @@ export class MissionController {
         objectiveId: null,
         objectiveTitle: this.state.missionId === 'counterfire'
           ? 'Defensive line lost'
-          : this.state.missionId === 'a-signal-in-the-spine' ? 'Signal lost' : 'The line is broken',
-        objectiveBody: signalFailure === 'node-destroyed'
+          : this.state.missionId === 'a-signal-in-the-spine'
+            ? 'Signal lost'
+            : firstContactFailure === 'engineers-lost' ? 'Construction crew lost' : 'The line is broken',
+        objectiveBody: firstContactFailure === 'engineers-lost'
+          ? 'Every Compact engineer was lost before the field force could be established.'
+          : signalFailure === 'node-destroyed'
           ? 'The Spinal Node was destroyed before its archive could be secured.'
           : signalFailure === 'engineer-killed'
             ? 'The restoration Engineer was lost before the node came online.'
@@ -360,7 +373,9 @@ export class MissionController {
           : reason === 'match-ended' || counterfireFailure === 'match-ended' || signalFailure === 'match-ended'
           ? 'The battle ended before the forward-line objectives were secured.'
           : 'The protected Extractor was destroyed before the raiders were defeated.',
-        hint: 'Reload the mission and re-form the established defence group.',
+        hint: firstContactFailure === 'engineers-lost'
+          ? 'Retry First Contact and keep at least one engineer alive.'
+          : 'Reload the mission and re-form the established defence group.',
         progressText: `${this.state.objectiveIndex + 1} / ${objectives.length}`,
       };
     }
@@ -411,7 +426,9 @@ export class MissionController {
       title: this.state.status === 'completed' ? 'Mission complete' : 'Mission failed',
       summary: this.state.status === 'completed'
         ? `${missionTitle(this.state.missionId)} objectives secured.`
-        : `${missionTitle(this.state.missionId)} ended before all objectives were secured.`,
+        : this.state.milestones.firstContactFailureReason === 'engineers-lost'
+          ? 'Construction crew lost. Every Compact engineer was destroyed before deployment.'
+          : `${missionTitle(this.state.missionId)} ended before all objectives were secured.`,
       rows,
     };
   }
@@ -496,7 +513,7 @@ export function parseMissionSnapshot(input: unknown): MissionSnapshot {
     fail('$.status', 'completed mission must include every objective and a completion tick');
   }
   if (root.status === 'failed' &&
-      (missionId === 'first-contact' || objectiveIndex >= objectives.length || completedAtTick !== null || failedAtTick === null)) {
+      (objectiveIndex >= objectives.length || completedAtTick !== null || failedAtTick === null)) {
     fail('$.status', 'failed state must be an incomplete fallible mission with a failure tick');
   }
   if (root.status !== 'failed' && failedAtTick !== null) {
@@ -518,13 +535,13 @@ export function parseMissionSnapshot(input: unknown): MissionSnapshot {
     ? emptyNarrativeState()
     : readNarrativeState(root.narrative, '$.narrative', missionId);
   validateNarrativeProgress(missionId, objectiveIndex, root.status, narrative);
-  const failureReason = missionId === 'break-the-line'
-    ? milestones.breakLine?.failureReason ?? null
-    : missionId === 'counterfire'
-      ? milestones.counterfire?.failureReason ?? null
-      : missionId === 'a-signal-in-the-spine'
-        ? milestones.signalInSpine?.failureReason ?? null
-        : null;
+  const failureReason = missionId === 'first-contact'
+    ? milestones.firstContactFailureReason
+    : missionId === 'break-the-line'
+      ? milestones.breakLine?.failureReason ?? null
+      : missionId === 'counterfire'
+        ? milestones.counterfire?.failureReason ?? null
+        : milestones.signalInSpine?.failureReason ?? null;
   if (root.status === 'failed' && !failureReason) {
     fail('$.milestones', 'a failure reason is required for a failed mission');
   }
@@ -606,6 +623,7 @@ function emptyMilestones(missionId: MissionId): MissionMilestones {
     capturedNodeIds: [],
     deployedLongbow: false,
     firedAntispinward: false,
+    firstContactFailureReason: null,
     breakLine: missionId === 'break-the-line' ? emptyBreakLineMilestones() : null,
     counterfire: missionId === 'counterfire' ? emptyCounterfireMilestones() : null,
     signalInSpine: missionId === 'a-signal-in-the-spine' ? emptySignalMilestones() : null,
@@ -718,6 +736,13 @@ function validateBindings(
 
 function validateWorldBindings(state: MissionSnapshot, world: World): void {
   if (state.status === 'failed') {
+    if (state.missionId === 'first-contact') {
+      if (state.milestones.firstContactFailureReason !== 'engineers-lost' || world.units.some((unit) =>
+        unit.alive && unit.faction === Faction.Compact && unit.kind === 'engineer')) {
+        fail('$.milestones.firstContactFailureReason', 'engineers-lost requires every Compact engineer to be gone');
+      }
+      return;
+    }
     if (state.missionId === 'a-signal-in-the-spine') {
       const milestones = state.milestones.signalInSpine!;
       const reason = milestones.failureReason;
@@ -770,6 +795,10 @@ function validateWorldBindings(state: MissionSnapshot, world: World): void {
     return;
   }
   const bindings = firstContactBindings(state);
+  if (!world.units.some((unit) =>
+    unit.alive && unit.faction === Faction.Compact && unit.kind === 'engineer')) {
+    fail('$.milestones.firstContactFailureReason', 'active First Contact requires a live Compact engineer');
+  }
   if (!state.milestones.capturedNodeIds.includes(bindings.tutorialNode)) {
     const node = world.structureById(bindings.tutorialNode);
     if (!node?.alive || node.kind !== 'spinalNode' || node.faction !== -1 || node.progress !== 1) {
@@ -1008,7 +1037,7 @@ function readMilestones(missionId: MissionId, value: unknown, path: string): Mis
   const milestones = record(value, path, [
     'selectedEngineer', 'structureCounts', 'unitCounts', 'capturedNodeIds',
     'deployedLongbow', 'firedAntispinward',
-  ], ['breakLine', 'counterfire', 'signalInSpine']);
+  ], ['firstContactFailureReason', 'breakLine', 'counterfire', 'signalInSpine']);
   const structureCounts = countRecord<StructureKind>(
     milestones.structureCounts,
     `${path}.structureCounts`,
@@ -1046,6 +1075,15 @@ function readMilestones(missionId: MissionId, value: unknown, path: string): Mis
   if (missionId !== 'a-signal-in-the-spine' && signalInSpine) {
     fail(`${path}.signalInSpine`, 'must be null outside a-signal-in-the-spine');
   }
+  const firstContactFailureReason = milestones.firstContactFailureReason === undefined
+    ? null
+    : milestones.firstContactFailureReason;
+  if (firstContactFailureReason !== null && firstContactFailureReason !== 'engineers-lost') {
+    fail(`${path}.firstContactFailureReason`, 'expected engineers-lost or null');
+  }
+  if (missionId !== 'first-contact' && firstContactFailureReason !== null) {
+    fail(`${path}.firstContactFailureReason`, 'must be null outside first-contact');
+  }
   if (missionId !== 'first-contact' && (
     milestones.selectedEngineer !== false || Object.keys(structureCounts).length > 0 ||
     Object.keys(unitCounts).length > 0 || capturedNodeIds.length > 0 ||
@@ -1058,6 +1096,7 @@ function readMilestones(missionId: MissionId, value: unknown, path: string): Mis
     capturedNodeIds,
     deployedLongbow: bool(milestones.deployedLongbow, `${path}.deployedLongbow`),
     firedAntispinward: bool(milestones.firedAntispinward, `${path}.firedAntispinward`),
+    firstContactFailureReason,
     breakLine,
     counterfire,
     signalInSpine,

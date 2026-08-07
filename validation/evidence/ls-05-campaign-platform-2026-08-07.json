@@ -1,0 +1,47 @@
+{
+  "schema": "rww.launch-slice-verification",
+  "version": 1,
+  "sliceId": "LS-05",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "policyVersion": 1,
+  "implementation": {
+    "missionRegistrySha256": "55ddb105cd3934f14f69705fba80ab379b2e392dc88c02b16f6ac0a2aa40641b",
+    "campaignProfileSha256": "aebe8fbe0bb628af5dd191dac089c00a7a4cbce4da6ca4c7aead34dbcab19",
+    "campaignRouteSha256": "8c85e7771bf6c96d6f543d534875de2f68d5060f4e66cc13d2ccd0a1966df31f",
+    "titleScreenSha256": "8afc0f8bbfebd6587b52f6dda63f1efd160db6bf0086f2772fdab2d999d86d45",
+    "campaignE2eSha256": "f6c6c84953a02865a8de6974c2ca2639dfe61e1ef3f679be8e82bd1f7608f3a2"
+  },
+  "checks": [
+    {
+      "id": "twelve-mission-registry",
+      "result": "passed",
+      "evidence": "The exact six Compact and six Choir mission records, ordering, faction ownership, purposes, links, and honest availability validate."
+    },
+    {
+      "id": "versioned-profile",
+      "result": "passed",
+      "evidence": "Strict profile parsing, version-1 migration, corrupt-profile recovery, match-save independence, and bounded storage pass."
+    },
+    {
+      "id": "campaign-lifecycle",
+      "result": "passed",
+      "evidence": "Start, natural failure, persisted failure, validated retry, successful retry completion, replay, repeated replay, continuation, and unavailable-mission handling pass through production routes."
+    },
+    {
+      "id": "campaign-archive",
+      "result": "passed",
+      "evidence": "The production archive exposes both arcs, mission states, selected-mission detail, campaign record, replay history, fallback media, keyboard access, and mobile containment."
+    },
+    {
+      "id": "focused-verification",
+      "result": "passed",
+      "evidence": "Campaign E2E passed 9 tests, campaign unit tests passed 13 tests, and the production build completed without unexpected console errors or warnings."
+    }
+  ],
+  "visualFixture": {
+    "viewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+    "candidateFrame": "output/references/rww/ls-05-campaign-profile-1280x720.png",
+    "candidateFrameSha256": "3f85519d79e2c2afde3f2b58e9e799cb8c8d683d850d02ec0bf8a6a6d6b5e339",
+    "distribution": "ignored local evidence"
+  }
+}

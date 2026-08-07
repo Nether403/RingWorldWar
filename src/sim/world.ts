@@ -925,12 +925,13 @@ export class World {
     return !this.structureById(deposit.claimedBy)?.alive;
   }
 
-  private recomputeCommandCaps(): void {
+  /** Rebuild command capacity from authoritative completed structure state. */
+  recomputeCommandCaps(): void {
     for (const f of [Faction.Compact, Faction.Choir]) {
       this.players[f].commandCap = STARTING_COMMAND;
     }
     for (const st of this.structures) {
-      if (st.alive && st.kind === 'spinalNode' && st.faction >= 0) {
+      if (st.alive && st.progress >= 1 && st.kind === 'spinalNode' && st.faction >= 0) {
         this.players[st.faction as Faction].commandCap += COMMAND_PER_NODE;
       }
     }

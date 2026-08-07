@@ -1,0 +1,24 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-04",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "validation/evidence/ls-04-runtime-scenario-2026-08-07.json",
+      "sha256": "2287b0c6585e5590af55a8e9b39a2c98ab37da557746fc9fab18462274d2c04e"
+    },
+    {
+      "path": "validation/references/sc2-wings-of-liberty.json",
+      "sha256": "16c8201801fa29bfad13a2cea65e1b37c17c5658cd0a8ef12f2570fa4b095ee0"
+    }
+  ],
+  "checks": [
+    {
+      "id": "runtime-scenario-world-factory",
+      "result": "passed",
+      "summary": "The strict production scenario contract, deterministic fresh-world factory, production First Contact route, functional browser checks, and blind 1280x720 onboarding comparison all passed."
+    }
+  ]
+}

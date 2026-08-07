@@ -1,0 +1,39 @@
+{
+  "schema": "rww.visual-reference",
+  "version": 1,
+  "id": "sc2-wings-of-liberty-720p",
+  "title": "StarCraft II: Wings of Liberty gameplay and HUD",
+  "source": {
+    "url": "https://www.youtube.com/watch?v=n0BJHiimySs",
+    "title": "StarCraft II Wings of Liberty PC Gameplay Ultra High Settings 720p HD",
+    "durationSeconds": 659,
+    "publishedResolution": { "width": 1280, "height": 720 },
+    "localReviewCopy": "output/references/sc2/sc2-hud-source.mp4",
+    "sha256": "88d2f945d1171a2081f2f748606952404e6fd11e523653d419d2a719bbaea7eb"
+  },
+  "captureViewport": { "width": 1280, "height": 720, "deviceScaleFactor": 1 },
+  "distribution": "Reference media and frames remain ignored local artifacts and are not release inputs.",
+  "moments": [
+    {
+      "id": "onboarding-setup",
+      "timestampSeconds": 60,
+      "equivalentMoment": "Campaign objective visible while the player selects an early production structure and tutorial topics remain available.",
+      "localFrame": "output/references/sc2/sc2-hud-01-setup-1280x720.png",
+      "sha256": "97274a7b06cdf4f43000607418e833a93c9177fbcc3d85da41cbeb2302ca0c40"
+    },
+    {
+      "id": "economy-production",
+      "timestampSeconds": 270,
+      "equivalentMoment": "Developed base with workers, multiple production structures, an active queue, objectives, resources, minimap, and selected-building commands visible together.",
+      "localFrame": "output/references/sc2/sc2-hud-02-economy-1280x720.png",
+      "sha256": "a02fef003010560639c02a90fa8fba4b153a11ebc280825ae5f9e29399854a2f"
+    },
+    {
+      "id": "battle-objective",
+      "timestampSeconds": 540,
+      "equivalentMoment": "A dense infantry engagement at the mission objective with primary and bonus objectives, battle space, minimap, resources, and command surface visible.",
+      "localFrame": "output/references/sc2/sc2-hud-03-battle-1280x720.png",
+      "sha256": "acc58762079b9c11447f85f26344f0bdb849c227c25d1852348d0e6921a936f8"
+    }
+  ]
+}

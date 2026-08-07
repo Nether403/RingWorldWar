@@ -1,0 +1,28 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-06",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "validation/evidence/ls-06-camera-controller-2026-08-07.json",
+      "sha256": "5555db443e827a902003a87c260d3f09088de3e18b4dc0fb2bcac46fe7c06232"
+    },
+    {
+      "path": "validation/evidence/reviews/ls-06-criterion-review-2026-08-07.json",
+      "sha256": "6d24aa6b687407d1593162c5b5be03d88a4744a192a92cfaa57150433fa70979"
+    },
+    {
+      "path": "docs/launch-scope-execution-policy.md",
+      "sha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c"
+    }
+  ],
+  "checks": [
+    {
+      "id": "camera-controller-lifecycle",
+      "result": "passed",
+      "summary": "The camera mode lifecycle, transactional Game transitions, capability-driven input isolation, resize/disposal behavior, and tactical/direct compatibility matrix pass; one optional consolidated integration test remains polish."
+    }
+  ]
+}

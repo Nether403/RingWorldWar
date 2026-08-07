@@ -1,0 +1,28 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-02",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "docs/gate-1.md",
+      "sha256": "2675c60ecffb38a15f1a0a7d460bf9ce43f9e9cb3bc74de9a232e6b7cf6b25d3"
+    },
+    {
+      "path": "docs/roadmap.md",
+      "sha256": "745c204cc414ae38cb1b418f842141fa4874aedcf31ba517db757a21d961bab0"
+    },
+    {
+      "path": "validation/evidence/full-suite-2026-08-05.json",
+      "sha256": "2a378b353cfa716d2501fe2ba346fe17894c0812a4e869b20debc488bdc96e23"
+    }
+  ],
+  "checks": [
+    {
+      "id": "technical-baseline-reproducible",
+      "result": "passed",
+      "summary": "The technical playable gate, current delivery ledger, and full-suite evidence establish a reproducible baseline for subsequent launch work."
+    }
+  ]
+}
