@@ -8,14 +8,19 @@ This is the authoritative source for current delivery status and near-term seque
 
 The project now targets a solo/AI-assisted PC release with a browser demo. The approved expansion roadmap is recorded in `docs/publishable-game-roadmap.md`.
 
-The current implementation milestone is the campaign/session foundation. The title flow now launches an honestly labeled faction-selectable skirmish, runtime player perspective reaches input, fog, rendering, audio, HUD, AI, camera placement, restart, and saves, and version 1 saves migrate to their historical Compact perspective.
+The current implementation milestone is the Ring USP slice. LS-04 delivered the strict runtime scenario definition and deterministic world factory, LS-05 delivered the twelve-mission registry and versioned campaign profile, and LS-06 delivered the transactional camera-controller interface. Their exact receipts are tracked in `validation/evidence/launch-scope/`.
 
-The next dependency is a shared runtime scenario definition and world factory. New campaign missions, aircraft, transports, and interactive environmental density must not be added before their supporting runtime contracts exist.
+LS-07 is active under the approved bounded contract in `docs/launch-scope/ls-07-paired-spinal-nodes.md`. It adds explicit operational pairs, reversible local Spinal Alignment, and one deterministic pair-only Dominance consequence. Chord effects, overhead intelligence, transport, stabilization, alternate victory, whole-ring presentation, and campaign finales remain outside this slice and must not be pulled forward.
 
 ## Current Status
 
 | Area | Status | Evidence or boundary |
 | --- | --- | --- |
+| Launch execution policy | Approved and enforced | `docs/launch-scope-execution-policy.md` and progress-manifest schema version 2 bound remediation, qualification, and claim receipts |
+| LS-04 runtime scenarios/world factory | Complete | Exact claim receipt in `validation/evidence/launch-scope/LS-04.json` |
+| LS-05 mission registry/campaign profile | Complete, polish backlog | Exact claim receipt in `validation/evidence/launch-scope/LS-05.json`; conventional listbox arrow navigation remains optional polish |
+| LS-06 camera controller interface | Complete, polish backlog | Exact claim receipt in `validation/evidence/launch-scope/LS-06.json`; one consolidated fault-injection integration test remains optional polish |
+| LS-07 paired Spinal Nodes | Active, contract approved | Exact mechanics, exclusions, acceptance matrix, canon boundary, and future evidence paths are frozen in `docs/launch-scope/ls-07-paired-spinal-nodes.md` |
 | Gate 1 technical playable slice | Passed | Automated and technical receipt in `docs/gate-1.md` |
 | Phase 2 systems implementation | Delivered | AI tiers, weapons, abilities, faction modifiers, save/load, quality settings, and headless orchestration are summarized in `tasks/phase-2-systems-depth/execution-report.md` |
 | Gate 2 gameplay cohorts | Passed | Veteran mirror, Veteran vs Recruit, and Commander vs Veteran cohorts all pass the configured gameplay gates in `docs/core-match-validation-results.md` |

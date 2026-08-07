@@ -45,7 +45,7 @@ const SLICE_QUALIFICATIONS = new Set(['not-run', 'pending', 'automation-passed']
 const SLICE_DISPOSITIONS = new Set(['pending', 'clean', 'polish-backlog']);
 const COMPLETE_DISPOSITIONS = new Set(['clean', 'polish-backlog']);
 const GATE_STATES = new Set(['passed', 'in-progress', 'open']);
-const CLAIM_EVIDENCE_POLICY = Object.freeze({
+export const CLAIM_EVIDENCE_POLICY = Object.freeze({
   'LS-01': Object.freeze({
     acceptedState: 'complete',
     receiptPath: 'validation/evidence/launch-scope/LS-01.json',
@@ -97,6 +97,17 @@ const CLAIM_EVIDENCE_POLICY = Object.freeze({
     ]),
     checkIds: Object.freeze(['camera-controller-lifecycle']),
   }),
+  'LS-07': Object.freeze({
+    acceptedState: 'complete',
+    receiptPath: 'validation/evidence/launch-scope/LS-07.json',
+    sourcePaths: Object.freeze([
+      'validation/evidence/ls-07-paired-nodes-2026-08-07.json',
+      'validation/evidence/reviews/ls-07-criterion-review-2026-08-07.json',
+      'docs/launch-scope/ls-07-paired-spinal-nodes.md',
+      'docs/launch-scope-execution-policy.md',
+    ]),
+    checkIds: Object.freeze(['paired-spinal-node-alignment']),
+  }),
   'G-07': Object.freeze({
     acceptedState: 'passed',
     receiptPath: 'validation/evidence/launch-scope/G-07.json',
@@ -109,6 +120,94 @@ const CLAIM_EVIDENCE_POLICY = Object.freeze({
 } as const);
 
 type ClaimEvidenceId = keyof typeof CLAIM_EVIDENCE_POLICY;
+
+export const LS07_ACCEPTANCE_IDS = Object.freeze([
+  'topology',
+  'capture',
+  'alignment',
+  'gameplay-consequence',
+  'ai',
+  'persistence',
+  'presentation',
+  'regression',
+  'scope',
+] as const);
+
+export const LS07_REQUIRED_SOURCE_PATHS = Object.freeze([
+  'src/sim/data.ts',
+  'src/sim/world.ts',
+  'src/sim/serialize.ts',
+  'src/scenario/runtimeScenario.ts',
+  'src/scenario/worldFactory.ts',
+  'src/scenario/firstContact.ts',
+  'src/ai/opponent.ts',
+  'src/ui/hud.ts',
+  'tests/sim/spinalAlignment.test.ts',
+  'tests/sim/serialize.test.ts',
+  'tests/ai/strategist.test.ts',
+  'tests/scenario/runtimeScenario.test.ts',
+  'e2e/spinal-alignment.spec.ts',
+] as const);
+
+export const LS07_RUN_POLICY = Object.freeze({
+  'focused-unit': Object.freeze({
+    command: 'npx vitest run tests/sim/spinalAlignment.test.ts tests/sim/serialize.test.ts tests/ai/strategist.test.ts tests/scenario/runtimeScenario.test.ts',
+    artifactPath: 'validation/evidence/runs/ls-07-focused-unit-2026-08-07.json',
+  }),
+  'focused-browser': Object.freeze({
+    command: 'npx playwright test e2e/spinal-alignment.spec.ts --project=chromium-regression',
+    artifactPath: 'validation/evidence/runs/ls-07-focused-browser-2026-08-07.json',
+  }),
+  'full-check': Object.freeze({
+    command: 'npm run check',
+    artifactPath: 'validation/evidence/runs/ls-07-full-check-2026-08-07.json',
+  }),
+  'core-match': Object.freeze({
+    command: 'npm run validate:core-match',
+    artifactPath: 'validation/evidence/runs/ls-07-core-match-2026-08-07.json',
+  }),
+} as const);
+
+type LS07RunId = keyof typeof LS07_RUN_POLICY;
+
+export const LS07_CHECK_POLICY = Object.freeze({
+  topology: Object.freeze({
+    runIds: Object.freeze(['focused-unit'] as LS07RunId[]),
+    testIds: Object.freeze(['canonical-pair-topology', 'scenario-pair-identity']),
+  }),
+  capture: Object.freeze({
+    runIds: Object.freeze(['focused-unit'] as LS07RunId[]),
+    testIds: Object.freeze(['two-phase-capture-timing', 'contested-freeze-friendly-repair', 'damage-neutralization']),
+  }),
+  alignment: Object.freeze({
+    runIds: Object.freeze(['focused-unit'] as LS07RunId[]),
+    testIds: Object.freeze(['alignment-event-order', 'unpaired-node-behavior']),
+  }),
+  'gameplay-consequence': Object.freeze({
+    runIds: Object.freeze(['focused-unit'] as LS07RunId[]),
+    testIds: Object.freeze(['pair-only-dominance', 'existing-victory-outcomes']),
+  }),
+  ai: Object.freeze({
+    runIds: Object.freeze(['focused-unit'] as LS07RunId[]),
+    testIds: Object.freeze(['ai-pair-completion', 'ai-pair-denial-defense']),
+  }),
+  persistence: Object.freeze({
+    runIds: Object.freeze(['focused-unit'] as LS07RunId[]),
+    testIds: Object.freeze(['world-v2-round-trip', 'world-v1-pair-migration', 'legacy-game-save-compatibility']),
+  }),
+  presentation: Object.freeze({
+    runIds: Object.freeze(['focused-browser'] as LS07RunId[]),
+    testIds: Object.freeze(['hud-minimap-pair-state', 'alignment-accessible-events', 'hidden-mate-no-leak']),
+  }),
+  regression: Object.freeze({
+    runIds: Object.freeze(['full-check', 'core-match'] as LS07RunId[]),
+    testIds: Object.freeze(['full-check', 'core-match-cohorts']),
+  }),
+  scope: Object.freeze({
+    runIds: Object.freeze(['focused-unit'] as LS07RunId[]),
+    testIds: Object.freeze(['ls07-scope-exclusions']),
+  }),
+} as const);
 
 function evidencePolicy(claimId: string) {
   return Object.prototype.hasOwnProperty.call(CLAIM_EVIDENCE_POLICY, claimId)
@@ -162,6 +261,266 @@ function isSafeRepositoryPath(path: string): boolean {
     && !path.startsWith('/')
     && !segments.includes('..')
     && /^(?:docs|validation)\/[A-Za-z0-9._/-]+$/.test(path);
+}
+
+function isSafeImplementationPath(path: string): boolean {
+  const segments = path.split('/');
+  return !path.includes('\\')
+    && !path.startsWith('/')
+    && !segments.includes('..')
+    && /^(?:src|tests|e2e)\/[A-Za-z0-9._/-]+$/.test(path);
+}
+
+function requireSha256(value: unknown, label: string): string {
+  const digest = requireNonEmptyString(value, label);
+  if (!/^[a-f0-9]{64}$/.test(digest)) throw new Error(`${label} must be a lowercase SHA-256`);
+  return digest;
+}
+
+function requireStringArray(value: unknown, label: string): string[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value.map((entry, index) => requireNonEmptyString(entry, `${label}[${index}]`));
+}
+
+export function ls07SourceSnapshotSha256(sourceRefsValue: unknown): string {
+  const sourceRefs = asArray(sourceRefsValue).map((source, index) =>
+    requireRecord(source, `LS-07 source snapshot[${index}]`));
+  const canonical = sourceRefs.map((source, index) => ({
+    path: requireNonEmptyString(source.path, `LS-07 source snapshot[${index}].path`),
+    sha256: requireSha256(source.sha256, `LS-07 source snapshot[${index}].sha256`),
+  }));
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function validateLS07EvidenceShape(
+  machineValue: unknown,
+  reviewValue: unknown,
+  runArtifactValues: Record<string, unknown>,
+  expectedHashes?: { contractSha256: string; policySha256: string },
+): void {
+  const machine = requireRecord(machineValue, 'LS-07 machine evidence');
+  requireExactKeys(
+    machine,
+    ['schema', 'version', 'sliceId', 'contractSha256', 'sourceRefs', 'runs', 'checks'],
+    'LS-07 machine evidence',
+  );
+  if (machine.schema !== 'rww.ls-07-verification' || machine.version !== 1 || machine.sliceId !== 'LS-07') {
+    throw new Error('LS-07 machine evidence has an invalid identity');
+  }
+  const contractSha256 = requireSha256(machine.contractSha256, 'LS-07 machine contractSha256');
+  if (expectedHashes && contractSha256 !== expectedHashes.contractSha256) {
+    throw new Error('LS-07 machine evidence does not bind the current contract');
+  }
+
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-07 machine sourceRefs[${index}]`));
+  const sourcePaths = sourceRefs.map((source, index) => {
+    requireExactKeys(source, ['path', 'sha256'], `LS-07 machine sourceRefs[${index}]`);
+    const path = requireNonEmptyString(source.path, `LS-07 machine sourceRefs[${index}].path`);
+    if (!isSafeImplementationPath(path)) throw new Error(`Unsafe LS-07 implementation source path: ${path}`);
+    requireSha256(source.sha256, `LS-07 machine sourceRefs[${index}].sha256`);
+    return path;
+  });
+  if (new Set(sourcePaths).size !== sourcePaths.length) throw new Error('LS-07 machine evidence has duplicate source paths');
+  for (const requiredPath of LS07_REQUIRED_SOURCE_PATHS) {
+    if (!sourcePaths.includes(requiredPath)) throw new Error(`LS-07 machine evidence is missing required source: ${requiredPath}`);
+  }
+  const sourceSnapshotSha256 = ls07SourceSnapshotSha256(sourceRefs);
+
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-07 machine runs[${index}]`));
+  const runIds = runs.map((run, index) => {
+    requireExactKeys(run, ['id', 'command', 'result', 'exitCode', 'artifact'], `LS-07 machine runs[${index}]`);
+    return requireNonEmptyString(run.id, `LS-07 machine runs[${index}].id`);
+  });
+  if (JSON.stringify(runIds) !== JSON.stringify(Object.keys(LS07_RUN_POLICY))) {
+    throw new Error('LS-07 machine runs do not match the exact verification policy');
+  }
+  const passedTestIdsByRun = new Map<string, Set<string>>();
+  for (const [index, run] of runs.entries()) {
+    const id = runIds[index] as LS07RunId;
+    const runPolicy = LS07_RUN_POLICY[id];
+    if (run.command !== runPolicy.command || run.result !== 'passed' || run.exitCode !== 0) {
+      throw new Error(`LS-07 verification run ${id} did not pass its exact command`);
+    }
+    const artifact = requireRecord(run.artifact, `LS-07 machine runs[${index}].artifact`);
+    requireExactKeys(artifact, ['path', 'sha256'], `LS-07 machine runs[${index}].artifact`);
+    if (artifact.path !== runPolicy.artifactPath) throw new Error(`LS-07 verification run ${id} has the wrong artifact path`);
+    requireSha256(artifact.sha256, `LS-07 machine runs[${index}].artifact.sha256`);
+
+    const runArtifact = requireRecord(runArtifactValues[id], `LS-07 run artifact ${id}`);
+    requireExactKeys(
+      runArtifact,
+      ['schema', 'version', 'id', 'command', 'result', 'exitCode', 'sourceSnapshotSha256', 'passedTestIds', 'summary'],
+      `LS-07 run artifact ${id}`,
+    );
+    if (runArtifact.schema !== 'rww.command-verification' || runArtifact.version !== 1 || runArtifact.id !== id) {
+      throw new Error(`LS-07 run artifact ${id} has an invalid identity`);
+    }
+    if (runArtifact.command !== runPolicy.command || runArtifact.result !== 'passed' || runArtifact.exitCode !== 0) {
+      throw new Error(`LS-07 run artifact ${id} does not prove the exact passing command`);
+    }
+    requireSha256(runArtifact.sourceSnapshotSha256, `LS-07 run artifact ${id}.sourceSnapshotSha256`);
+    if (runArtifact.sourceSnapshotSha256 !== sourceSnapshotSha256) {
+      throw new Error(`LS-07 run artifact ${id} does not bind the implementation source snapshot`);
+    }
+    const runSummary = requireNonEmptyString(runArtifact.summary, `LS-07 run artifact ${id}.summary`);
+    if (runSummary.length < 20) throw new Error(`LS-07 run artifact ${id} lacks a substantive summary`);
+    const passedTestIds = requireStringArray(runArtifact.passedTestIds, `LS-07 run artifact ${id}.passedTestIds`);
+    if (new Set(passedTestIds).size !== passedTestIds.length) throw new Error(`LS-07 run artifact ${id} has duplicate test IDs`);
+    passedTestIdsByRun.set(id, new Set(passedTestIds));
+  }
+  const expectedTestIdsByRun = new Map<string, string[]>();
+  for (const policy of Object.values(LS07_CHECK_POLICY)) {
+    for (const runId of policy.runIds) {
+      const expected = expectedTestIdsByRun.get(runId) ?? [];
+      for (const testId of policy.testIds) if (!expected.includes(testId)) expected.push(testId);
+      expectedTestIdsByRun.set(runId, expected);
+    }
+  }
+  for (const runId of Object.keys(LS07_RUN_POLICY)) {
+    if (JSON.stringify([...passedTestIdsByRun.get(runId)!]) !== JSON.stringify(expectedTestIdsByRun.get(runId) ?? [])) {
+      throw new Error(`LS-07 run artifact ${runId} does not contain the exact predeclared test IDs`);
+    }
+  }
+
+  const checks = asArray(machine.checks).map((check, index) =>
+    requireRecord(check, `LS-07 machine checks[${index}]`));
+  const checkIds = checks.map((check, index) => {
+    requireExactKeys(check, ['id', 'result', 'runIds', 'testIds'], `LS-07 machine checks[${index}]`);
+    if (check.result !== 'passed') throw new Error(`LS-07 machine check ${String(check.id)} did not pass`);
+    return requireNonEmptyString(check.id, `LS-07 machine checks[${index}].id`);
+  });
+  if (JSON.stringify(checkIds) !== JSON.stringify(LS07_ACCEPTANCE_IDS)) {
+    throw new Error('LS-07 machine checks do not cover the exact acceptance matrix');
+  }
+  for (const [index, check] of checks.entries()) {
+    const id = checkIds[index] as keyof typeof LS07_CHECK_POLICY;
+    const checkPolicy = LS07_CHECK_POLICY[id];
+    const checkRunIds = requireStringArray(check.runIds, `LS-07 machine checks[${index}].runIds`);
+    const testIds = requireStringArray(check.testIds, `LS-07 machine checks[${index}].testIds`);
+    if (JSON.stringify(checkRunIds) !== JSON.stringify(checkPolicy.runIds)
+      || JSON.stringify(testIds) !== JSON.stringify(checkPolicy.testIds)) {
+      throw new Error(`LS-07 machine check ${id} does not match its exact run and test policy`);
+    }
+    for (const testId of testIds) {
+      if (!checkRunIds.some((runId) => passedTestIdsByRun.get(runId)?.has(testId))) {
+        throw new Error(`LS-07 machine check ${id} cannot prove test ID ${testId}`);
+      }
+    }
+  }
+
+  const review = requireRecord(reviewValue, 'LS-07 criterion review');
+  requireExactKeys(
+    review,
+    [
+      'schema', 'version', 'reviewId', 'claimId', 'contractSha256', 'policySha256', 'reviewRound',
+      'reviewType', 'independentContext', 'reviewer', 'scores', 'dependencyReady', 'blockers',
+      'requiredQualityFindings', 'humanValidation', 'polish',
+    ],
+    'LS-07 criterion review',
+  );
+  if (review.schema !== 'rww.criterion-review' || review.version !== 1 || review.claimId !== 'LS-07') {
+    throw new Error('LS-07 criterion review has an invalid identity');
+  }
+  requireNonEmptyString(review.reviewId, 'LS-07 criterion review reviewId');
+  if (review.reviewType !== 'gameplay-system-acceptance' || review.independentContext !== true) {
+    throw new Error('LS-07 criterion review is not an independent gameplay-system review');
+  }
+  const reviewer = requireRecord(review.reviewer, 'LS-07 criterion review reviewer');
+  requireExactKeys(reviewer, ['role', 'taskId', 'model', 'completedAt', 'sourceSnapshotSha256'], 'LS-07 criterion review reviewer');
+  if (reviewer.role !== 'independent-critic') throw new Error('LS-07 criterion review has the wrong reviewer role');
+  const taskId = requireNonEmptyString(reviewer.taskId, 'LS-07 criterion review reviewer.taskId');
+  if (!/^ses_[A-Za-z0-9]+$/.test(taskId)) throw new Error('LS-07 criterion review has invalid task provenance');
+  requireNonEmptyString(reviewer.model, 'LS-07 criterion review reviewer.model');
+  const completedAt = requireNonEmptyString(reviewer.completedAt, 'LS-07 criterion review reviewer.completedAt');
+  if (!isoDateString(completedAt)) throw new Error('LS-07 criterion review has invalid completion time');
+  if (requireSha256(reviewer.sourceSnapshotSha256, 'LS-07 criterion review reviewer.sourceSnapshotSha256') !== sourceSnapshotSha256) {
+    throw new Error('LS-07 criterion review does not bind the implementation source snapshot');
+  }
+  if (!Number.isInteger(review.reviewRound) || Number(review.reviewRound) < 1 || Number(review.reviewRound) > 3) {
+    throw new Error('LS-07 criterion review exceeds the bounded review policy');
+  }
+  const reviewContractSha256 = requireSha256(review.contractSha256, 'LS-07 review contractSha256');
+  const reviewPolicySha256 = requireSha256(review.policySha256, 'LS-07 review policySha256');
+  if (expectedHashes && (
+    reviewContractSha256 !== expectedHashes.contractSha256
+    || reviewPolicySha256 !== expectedHashes.policySha256
+  )) {
+    throw new Error('LS-07 criterion review does not bind the current contract and execution policy');
+  }
+
+  const scores = requireRecord(review.scores, 'LS-07 criterion review scores');
+  requireExactKeys(scores, [...LS07_ACCEPTANCE_IDS], 'LS-07 criterion review scores');
+  for (const id of LS07_ACCEPTANCE_IDS) {
+    const scoreRecord = requireRecord(scores[id], `LS-07 criterion review scores.${id}`);
+    requireExactKeys(scoreRecord, ['score', 'checkId', 'rationale'], `LS-07 criterion review scores.${id}`);
+    if (scoreRecord.checkId !== id) throw new Error(`LS-07 criterion ${id} is not linked to its machine check`);
+    const rationale = requireNonEmptyString(scoreRecord.rationale, `LS-07 criterion review scores.${id}.rationale`);
+    if (rationale.length < 20) throw new Error(`LS-07 criterion ${id} lacks a substantive rationale`);
+    const score = scoreRecord.score;
+    if (!Number.isInteger(score) || Number(score) < 3 || Number(score) > 4) {
+      throw new Error(`LS-07 criterion ${id} is below ship-ready`);
+    }
+  }
+  if (review.dependencyReady !== true) throw new Error('LS-07 criterion review is not dependency-ready');
+  if (requireStringArray(review.blockers, 'LS-07 criterion review blockers').length !== 0) {
+    throw new Error('LS-07 criterion review contains blockers');
+  }
+  if (requireStringArray(review.requiredQualityFindings, 'LS-07 criterion review requiredQualityFindings').length !== 0) {
+    throw new Error('LS-07 criterion review contains required-quality findings');
+  }
+  if (requireStringArray(review.humanValidation, 'LS-07 criterion review humanValidation').length !== 0) {
+    throw new Error('LS-07 criterion review must not claim human validation');
+  }
+  const polish = asArray(review.polish).map((finding, index) =>
+    requireRecord(finding, `LS-07 criterion review polish[${index}]`));
+  for (const [index, finding] of polish.entries()) {
+    requireExactKeys(finding, ['id', 'summary', 'reopenTrigger'], `LS-07 criterion review polish[${index}]`);
+    requireNonEmptyString(finding.id, `LS-07 criterion review polish[${index}].id`);
+    requireNonEmptyString(finding.summary, `LS-07 criterion review polish[${index}].summary`);
+    requireNonEmptyString(finding.reopenTrigger, `LS-07 criterion review polish[${index}].reopenTrigger`);
+  }
+}
+
+async function validateLS07CurrentSources(machineValue: unknown): Promise<void> {
+  const machine = requireRecord(machineValue, 'LS-07 machine evidence');
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-07 machine sourceRefs[${index}]`));
+  await Promise.all(sourceRefs.map(async (source, index) => {
+    const path = requireNonEmptyString(source.path, `LS-07 machine sourceRefs[${index}].path`);
+    const expected = requireSha256(source.sha256, `LS-07 machine sourceRefs[${index}].sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+    } catch {
+      throw new Error(`LS-07 implementation source is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-07 implementation source SHA-256 mismatch: ${path}`);
+  }));
+}
+
+async function loadLS07RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
+  const machine = requireRecord(machineValue, 'LS-07 machine evidence');
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-07 machine runs[${index}]`));
+  const result: Record<string, unknown> = {};
+  for (const [index, run] of runs.entries()) {
+    const id = requireNonEmptyString(run.id, `LS-07 machine runs[${index}].id`);
+    const artifact = requireRecord(run.artifact, `LS-07 machine runs[${index}].artifact`);
+    const path = requireNonEmptyString(artifact.path, `LS-07 machine runs[${index}].artifact.path`);
+    if (!isSafeRepositoryPath(path) || !path.startsWith('validation/evidence/runs/')) {
+      throw new Error(`Unsafe LS-07 run artifact path: ${path}`);
+    }
+    const expected = requireSha256(artifact.sha256, `LS-07 machine runs[${index}].artifact.sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+      result[id] = await readJson(resolve(root, path));
+    } catch {
+      throw new Error(`LS-07 run artifact is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-07 run artifact SHA-256 mismatch: ${path}`);
+  }
+  return result;
 }
 
 async function sha256File(path: string): Promise<string> {
@@ -252,6 +611,20 @@ export async function validateClaimEvidenceReceipt(
     requireExactKeys(check, ['id', 'result', 'summary'], `${claimId}.checks[${index}]`);
     requireNonEmptyString(check.summary, `${claimId}.checks[${index}].summary`);
     if (check.result !== 'passed') throw new Error(`${claimId}.checks[${index}] did not pass`);
+  }
+  if (claimId === 'LS-07') {
+    const digestByPath = new Map(sourceRefs.map((source, index) => [
+      sourcePaths[index]!,
+      requireSha256(source.sha256, `${claimId}.sourceRefs[${index}].sha256`),
+    ]));
+    const machine = await readJson(resolve(root, policy.sourcePaths[0]));
+    const review = await readJson(resolve(root, policy.sourcePaths[1]));
+    const runArtifacts = await loadLS07RunArtifacts(machine);
+    validateLS07EvidenceShape(machine, review, runArtifacts, {
+      contractSha256: digestByPath.get('docs/launch-scope/ls-07-paired-spinal-nodes.md')!,
+      policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
+    });
+    await validateLS07CurrentSources(machine);
   }
   return receipt;
 }

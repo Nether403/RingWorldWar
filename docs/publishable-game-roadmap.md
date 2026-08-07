@@ -12,7 +12,7 @@ Ring World War is not an ordinary RTS on a curved map. Its identity is:
 The release must make four ideas visible in play:
 
 - Direction is territory: antispinward positions create long-shot artillery advantage.
-- The world is overhead: strategic structures, shadow bands, launches, and damage remain readable around the ring.
+- The world is overhead: strategic structures, shadow bands, launches, and damage remain spatially readable around the ring when applicable intelligence rules reveal them.
 - Gravity is a system: direction, altitude, velocity, drag, and chord flight create tactical consequences.
 - The habitat is inhabited: cities, agriculture, vegetation, industry, and evacuation infrastructure make battles costly.
 
@@ -63,7 +63,7 @@ Ballistic Arena
 | --- | --- | --- |
 | 0. Product truth | Canon, release contract, CI, licensing/title gates | One authoritative product direction and reproducible release baseline |
 | 1. Campaign platform | Session perspective, runtime scenarios, mission registry, campaign profile | Title to faction-correct skirmish and mission-to-mission progression |
-| 2. Ring USP slice | Paired Nodes, direction overlay, shadow rules, overhead intelligence, whole-ring view, Gravity Range | Uncoached players understand and exploit the directional advantage |
+| 2. Ring USP slice | Authenticated Spinal Node pairs and local Alignment, direction overlay, shadow rules, overhead intelligence, whole-ring view, Gravity Range | Uncoached players understand and exploit the directional advantage |
 | 3. Inhabited ring | District scatter, vegetation, cities, ambient life, integrated tutorial arc | Public browser alpha with a dense, readable battlefield |
 | 4. Air and transport | Air domain, target masks, cargo, four requested roles, AI and saves | Deterministic combined-arms test arena |
 | 5. Compact campaign | Revise four existing missions and add two finales | Complete six-mission Anchor arc |
@@ -82,8 +82,8 @@ Planning range: 15-24 months with a commercial go/no-go checkpoint after Milesto
 | Break the Line | Existing, revise | Established base, scouting, two-front movement, artillery positioning |
 | Counterfire | Existing, revise | Power, interception, ammunition counters, threat telegraphing |
 | A Signal in the Spine | Existing, revise | Bulwark escort, Needle threat, land transport, final-correction evidence |
-| The Shadow Front | New | Inhabited-arc defense, strikecraft, anti-air, shadow timing, paired Nodes |
-| Anchor the Living | New | Multi-front Alignment finale, air transport, capture versus destruction |
+| The Shadow Front | New | Inhabited-arc defense, strikecraft, anti-air, shadow timing, an authenticated Spinal Node pair |
+| Anchor the Living | New | Multi-front Spinal Alignment objective supporting Anchor, air transport, capture versus loss of control |
 
 ### Axiom Choir
 
@@ -93,8 +93,8 @@ Planning range: 15-24 months with a commercial go/no-go checkpoint after Milesto
 | Against the Spin | Relocation after fire and favorable-direction attacks |
 | The Weight We Shed | Land transports, archives, evacuees, and dismantling choices |
 | Beneath the Shadow | Sensor resilience, strikecraft, anti-air route planning |
-| What We Carry | Air transport and paired-node chord evacuation |
-| Migration Window | Distributed launch defense and Migration Alignment finale |
+| What We Carry | Air transport and evacuation through contested paired-node territory |
+| Migration Window | Distributed launch defense and a multi-front Spinal Alignment objective supporting Migration |
 
 ## Environment Direction
 

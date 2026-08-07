@@ -65,12 +65,21 @@ The following are present-day gameplay facts and may be used by narrative materi
 - Standard rockets, cruise missiles, Chord Shots, counter-battery reveal, point defence, and Laser Grid interception are part of the current arsenal.
 - The Shadow-Square Network produces visible moving day and night conditions; not every proposed systemic consequence of those conditions exists yet.
 
+## Approved Canon Pending Implementation
+
+The following LS-07 facts are approved canon but must not be described as current player capabilities until the slice qualifies:
+
+- Surviving routing records identify some Spinal Nodes as authenticated operational pairs.
+- A faction establishes local Spinal Alignment while it controls both members of a pair; that Alignment ends when it no longer controls both.
+- Individual Nodes provide local Command access. Alignment is a reversible theater-level state, not execution of Anchor or Migration and not a victory condition by itself.
+- The approved launch implementation makes completed pairs, rather than individual Nodes, generate the existing Dominance tiebreak score.
+
 ## Proposed Future Mechanics
 
 The following ideas fit the narrative direction but are proposals, not implemented features or promised canon:
 
 - A ring-scale Anchor or Migration victory condition.
-- Antipodal Spinal Node pairs and multi-node alignment corridors.
+- Multi-node alignment corridors and ring-scale Alignment systems beyond local pair control.
 - Structural stress, atmospheric loss, or sectors made unusable by warfare.
 - Arc-wide power and command links that can be severed from either direction.
 - Stronger day/night effects on sensing, cloaking, solar output, and interception.
@@ -86,10 +95,10 @@ These proposals require separate design validation. They should not be described
 - The ring's age, builders, original purpose, and relationship to any wider civilization are unknown.
 - The Solar Filament's precise construction, failure cause, and remaining lifetime are unknown.
 - The original purpose of the quarantine interlocks is disputed and intentionally unresolved.
-- The exact number, pairing, and full capabilities of Spinal Nodes are not canon beyond their current local role.
+- Known theaters contain authenticated operational pairs of Spinal Nodes, but the Network's total node count, whether every Node belongs to a pair, its complete hierarchy, and final-protocol authorization requirements remain unknown.
 - The exact capacity, destination, travel time, and selection rules of Migration are unknown.
 - The duration and long-term viability of Anchor are unknown.
 - No faction's doctrine is established as objectively correct, and the war's final outcome is not canon.
 - The Architects, the Iterants, and a ring whose definitive purpose was machine-intelligence containment are not current canon.
 - Anchor stopping the ring's rotation is not canon. Anchor stabilizes angular velocity.
-- Proposed Alignment, structural-stress, Arc Link, and Chord-insertion systems are not current mechanics or guaranteed future features.
+- Ring-scale Alignment victory, structural-stress, Arc Link, and Chord-insertion systems are not current mechanics or guaranteed future features.

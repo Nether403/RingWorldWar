@@ -28,9 +28,9 @@ The ring's central light and energy source. Its growing instability drives the L
 
 The moving panel network that regulates light and climate across the ring's inhabited surface. Its synchronization is failing. The network's complete extent and original control hierarchy remain provisional.
 
-## Spinal Network / Spinal Node
+## Spinal Network / Spinal Node / Spinal Alignment
 
-The Spinal Network is the ring-wide control and structural-correction system capable of authorizing one final habitat-scale operation. A Spinal Node is a territorial access point through which local authorities can command part of that network. The nodes' exact number, pairing, and activation requirements remain provisional.
+The Spinal Network is the surviving ring-wide control and structural-correction system capable of authorizing one final habitat-scale operation. A Spinal Node is a territorial access point through which a theater authority can command part of that network. Surviving routing records identify some Nodes as operational pairs; controlling both members establishes a reversible local Spinal Alignment. The Network's total node count, complete hierarchy, relationship among pairs, and final-protocol authorization requirements remain unresolved.
 
 ## Bastion
 

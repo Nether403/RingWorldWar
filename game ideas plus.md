@@ -1,3 +1,4 @@
+> **Brainstorming status:** This file is non-authoritative. For launch scope, `docs/launch-scope/ls-07-paired-spinal-nodes.md` supersedes the paired-node, Alignment, and victory proposals below. LS-07 approves explicit operational pairs, reversible local Alignment, and pair-only Dominance; chord accuracy, overhead intelligence, insertion, structural stabilization, and alternate victory remain future proposals.
 
 > **The ring should be the battlefield, the prize, and the resource being destroyed by the war.**
 
@@ -72,6 +73,8 @@ This gives you a game identity that can be explained in one sentence:
 # Ring-specific mechanics
 
 ## 1. Spinal Nodes should come in antipodal pairs
+
+> **Launch-scope boundary:** Known standard-map pairs may be antipodal, but universal pairing is not canon. Only local pair control and pair-only Dominance are approved for LS-07; the strategic abilities listed below are not part of the slice.
 
 At present, Spinal Nodes provide command capacity and Dominance. That works mechanically, but they still resemble conventional RTS control points.
 
@@ -204,6 +207,8 @@ Directly piloting the mech during the landing and immediate assault would connec
 Keep Bastion destruction as the straightforward military victory, but add a thematic strategic victory.
 
 ## Alignment victory
+
+> **Not approved for LS-07.** This remains a separate future proposal. Local Spinal Alignment does not end a match or execute either final protocol.
 
 To enact its survival plan, a faction must:
 

@@ -3,7 +3,14 @@ import manifest from '../../docs/launch-scope-progress.json';
 import g07Receipt from '../../validation/evidence/launch-scope/G-07.json';
 import ls01Receipt from '../../validation/evidence/launch-scope/LS-01.json';
 import {
+  CLAIM_EVIDENCE_POLICY,
+  LS07_ACCEPTANCE_IDS,
+  LS07_CHECK_POLICY,
+  LS07_REQUIRED_SOURCE_PATHS,
+  LS07_RUN_POLICY,
+  ls07SourceSnapshotSha256,
   validateClaimEvidenceReceipt,
+  validateLS07EvidenceShape,
   validateLaunchProgressManifest,
 } from '../../vite.config.ts';
 
@@ -12,6 +19,63 @@ function copyManifest(): Record<string, any> {
 }
 
 describe('launch progress manifest integrity', () => {
+  it('predeclares the exact LS-07 completion evidence policy before implementation', () => {
+    expect(CLAIM_EVIDENCE_POLICY['LS-07']).toEqual({
+      acceptedState: 'complete',
+      receiptPath: 'validation/evidence/launch-scope/LS-07.json',
+      sourcePaths: [
+        'validation/evidence/ls-07-paired-nodes-2026-08-07.json',
+        'validation/evidence/reviews/ls-07-criterion-review-2026-08-07.json',
+        'docs/launch-scope/ls-07-paired-spinal-nodes.md',
+        'docs/launch-scope-execution-policy.md',
+      ],
+      checkIds: ['paired-spinal-node-alignment'],
+    });
+  });
+
+  it('requires semantic LS-07 category coverage, ship-ready scores, and no blocking findings', () => {
+    const machine = ls07MachineEvidence();
+    const review = ls07CriterionReview();
+    const runArtifacts = ls07RunArtifacts();
+    expect(() => validateLS07EvidenceShape(machine, review, runArtifacts)).not.toThrow();
+
+    const missingCategory = structuredClone(machine);
+    missingCategory.checks.pop();
+    expect(() => validateLS07EvidenceShape(missingCategory, review, runArtifacts)).toThrow(/exact acceptance matrix/i);
+
+    const lowScore = structuredClone(review);
+    lowScore.scores.ai.score = 2;
+    expect(() => validateLS07EvidenceShape(machine, lowScore, runArtifacts)).toThrow(/ai.*below ship-ready/i);
+
+    const blocked = structuredClone(review);
+    blocked.blockers = ['AI denial is not implemented.'];
+    expect(() => validateLS07EvidenceShape(machine, blocked, runArtifacts)).toThrow(/contains blockers/i);
+
+    const requiredFinding = structuredClone(review);
+    requiredFinding.requiredQualityFindings = ['Minimap pair state is absent.'];
+    expect(() => validateLS07EvidenceShape(machine, requiredFinding, runArtifacts)).toThrow(/required-quality findings/i);
+
+    const emptyProof = structuredClone(runArtifacts);
+    emptyProof['focused-unit'].passedTestIds = [];
+    expect(() => validateLS07EvidenceShape(machine, review, emptyProof)).toThrow(/exact predeclared test IDs/i);
+
+    const emptyRationale = structuredClone(review);
+    emptyRationale.scores.topology.rationale = 'x';
+    expect(() => validateLS07EvidenceShape(machine, emptyRationale, runArtifacts)).toThrow(/substantive rationale/i);
+
+    const forgedTest = structuredClone(runArtifacts);
+    forgedTest['focused-unit'].passedTestIds.push('forged-extra-test');
+    expect(() => validateLS07EvidenceShape(machine, review, forgedTest)).toThrow(/exact predeclared test IDs/i);
+
+    const wrongSnapshot = structuredClone(runArtifacts);
+    wrongSnapshot['focused-unit'].sourceSnapshotSha256 = 'f'.repeat(64);
+    expect(() => validateLS07EvidenceShape(machine, review, wrongSnapshot)).toThrow(/source snapshot/i);
+
+    const missingProvenance = structuredClone(review);
+    missingProvenance.reviewer.taskId = 'anonymous';
+    expect(() => validateLS07EvidenceShape(machine, missingProvenance, runArtifacts)).toThrow(/task provenance/i);
+  });
+
   it('accepts the repository manifest with existing evidence artifacts', async () => {
     await expect(validateLaunchProgressManifest(copyManifest())).resolves.toMatchObject({
       schema: 'rww.launch-scope-progress',
@@ -213,7 +277,7 @@ describe('launch progress manifest integrity', () => {
     const extraSource = structuredClone(ls01Receipt) as Record<string, any>;
     extraSource.sourceRefs.push({
       path: 'docs/roadmap.md',
-      sha256: '745c204cc414ae38cb1b418f842141fa4874aedcf31ba517db757a21d961bab0',
+      sha256: '07e1231f464b4b8e9fc046ea18030b9a32e8bb18e7f3a2b9d78f3637314ba6a0',
     });
     await expect(validateClaimEvidenceReceipt(copyManifest().slices[0], extraSource))
       .rejects.toThrow(/source paths.*policy/i);
@@ -250,3 +314,85 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/invalid reference URL/i);
   });
 });
+
+function ls07MachineEvidence(): Record<string, any> {
+  return {
+    schema: 'rww.ls-07-verification',
+    version: 1,
+    sliceId: 'LS-07',
+    contractSha256: 'a'.repeat(64),
+    sourceRefs: LS07_REQUIRED_SOURCE_PATHS.map((path) => ({ path, sha256: 'b'.repeat(64) })),
+    runs: Object.entries(LS07_RUN_POLICY).map(([id, policy]) => ({
+      id,
+      command: policy.command,
+      result: 'passed',
+      exitCode: 0,
+      artifact: { path: policy.artifactPath, sha256: 'd'.repeat(64) },
+    })),
+    checks: LS07_ACCEPTANCE_IDS.map((id) => ({
+      id,
+      result: 'passed',
+      runIds: [...LS07_CHECK_POLICY[id].runIds],
+      testIds: [...LS07_CHECK_POLICY[id].testIds],
+    })),
+  };
+}
+
+function ls07RunArtifacts(): Record<string, any> {
+  const testIdsByRun = new Map<string, string[]>();
+  for (const policy of Object.values(LS07_CHECK_POLICY)) {
+    for (const runId of policy.runIds) {
+      const ids = testIdsByRun.get(runId) ?? [];
+      for (const testId of policy.testIds) if (!ids.includes(testId)) ids.push(testId);
+      testIdsByRun.set(runId, ids);
+    }
+  }
+  const sourceSnapshotSha256 = ls07SourceSnapshotSha256(
+    LS07_REQUIRED_SOURCE_PATHS.map((path) => ({ path, sha256: 'b'.repeat(64) })),
+  );
+  return Object.fromEntries(Object.entries(LS07_RUN_POLICY).map(([id, policy]) => [id, {
+    schema: 'rww.command-verification',
+    version: 1,
+    id,
+    command: policy.command,
+    result: 'passed',
+    exitCode: 0,
+    sourceSnapshotSha256,
+    passedTestIds: testIdsByRun.get(id) ?? [],
+    summary: `${id} completed successfully`,
+  }]));
+}
+
+function ls07CriterionReview(): Record<string, any> {
+  const sourceSnapshotSha256 = ls07SourceSnapshotSha256(
+    LS07_REQUIRED_SOURCE_PATHS.map((path) => ({ path, sha256: 'b'.repeat(64) })),
+  );
+  return {
+    schema: 'rww.criterion-review',
+    version: 1,
+    reviewId: 'ls-07-test-review',
+    claimId: 'LS-07',
+    contractSha256: 'a'.repeat(64),
+    policySha256: 'c'.repeat(64),
+    reviewRound: 1,
+    reviewType: 'gameplay-system-acceptance',
+    independentContext: true,
+    reviewer: {
+      role: 'independent-critic',
+      taskId: 'ses_testreview',
+      model: 'test-model',
+      completedAt: '2026-08-07T00:00:00.000Z',
+      sourceSnapshotSha256,
+    },
+    scores: Object.fromEntries(LS07_ACCEPTANCE_IDS.map((id) => [id, {
+      score: 3,
+      checkId: id,
+      rationale: `${id} meets the bounded ship-ready contract.`,
+    }])),
+    dependencyReady: true,
+    blockers: [],
+    requiredQualityFindings: [],
+    humanValidation: [],
+    polish: [],
+  };
+}
