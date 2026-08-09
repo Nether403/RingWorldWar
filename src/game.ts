@@ -46,6 +46,8 @@ import type { VoiceUnitRef } from './audio/voiceDirector';
 import type { RuntimeScenario } from './scenario/runtimeScenario';
 import { createRuntimeScenarioWorld } from './scenario/worldFactory';
 import type { RuntimeScenarioResolvedOpeningView } from './scenario/worldFactory';
+import { GravityRangeController, type GravityRangeHudModel } from './arcade/gravityRange';
+import type { GravityRangeBindings } from './arcade/gravityRangeScenario';
 
 export const SAVE_SLOT_KEY = 'ring-world-war/save-slot';
 const MAX_PENDING_PRESENTATION_EVENTS = 4_096;
@@ -75,6 +77,7 @@ export class Game {
   private ai: AiOpponent;
   private aiEnabled = true;
   private mission: MissionController | null = null;
+  private gravityRange: GravityRangeController | null = null;
   private readonly presentationEvents: SimEvent[] = [];
   onPresentationEvents: ((events: readonly SimEvent[]) => void) | null = null;
   onTransientReset: (() => void) | null = null;
@@ -273,6 +276,18 @@ export class Game {
     const elapsed = performance.now() - stepStart;
     if (this.aiEnabled) this.ai.update(this.world, SIM_DT);
     const events = this.world.drainEvents();
+    const previousGravityStage = this.gravityRange?.model.stage ?? null;
+    this.gravityRange?.observe(events);
+    const gravityStage = this.gravityRange?.model.stage ?? null;
+    if (gravityStage !== previousGravityStage) {
+      if (gravityStage === 'antispinward') {
+        this.beginArtilleryTarget(this.gravityRange!.bindings.launcherId, 'batteryGun');
+        this.hud.alert('Spinward marker confirmed — now strike 1,800 m antispinward');
+      } else if (gravityStage === 'complete') {
+        this.cancelArtilleryTarget();
+        this.hud.alert('Gravity Range complete — antispinward carried the farther shot');
+      }
+    }
     this.mission?.advanceTick(this.world, events);
     this.notifyMissionResult();
     for (const event of events) {
@@ -328,6 +343,39 @@ export class Game {
 
   get narrativeHudModel(): NarrativeHudModel | null {
     return this.mission?.narrativeHudModel() ?? null;
+  }
+
+  get gravityRangeHudModel(): GravityRangeHudModel | null {
+    return this.gravityRange?.model ?? null;
+  }
+
+  get gravityRangeReloadSeconds(): number {
+    if (!this.gravityRange) return 0;
+    const launcher = this.world.structureById(this.gravityRange.bindings.launcherId);
+    if (!launcher) return 0;
+    const weaponIndex = STRUCTURES[launcher.kind].weapons.indexOf('batteryGun');
+    return Math.max(0, launcher.cd[weaponIndex] ?? 0);
+  }
+
+  startGravityRange(bindings: GravityRangeBindings): void {
+    this.gravityRange = new GravityRangeController(this.world, this.playerFaction, bindings);
+    this.selection.clear();
+    this.selection.add(bindings.launcherId);
+    this.beginArtilleryTarget(bindings.launcherId, 'batteryGun');
+    this.hud.alert('Gravity Range — strike the 800 m spinward marker first');
+  }
+
+  focusGravityRangeTarget(): boolean {
+    const target = this.gravityRange?.currentTarget;
+    if (!target || this.wholeRingViewActive) return false;
+    this.selection.clear();
+    this.selection.add(this.gravityRange!.bindings.launcherId);
+    this.rig.setFocus(target.s, target.z);
+    this.updateCursor(target.s, target.z);
+    this.beginArtilleryTarget(this.gravityRange!.bindings.launcherId, 'batteryGun');
+    this.hud.focusMinimapAt(target.s, target.z);
+    this.hud.alert(`${this.gravityRange!.model.directionLabel} marker focused — press Enter on the minimap to fire`);
+    return true;
   }
 
   acknowledgeNarrative(): void {
@@ -473,7 +521,10 @@ export class Game {
     if (!this.wholeRingViewActive) return true;
     const transition = this.cameraController.requestMode('tactical');
     if (!transition.ok) return false;
-    this.hud.alert('Tactical control restored');
+    if (this.gravityRange && this.gravityRange.model.status === 'active') {
+      this.beginArtilleryTarget(this.gravityRange.bindings.launcherId, 'batteryGun');
+      this.hud.alert(`Gravity Range restored — ${this.gravityRange.model.directionLabel} marker active`);
+    } else this.hud.alert('Tactical control restored');
     return true;
   }
 
@@ -572,6 +623,10 @@ export class Game {
     const selectedWeapon = weaponId ?? weapons.find((id) => WEAPONS[id]?.kind === 'ballistic');
     if (!selectedWeapon || !weapons.includes(selectedWeapon)) return;
     if (WEAPONS[selectedWeapon]?.kind !== 'ballistic') return;
+    if (this.gravityRange && !this.gravityRange.acceptsArtillery(sourceId, selectedWeapon)) {
+      this.hud.alert('Gravity Range uses the selected Rocket Battery and Standard Rocket only');
+      return;
+    }
     this.hud.placing = null;
     this.artillerySourceId = sourceId;
     this.artilleryWeaponId = selectedWeapon;
@@ -978,6 +1033,9 @@ export class Game {
   }
 
   saveGame(): SaveActionResult {
+    if (this.gravityRange) {
+      return { ok: false, message: 'Gravity Range is a reset-only arcade exercise' };
+    }
     try {
       const inactivePlayerController = new AiOpponent(this.playerFaction, this.difficulty, this.seed);
       const serialized = serializeGameSave(
@@ -999,6 +1057,9 @@ export class Game {
   }
 
   loadGame(): SaveActionResult {
+    if (this.gravityRange) {
+      return { ok: false, message: 'Gravity Range does not use campaign or skirmish saves' };
+    }
     try {
       const saved = localStorage.getItem(SAVE_SLOT_KEY);
       if (!saved) return { ok: false, message: 'Could not load: no saved game in this browser' };

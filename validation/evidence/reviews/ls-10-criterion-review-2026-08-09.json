@@ -1,7 +1,7 @@
 {
   "schema": "rww.criterion-review",
   "version": 1,
-  "reviewId": "ls-10-remediation-review-2026-08-09",
+  "reviewId": "ls-10-gravity-range-regression-review-2026-08-09",
   "claimId": "LS-10",
   "contractSha256": "0c2eb47ea03f592d8c818e2ce6340c4d6e29d2211ebcdadc7f46e6462a49cbe1",
   "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
@@ -10,10 +10,10 @@
   "independentContext": true,
   "reviewer": {
     "role": "independent-critic",
-    "taskId": "ses_019c5d29effeP7sebIoChzfuJP",
+    "taskId": "ses_0188b187effeZBoyU4R2zI82Tp",
     "model": "azure/gpt-5.6-sol",
-    "completedAt": "2026-08-09T13:24:00.000Z",
-    "sourceSnapshotSha256": "43070ec843d34e44ca479c982ba7ead39e2516d416586647309ed88ed3f26c20"
+    "completedAt": "2026-08-09T17:03:10.142Z",
+    "sourceSnapshotSha256": "377a67fe888b0804af831a84addcd92cf47169cfee9600376b67056c2f6888ff"
   },
   "scores": {
     "dedicated-view": { "score": 3, "checkId": "dedicated-view", "rationale": "A dedicated side-on camera owner preserves logical tactical focus, yaw, zoom, projection, layers, resize behavior, and transactional rollback." },

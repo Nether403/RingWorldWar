@@ -6,9 +6,9 @@
   "sourceRefs": [
     { "path": "src/render/strategicAnnulus.ts", "sha256": "0fef3a13d85fe97d6edd8c4ce3d0cb9507a6c4cefd4138b085e0e7e13c49d8ef" },
     { "path": "src/render/cameraController.ts", "sha256": "79658b3121942d7cfc454483d1cba2b1fa6d6e874349c3ecb51af453f94b3037" },
-    { "path": "src/game.ts", "sha256": "e0522dc54db2faee927d6c51b30cc8193e387350d5b5bd03ed1e0322cf509b66" },
-    { "path": "src/main.ts", "sha256": "3a15c8d836121e1154219c47fc7007ef3e912ef24bf5feeef130a1e3c3cf44b0" },
-    { "path": "src/ui/hud.ts", "sha256": "6f0fe0a02b69f5805d12eb71eedaef961949f2e13011e27f6856a16a3e5f232e" },
+    { "path": "src/game.ts", "sha256": "b62fa820fac645a19587c16c618035abab7a2ca225605c0f3365d12bd554cc22" },
+    { "path": "src/main.ts", "sha256": "1669e961cb87c2b88a98b6c8cd53601786b109cc7e26a66bb4d7cc0f278070a4" },
+    { "path": "src/ui/hud.ts", "sha256": "22279124c6ef1a8456f54ec80fcc65381932680806d283fb2111771dc11fb358" },
     { "path": "src/ui/settingsMenu.ts", "sha256": "1e2bc928e92d2f252c69174ed9644b7d2015a18a2a4d5aefbfae379e80e8d899" },
     { "path": "tests/render/strategicAnnulus.test.ts", "sha256": "df3386d4dd2bda6db88f754212355aabe238583b0700b022a7619378f0482c52" },
     { "path": "tests/render/cameraController.test.ts", "sha256": "8c589ea32efe2c3d3085b4d71652a9689e34e74be7e04afff2d872c9e9c05ea2" },
@@ -24,28 +24,28 @@
       "command": "npx vitest run tests/render/cameraController.test.ts tests/render/strategicAnnulus.test.ts tests/ui/hud.test.ts",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-10-focused-unit-2026-08-09.json", "sha256": "06b7705f8f5020f1443ec1c203857ce3cab99c94ce9c18a40c41a8b305ce277e" }
+      "artifact": { "path": "validation/evidence/runs/ls-10-focused-unit-2026-08-09.json", "sha256": "20f84bccee9721531c3bf79671e73b41c1ffc335501e2314bab43f44a82cdb18" }
     },
     {
       "id": "focused-browser",
       "command": "npx playwright test e2e/whole-ring-strategic-view.spec.ts e2e/camera-controller.spec.ts e2e/camera-transaction.spec.ts e2e/shadow-intelligence.spec.ts e2e/spinal-alignment.spec.ts --project=chromium-regression",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-10-focused-browser-2026-08-09.json", "sha256": "4337a212e1306c2fe0073e1d59c1c90291f785076e5d38e3a945fcfad05eb52e" }
+      "artifact": { "path": "validation/evidence/runs/ls-10-focused-browser-2026-08-09.json", "sha256": "3aa205d13670a7789d7cc517c60799000495f058e20e58a82664fcede4c4742c" }
     },
     {
       "id": "full-check",
       "command": "npm run check",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-10-full-check-2026-08-09.json", "sha256": "d996b9035155834f77bd436d24a11526f4a77d3653d310da9c041e85564bfed1" }
+      "artifact": { "path": "validation/evidence/runs/ls-10-full-check-2026-08-09.json", "sha256": "c2d53dbc52f66547b031746d26c80bfdd95776d5085c8e2506633a9756e81a82" }
     },
     {
       "id": "core-match",
       "command": "npm run validate:core-match",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-10-core-match-2026-08-09.json", "sha256": "b2a64708717eb76a9270a98190a3e96f0530a4d9c403bc03ee96702622ea9ee3" }
+      "artifact": { "path": "validation/evidence/runs/ls-10-core-match-2026-08-09.json", "sha256": "b62ef213a211e6bc857eef89e52fc347f8a73d576e5af06c1f406318d6bdee55" }
     }
   ],
   "checks": [

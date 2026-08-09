@@ -5,7 +5,7 @@
   "command": "npm run check",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "ce7a667dc8a7a2f95943d64b42bd142ac5f7fa3ee4ac9ffe09d5244d62711513",
+  "sourceSnapshotSha256": "74e71e671e948cfd3a5680465d433dacc8c165c144c5a8dca6c8552ee69b7154",
   "passedTestIds": ["full-check"],
   "summary": "npm run check passed lint, the complete unit suite, typecheck, and the production Vite build after LS-10 integration."
 }

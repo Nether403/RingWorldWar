@@ -1,0 +1,18 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-unit",
+  "command": "npx vitest run tests/arcade/gravityRange.test.ts tests/sim/ballistics.test.ts tests/sim/artillery.test.ts tests/scenario/runtimeScenario.test.ts",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "5e9b8aa3e51b9dfd70797596f68293051a222a427014ed696e3a823cbb1667cb",
+  "passedTestIds": [
+    "gravity-range-setup",
+    "gravity-range-loop",
+    "gravity-range-authority",
+    "directional-ballistics-regression",
+    "artillery-authority-regression",
+    "runtime-scenario-regression"
+  ],
+  "summary": "Four focused Vitest files passed 58 Gravity Range, canonical ballistics, artillery authority, and runtime scenario tests on the final LS-11 source snapshot."
+}

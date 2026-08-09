@@ -11,6 +11,7 @@ test('shows a lightweight Last Rotation menu before starting a new skirmish', as
   await expect(title.getByRole('heading', { name: 'Ring World War' })).toBeVisible();
   await expect(title.getByText('The Last Rotation', { exact: true })).toBeVisible();
   await expect(title.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  await expect(title.getByRole('button', { name: 'Gravity Range' })).toBeEnabled();
   expect(await page.locator('#app canvas').count()).toBe(0);
   expect(await page.evaluate(() => 'RWW' in window)).toBe(false);
 
@@ -285,6 +286,7 @@ test('removes a failed optional menu poster and preserves the CSS fallback', asy
   await expect(title.locator('.rww-title-media')).toHaveCount(0);
   await expect(title.locator('.rww-title-fallback')).toBeVisible();
   await expect(title.getByRole('button', { name: 'New Skirmish' })).toBeVisible();
+  await expect(title.getByRole('button', { name: 'Gravity Range' })).toBeVisible();
 });
 
 test('plays the reviewed intro with captions and skips into gameplay', async ({ page }) => {

@@ -46,6 +46,8 @@ import {
   type CampaignTransition,
 } from './campaign/campaignProfile';
 import { campaignMission } from './campaign/missionRegistry';
+import { GRAVITY_RANGE_SCENARIO, resolveGravityRangeBindings } from './arcade/gravityRangeScenario';
+import { GravityRangePanel } from './ui/gravityRangePanel';
 import {
   applyCampaignRouteContext,
   campaignRouteContextFromParams,
@@ -112,7 +114,8 @@ class CleanupStack {
 
 async function start(): Promise<void> {
   const params = new URLSearchParams(location.search);
-  const routedRuntimeScenario = runtimeScenarioFromParams(params);
+  const routedGravityRange = gravityRangeFromParams(params);
+  const routedRuntimeScenario = routedGravityRange ? GRAVITY_RANGE_SCENARIO : runtimeScenarioFromParams(params);
   const settings = new Settings({ search: params });
   const navigation = performance.getEntriesByType('navigation')[0];
   const startup: StartupMetrics = {
@@ -133,7 +136,9 @@ async function start(): Promise<void> {
     );
     const titleAction = titleScreenShown
       ? await showTitleScreen(settings, params, titleError, campaignProfile)
-      : { kind: 'new-skirmish' as const, playerFaction: factionFromParams(params) };
+      : routedGravityRange
+        ? { kind: 'gravity-range' as const }
+        : { kind: 'new-skirmish' as const, playerFaction: factionFromParams(params) };
     if (titleScreenShown) startup.startedAt = performance.now();
     try {
       let runtimeScenario = routedRuntimeScenario;
@@ -153,6 +158,16 @@ async function start(): Promise<void> {
         applyCampaignRouteContext(route.searchParams, transition.launch, titleAction.intent);
         route.searchParams.delete('campaign');
         route.searchParams.delete('campaignMessage');
+        history.replaceState(null, '', route);
+      } else if (titleAction.kind === 'gravity-range') {
+        runtimeScenario = GRAVITY_RANGE_SCENARIO;
+        campaignSession = null;
+        const route = new URL(location.href);
+        route.searchParams.set('menu', '0');
+        route.searchParams.set('mode', 'gravity-range');
+        route.searchParams.delete('scenario');
+        route.searchParams.delete('campaignMission');
+        route.searchParams.delete('campaignIntent');
         history.replaceState(null, '', route);
       }
       await startSession(cleanup, startup, params, settings, titleAction, runtimeScenario, campaignSession);
@@ -185,7 +200,7 @@ async function startSession(
     ? savedPlayerFaction()
     : titleAction.kind === 'campaign'
       ? campaignMission(titleAction.missionId).faction
-      : titleAction.playerFaction);
+      : titleAction.kind === 'new-skirmish' ? titleAction.playerFaction : Faction.Compact);
   const startS = playerFaction === Faction.Compact ? 0 : RING_CIRCUMFERENCE * 0.5;
 
   await boot.step(0.08, 'surveying the ring');
@@ -212,10 +227,11 @@ async function startSession(
     : new Game(seed, anchor, rig, cameraController, playerFaction);
   cleanup.defer(() => game.dispose());
   if (runtimeScenario) {
-    if (runtimeScenario.id !== 'first-contact') {
-      throw new Error(`Runtime scenario has no mission bootstrap: ${runtimeScenario.id}`);
-    }
-    game.startMission('first-contact', resolveFirstContactMissionBindings(game.scenarioBindings));
+    if (runtimeScenario.id === 'first-contact') {
+      game.startMission('first-contact', resolveFirstContactMissionBindings(game.scenarioBindings));
+    } else if (runtimeScenario.id === 'gravity-range') {
+      game.startGravityRange(resolveGravityRangeBindings(game.scenarioBindings));
+    } else throw new Error(`Runtime scenario has no session bootstrap: ${runtimeScenario.id}`);
   }
   if (campaignSession) wireCampaignSession(game, campaignSession);
   const audio = new ProceduralAudio(seed, createWebAudioBackend);
@@ -296,6 +312,14 @@ async function startSession(
   cleanup.defer(() => strategicAnnulus.dispose());
   renderer.scene.add(strategicAnnulus.object);
   game.hud.onWholeRingToggle = () => game.toggleWholeRingView();
+  const gravityRangePanel = game.gravityRangeHudModel
+    ? new GravityRangePanel(
+        () => { game.focusGravityRangeTarget(); },
+        () => navigateToGravityRange(settings.quality),
+        navigateToMainMenu,
+      )
+    : null;
+  if (gravityRangePanel) cleanup.defer(() => gravityRangePanel.dispose());
 
   // Aerial perspective. Inside a ring you are always looking through kilometres
   // of air at more world, so haze does most of the depth cueing.
@@ -329,12 +353,14 @@ async function startSession(
     game.hud.root.inert = open;
     renderer.gl.domElement.inert = open || game.hud.blocksGameplayInput;
     game.hud.root.setAttribute('aria-hidden', String(open));
+    gravityRangePanel?.setInteractionBlocked(open || game.hud.blocksGameplayInput);
     if (open) commandWiring?.cancel();
   }, (volume) => audio.setMasterVolume(volume), (volume) => audio.setVoiceVolume(volume));
   cleanup.defer(() => menu.dispose());
   game.hud.onBlockingOverlayChange = (blocked) => {
     renderer.gl.domElement.inert = blocked || menu.isOpen;
     input.setEnabled(!blocked && !menu.isOpen);
+    gravityRangePanel?.setInteractionBlocked(blocked || menu.isOpen);
   };
   menu.onSave = () => game.saveGame();
   menu.onLoad = () => game.loadGame();
@@ -353,7 +379,9 @@ async function startSession(
   boot.hide();
   if (!scenarioDriverEnabled) {
     game.hud.alert(runtimeScenario
-      ? 'First Contact: Choir raiders inbound — keep one engineer alive'
+      ? runtimeScenario.id === 'gravity-range'
+        ? 'Gravity Range: strike 800 m spinward, then 1,800 m antispinward'
+        : 'First Contact: Choir raiders inbound — keep one engineer alive'
       : 'Select an engineer — build extractors, then a Fabricator');
   }
 
@@ -395,6 +423,9 @@ async function startSession(
     game.effects.viewportHeight = renderer.gl.getContext().drawingBufferHeight;
     if (advanceSimulation) game.update(dt, visualTime);
     else game.updatePresentation(dt, visualTime);
+    if (gravityRangePanel && game.gravityRangeHudModel) {
+      gravityRangePanel.update(game.gravityRangeHudModel, game.gravityRangeReloadSeconds);
+    }
     audio.update(dt);
     environment.update(fixedVisualClock ? visualTime : game.world.time, anchor, rig.camera.position);
 
@@ -547,6 +578,7 @@ async function startSession(
       runtimeScenario: runtimeScenario?.id ?? null,
       scenarioBindings: game.scenarioBindings.size,
       mission: game.missionHudModel?.missionId ?? null,
+      gravityRange: game.gravityRangeHudModel,
       aiEnabled: game.isAiEnabled,
       units: game.world.units.length,
       structures: game.world.structures.length,
@@ -741,6 +773,22 @@ function navigateToCampaignBrowser(message: string): void {
   location.assign(route);
 }
 
+function navigateToGravityRange(quality: Settings['quality']): void {
+  const route = new URL(location.href);
+  route.search = '';
+  route.searchParams.set('menu', '0');
+  route.searchParams.set('mode', 'gravity-range');
+  route.searchParams.set('quality', quality);
+  location.assign(route);
+}
+
+function navigateToMainMenu(): void {
+  const route = new URL(location.href);
+  route.search = '';
+  route.searchParams.set('menu', '1');
+  location.assign(route);
+}
+
 function presentationMediaForSession(params: URLSearchParams): PresentationMedia {
   if (import.meta.env.DEV && params.get('mediaTest') === 'missing-intro') {
     return { ...PRESENTATION_MEDIA, introVideo: '/media/presentation/missing-intro.mp4' };
@@ -787,6 +835,14 @@ function factionFromParams(params: URLSearchParams): Faction {
 
 function factionSlug(faction: Faction): 'compact' | 'choir' {
   return faction === Faction.Choir ? 'choir' : 'compact';
+}
+
+function gravityRangeFromParams(params: URLSearchParams): boolean {
+  const modes = params.getAll('mode');
+  if (modes.length === 0) return false;
+  if (modes.length !== 1) throw new Error('Mode query must be specified exactly once');
+  if (modes[0] === 'gravity-range') return true;
+  throw new Error(`Unsupported mode: ${modes[0]}`);
 }
 
 /**

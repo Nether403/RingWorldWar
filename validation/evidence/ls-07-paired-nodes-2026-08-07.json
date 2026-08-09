@@ -10,8 +10,8 @@
     { "path": "src/scenario/runtimeScenario.ts", "sha256": "63de83b50cee12dfb147f9077bd642a88f4e4be151a08373825cfa79292ba586" },
     { "path": "src/scenario/worldFactory.ts", "sha256": "d61f1dd1915edc252df9ee00193ae3781a079708fd109d3071f4f2b388c90aae" },
     { "path": "src/scenario/firstContact.ts", "sha256": "cddb8789daa1a98ecc820af36400734e26ba3714e61c68d225288ed0a0e9c468" },
-    { "path": "src/ai/opponent.ts", "sha256": "71f4d08b6aacdab6deb941b4e364aa76cdc0a66a51c6cde573daf6755e298e16" },
-    { "path": "src/ui/hud.ts", "sha256": "6f0fe0a02b69f5805d12eb71eedaef961949f2e13011e27f6856a16a3e5f232e" },
+    { "path": "src/ai/opponent.ts", "sha256": "62e7bdd1ceb73c436dfae219d96e31cead8a605722d21315ddc106cdd0c30de7" },
+    { "path": "src/ui/hud.ts", "sha256": "22279124c6ef1a8456f54ec80fcc65381932680806d283fb2111771dc11fb358" },
     { "path": "tests/sim/spinalAlignment.test.ts", "sha256": "86ac65775f76c2254bed2b2fb9ab0e452cb640c53a21e59ac03295e974a3d571" },
     { "path": "tests/sim/serialize.test.ts", "sha256": "533dd06541301ec7e3bc268481af1c3928b7dc3da53b8fdedf71765b6a6dc1a1" },
     { "path": "tests/ai/strategist.test.ts", "sha256": "6a576def090dd0ff86f44e2eabd8902a62079ebcfd62d944a1409336636ed095" },
@@ -24,28 +24,28 @@
       "command": "npx vitest run tests/sim/spinalAlignment.test.ts tests/sim/serialize.test.ts tests/ai/strategist.test.ts tests/scenario/runtimeScenario.test.ts",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-07-focused-unit-2026-08-07.json", "sha256": "f5659a1c02333d8b5e2439464e85a103ef5ce656b82d03de04196234e49cb663" }
+      "artifact": { "path": "validation/evidence/runs/ls-07-focused-unit-2026-08-07.json", "sha256": "2da180340a3ae4b4b0e796a72cdb90ce2e8cd07c5653985b6e4aeb61253dc317" }
     },
     {
       "id": "focused-browser",
       "command": "npx playwright test e2e/spinal-alignment.spec.ts --project=chromium-regression",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-07-focused-browser-2026-08-07.json", "sha256": "6df648303b9a7cb4e04437b062c31c3accc6a9414dc1c67c00359b1746069894" }
+      "artifact": { "path": "validation/evidence/runs/ls-07-focused-browser-2026-08-07.json", "sha256": "7c97bb63f31709981850746a457f778e1d7dda6f583c3246ee0a1f4a8cc948bc" }
     },
     {
       "id": "full-check",
       "command": "npm run check",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-07-full-check-2026-08-07.json", "sha256": "d33ee1aceb0b33a488cc31936058a885191a2c92ca9d184d33f186c1281e40a3" }
+      "artifact": { "path": "validation/evidence/runs/ls-07-full-check-2026-08-07.json", "sha256": "c34dd5ac0b19a2f279dc37c055cf4a79f2f4afe31d650c99dcebe8d8937e87bb" }
     },
     {
       "id": "core-match",
       "command": "npm run validate:core-match",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-07-core-match-2026-08-07.json", "sha256": "1d6aaa7526c7e191f0917ae9251874187dacfe4a13129072d31ba956fd3a28b6" }
+      "artifact": { "path": "validation/evidence/runs/ls-07-core-match-2026-08-07.json", "sha256": "33182fe7086799a2360748b90e7cb7156a9a5546b4ecf4cbb05ab512bb11049e" }
     }
   ],
   "checks": [

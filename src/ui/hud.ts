@@ -16,7 +16,7 @@
  */
 
 import { RING_CIRCUMFERENCE, RING_HALF_WIDTH } from '@core/constants';
-import { deltaS } from '@core/ringMath';
+import { deltaS, wrapS } from '@core/ringMath';
 import type { ShadowTiming } from '@core/shadow';
 import {
   BUILDABLE,
@@ -394,6 +394,12 @@ export class Hud {
 
   get controlsOpen(): boolean {
     return !this.helpEl.hidden;
+  }
+
+  focusMinimapAt(s: number, z: number): void {
+    this.cameraS = wrapS(s);
+    this.cameraZ = Math.max(-RING_HALF_WIDTH, Math.min(RING_HALF_WIDTH, z));
+    this.map.focus();
   }
 
   constructor(

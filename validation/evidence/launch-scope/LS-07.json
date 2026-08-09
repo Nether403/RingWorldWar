@@ -3,15 +3,15 @@
   "version": 1,
   "claimId": "LS-07",
   "acceptedState": "complete",
-  "issuedAt": "2026-08-09T08:42:21.890Z",
+  "issuedAt": "2026-08-09T17:03:10.142Z",
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-07-paired-nodes-2026-08-07.json",
-      "sha256": "0e7d3eb23b013aded073b84b3ee6bc2b1b27debae7e6e3be2788df62d93b2f4d"
+      "sha256": "c7a08659ece4a027ed31745cf5f13a165ff16a4edb08676d2f007c805a059405"
     },
     {
       "path": "validation/evidence/reviews/ls-07-criterion-review-2026-08-07.json",
-      "sha256": "0a6aaeefa25428806295edbba6cb56549f42d79bd4a52f35ac632e76a644a684"
+      "sha256": "8b718ebd69a74d1d31ac28075123efbfc4076948657ffb67f8fb47c90d829418"
     },
     {
       "path": "docs/launch-scope/ls-07-paired-spinal-nodes.md",
@@ -26,7 +26,7 @@
     {
       "id": "paired-spinal-node-alignment",
       "result": "passed",
-      "summary": "All nine LS-07 categories pass on the refreshed source snapshot; the whole-ring view preserves exact hidden-mate and hostile-Alignment boundaries, deterministic pair AI, persistence, presentation, and scope."
+      "summary": "All nine LS-07 categories pass on the refreshed source snapshot; Gravity Range preserves hidden-mate and hostile-Alignment boundaries, deterministic pair AI, persistence, presentation, and scope."
     }
   ]
 }

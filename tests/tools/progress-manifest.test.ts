@@ -19,6 +19,13 @@ import ls10FocusedUnit from '../../validation/evidence/runs/ls-10-focused-unit-2
 import ls10FocusedBrowser from '../../validation/evidence/runs/ls-10-focused-browser-2026-08-09.json';
 import ls10FullCheck from '../../validation/evidence/runs/ls-10-full-check-2026-08-09.json';
 import ls10CoreMatch from '../../validation/evidence/runs/ls-10-core-match-2026-08-09.json';
+import ls11Receipt from '../../validation/evidence/launch-scope/LS-11.json';
+import ls11Machine from '../../validation/evidence/ls-11-gravity-range-2026-08-09.json';
+import ls11Review from '../../validation/evidence/reviews/ls-11-criterion-review-2026-08-09.json';
+import ls11FocusedUnit from '../../validation/evidence/runs/ls-11-focused-unit-2026-08-09.json';
+import ls11FocusedBrowser from '../../validation/evidence/runs/ls-11-focused-browser-2026-08-09.json';
+import ls11FullCheck from '../../validation/evidence/runs/ls-11-full-check-2026-08-09.json';
+import ls11CoreMatch from '../../validation/evidence/runs/ls-11-core-match-2026-08-09.json';
 import {
   CLAIM_EVIDENCE_POLICY,
   LS07_ACCEPTANCE_IDS,
@@ -32,12 +39,19 @@ import {
   LS10_ACCEPTANCE_IDS,
   LS10_REQUIRED_SOURCE_PATHS,
   LS10_RUN_POLICY,
+  LS11_ACCEPTANCE_IDS,
+  LS11_CHECK_POLICY,
+  LS11_REQUIRED_SOURCE_PATHS,
+  LS11_RUN_POLICY,
+  LS11_RUN_TEST_IDS,
   ls07SourceSnapshotSha256,
+  ls11SourceSnapshotSha256,
   validateClaimEvidenceReceipt,
   validateLS08CriterionReview,
   validateLS07EvidenceShape,
   validateLS09EvidenceShape,
   validateLS10EvidenceShape,
+  validateLS11EvidenceShape,
   validateLaunchProgressManifest,
 } from '../../vite.config.ts';
 
@@ -162,6 +176,65 @@ describe('launch progress manifest integrity', () => {
     await expect(validateClaimEvidenceReceipt(copyManifest().slices[9], ls10Receipt)).resolves.toBeDefined();
   });
 
+  it('enforces the complete LS-11 evidence matrix through the final permitted remediation round', () => {
+    const machine = ls11MachineEvidence();
+    const review = ls11CriterionReview();
+    const runs = ls11RunArtifacts(machine);
+    expect(() => validateLS11EvidenceShape(machine, review, runs)).not.toThrow();
+
+    const lowScore = structuredClone(review);
+    lowScore.scores['input-observation'].score = 2;
+    expect(() => validateLS11EvidenceShape(machine, lowScore, runs)).toThrow(/input-observation.*below ship-ready/i);
+
+    const blocked = structuredClone(review);
+    blocked.blockers = ['Narrow layout obscures the observer.'];
+    expect(() => validateLS11EvidenceShape(machine, blocked, runs)).toThrow(/not dependency-ready/i);
+
+    const requiredFinding = structuredClone(review);
+    requiredFinding.requiredQualityFindings = ['Live status floods assistive technology.'];
+    expect(() => validateLS11EvidenceShape(machine, requiredFinding, runs)).toThrow(/not dependency-ready/i);
+
+    const forgedMatrix = structuredClone(machine);
+    forgedMatrix.checks[0].testIds.push('forged-test');
+    expect(() => validateLS11EvidenceShape(forgedMatrix, review, runs)).toThrow(/exact run and test policy/i);
+
+    const staleSnapshot = structuredClone(runs);
+    staleSnapshot['focused-unit'].sourceSnapshotSha256 = 'f'.repeat(64);
+    expect(() => validateLS11EvidenceShape(machine, review, staleSnapshot)).toThrow(/source snapshot/i);
+
+    const missingRunTest = structuredClone(runs);
+    missingRunTest['focused-browser'].passedTestIds.pop();
+    expect(() => validateLS11EvidenceShape(machine, review, missingRunTest)).toThrow(/exact predeclared test IDs/i);
+
+    const missingReviewIdentity = structuredClone(review);
+    missingReviewIdentity.reviewId = '';
+    expect(() => validateLS11EvidenceShape(machine, missingReviewIdentity, runs)).toThrow(/reviewId/i);
+  });
+
+  it('binds LS-11 completion to the exact Gravity Range sources, runs, review, and receipt', async () => {
+    expect(CLAIM_EVIDENCE_POLICY['LS-11']).toEqual({
+      acceptedState: 'complete',
+      receiptPath: 'validation/evidence/launch-scope/LS-11.json',
+      sourcePaths: [
+        'validation/evidence/ls-11-gravity-range-2026-08-09.json',
+        'validation/evidence/reviews/ls-11-criterion-review-2026-08-09.json',
+        'docs/launch-scope/ls-11-gravity-range.md',
+        'docs/launch-scope-execution-policy.md',
+      ],
+      checkIds: ['gravity-range-mode'],
+    });
+    expect(ls11Machine.sourceRefs.map((source) => source.path)).toEqual(LS11_REQUIRED_SOURCE_PATHS);
+    expect(ls11Machine.checks.map((check) => check.id)).toEqual(LS11_ACCEPTANCE_IDS);
+    expect(ls11Machine.runs.map((run) => run.id)).toEqual(Object.keys(LS11_RUN_POLICY));
+    expect(() => validateLS11EvidenceShape(ls11Machine, ls11Review, {
+      'focused-unit': ls11FocusedUnit,
+      'focused-browser': ls11FocusedBrowser,
+      'full-check': ls11FullCheck,
+      'core-match': ls11CoreMatch,
+    })).not.toThrow();
+    await expect(validateClaimEvidenceReceipt(copyManifest().slices[10], ls11Receipt)).resolves.toBeDefined();
+  });
+
   it('keeps the directional-overlay canvas restoration regression in LS-07 presentation evidence', () => {
     expect(LS07_CHECK_POLICY.presentation.testIds).toContain('directional-overlay-canvas-state');
     expect(LS07_RUN_TEST_IDS['focused-browser']).toContain('directional-overlay-canvas-state');
@@ -214,7 +287,7 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(copyManifest())).resolves.toMatchObject({
       schema: 'rww.launch-scope-progress',
       version: 2,
-      activeSlice: 'LS-11',
+      activeSlice: 'LS-12',
       reviewPolicy: { maxRemediationRounds: 2, maxVisualRemediationRounds: 1 },
     });
   });
@@ -249,8 +322,8 @@ describe('launch progress manifest integrity', () => {
 
   it('rejects an activeSlice whose slice is not the sole active entry', async () => {
     const candidate = copyManifest();
-    candidate.slices[10].state = 'queued';
-    candidate.slices[10].qualification = 'not-run';
+    candidate.slices[11].state = 'queued';
+    candidate.slices[11].qualification = 'not-run';
 
     await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/exactly one active slice/i);
   });
@@ -292,7 +365,7 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(completePolish)).resolves.toBeDefined();
 
     const activePending = copyManifest();
-    activePending.slices[10].qualification = 'pending';
+    activePending.slices[11].qualification = 'pending';
     await expect(validateLaunchProgressManifest(activePending)).resolves.toBeDefined();
 
     for (const qualification of ['not-run', 'pending']) {
@@ -306,25 +379,25 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(completePending)).rejects.toThrow(/LS-01.*disposition.*complete/i);
 
     const activeNotRun = copyManifest();
-    activeNotRun.slices[10].qualification = 'not-run';
-    await expect(validateLaunchProgressManifest(activeNotRun)).rejects.toThrow(/LS-11.*qualification.*active/i);
-
-    for (const disposition of ['clean', 'polish-backlog']) {
-      const candidate = copyManifest();
-      candidate.slices[10].disposition = disposition;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-11.*disposition.*active/i);
-    }
-
-    for (const qualification of ['pending', 'automation-passed']) {
-      const candidate = copyManifest();
-      candidate.slices[11].qualification = qualification;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-12.*qualification.*queued/i);
-    }
+    activeNotRun.slices[11].qualification = 'not-run';
+    await expect(validateLaunchProgressManifest(activeNotRun)).rejects.toThrow(/LS-12.*qualification.*active/i);
 
     for (const disposition of ['clean', 'polish-backlog']) {
       const candidate = copyManifest();
       candidate.slices[11].disposition = disposition;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-12.*disposition.*queued/i);
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-12.*disposition.*active/i);
+    }
+
+    for (const qualification of ['pending', 'automation-passed']) {
+      const candidate = copyManifest();
+      candidate.slices[12].qualification = qualification;
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-13.*qualification.*queued/i);
+    }
+
+    for (const disposition of ['clean', 'polish-backlog']) {
+      const candidate = copyManifest();
+      candidate.slices[12].disposition = disposition;
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-13.*disposition.*queued/i);
     }
   }, 15_000);
 
@@ -527,6 +600,78 @@ function ls07CriterionReview(): Record<string, any> {
     blockers: [],
     requiredQualityFindings: [],
     humanValidation: [],
+    polish: [],
+  };
+}
+
+function ls11MachineEvidence(): Record<string, any> {
+  return {
+    schema: 'rww.ls-11-verification',
+    version: 1,
+    sliceId: 'LS-11',
+    contractSha256: 'a'.repeat(64),
+    sourceRefs: LS11_REQUIRED_SOURCE_PATHS.map((path) => ({ path, sha256: 'b'.repeat(64) })),
+    runs: Object.entries(LS11_RUN_POLICY).map(([id, policy]) => ({
+      id,
+      command: policy.command,
+      result: 'passed',
+      exitCode: 0,
+      artifact: { path: policy.artifactPath, sha256: 'd'.repeat(64) },
+    })),
+    checks: LS11_ACCEPTANCE_IDS.map((id) => ({
+      id,
+      result: 'passed',
+      runIds: [...LS11_CHECK_POLICY[id].runIds],
+      testIds: [...LS11_CHECK_POLICY[id].testIds],
+    })),
+  };
+}
+
+function ls11RunArtifacts(machine: Record<string, any>): Record<string, any> {
+  const sourceSnapshotSha256 = ls11SourceSnapshotSha256(machine.sourceRefs);
+  return Object.fromEntries(Object.entries(LS11_RUN_POLICY).map(([id, policy]) => [id, {
+    schema: 'rww.command-verification',
+    version: 1,
+    id,
+    command: policy.command,
+    result: 'passed',
+    exitCode: 0,
+    sourceSnapshotSha256,
+    passedTestIds: [...LS11_RUN_TEST_IDS[id as keyof typeof LS11_RUN_TEST_IDS]],
+    summary: `${id} proves the bounded LS-11 verification lane passed.`,
+  }]));
+}
+
+function ls11CriterionReview(): Record<string, any> {
+  const sourceSnapshotSha256 = ls11SourceSnapshotSha256(
+    LS11_REQUIRED_SOURCE_PATHS.map((path) => ({ path, sha256: 'b'.repeat(64) })),
+  );
+  return {
+    schema: 'rww.criterion-review',
+    version: 1,
+    reviewId: 'ls-11-test-review',
+    claimId: 'LS-11',
+    contractSha256: 'a'.repeat(64),
+    policySha256: 'c'.repeat(64),
+    reviewRound: 3,
+    reviewType: 'gameplay-presentation-accessibility',
+    independentContext: true,
+    reviewer: {
+      role: 'independent-critic',
+      taskId: 'ses_ls11testreview',
+      model: 'test-model',
+      completedAt: '2026-08-09T00:00:00.000Z',
+      sourceSnapshotSha256,
+    },
+    scores: Object.fromEntries(LS11_ACCEPTANCE_IDS.map((id) => [id, {
+      score: 3,
+      checkId: id,
+      rationale: `${id} meets the bounded LS-11 ship-ready contract.`,
+    }])),
+    dependencyReady: true,
+    blockers: [],
+    requiredQualityFindings: [],
+    humanValidation: ['G-01'],
     polish: [],
   };
 }

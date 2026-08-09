@@ -1,0 +1,48 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-11-final-remediation-review-2026-08-09",
+  "claimId": "LS-11",
+  "contractSha256": "5d658b44b92dac708f4ef6e9e5aed398c8bc2887b834c455c1b57b0354be79aa",
+  "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
+  "reviewRound": 3,
+  "reviewType": "gameplay-presentation-accessibility",
+  "independentContext": true,
+  "reviewer": {
+    "role": "independent-critic",
+    "taskId": "ses_018a3d330ffetkTsCFoU5K2PCw",
+    "model": "azure/gpt-5.6-sol",
+    "completedAt": "2026-08-09T17:13:55.371Z",
+    "sourceSnapshotSha256": "5e9b8aa3e51b9dfd70797596f68293051a222a427014ed696e3a823cbb1667cb"
+  },
+  "scores": {
+    "production-launch": { "score": 3, "checkId": "production-launch", "rationale": "The keyboard-accessible title action and direct route launch the same deterministic production scenario without requiring the development scenario driver." },
+    "canonical-setup": { "score": 4, "checkId": "canonical-setup", "rationale": "The fixed-seed AI-free setup supplies the completed launcher, power, sensors, opposing Bastions, exact targets, canonical preflight, and deterministic reconstruction." },
+    "authoritative-loop": { "score": 4, "checkId": "authoritative-loop", "rationale": "Projectile IDs bind to their launch stage and only ordered Compact batteryGun impacts from the selected launcher within tolerance can score." },
+    "direction-comprehension": { "score": 3, "checkId": "direction-comprehension", "rationale": "Panel, minimap, instructions, and whole-ring copy consistently contrast the 800 m spinward short shot with the 1,800 m antispinward long shot." },
+    "input-observation": { "score": 4, "checkId": "input-observation", "rationale": "Pointer and immediate keyboard minimap firing complete the range while whole-ring command isolation and tactical target restoration remain intact." },
+    "presentation-accessibility": { "score": 3, "checkId": "presentation-accessibility", "rationale": "The reviewed desktop and narrow layouts remain unobstructed, modal isolation is explicit, and live announcements occur only on meaningful state transitions." },
+    "lifecycle-regression": { "score": 3, "checkId": "lifecycle-regression", "rationale": "Save and load reject before storage mutation, retry preserves Low quality and saved data, disposal removes all owners, and full-check and core-match pass." }
+  },
+  "dependencyReady": true,
+  "blockers": [],
+  "requiredQualityFindings": [],
+  "humanValidation": ["G-01"],
+  "polish": [
+    {
+      "id": "LS-11-P01",
+      "summary": "Label active progress as Stage 1 of 2 or Stage 2 of 2 if later observation finds the current fraction ambiguous.",
+      "reopenTrigger": "Reopen only if player or accessibility review demonstrates that active-stage progress is interpreted as completed-impact count."
+    },
+    {
+      "id": "LS-11-P02",
+      "summary": "Add conflicting mode and scenario route tests plus a built-preview launch smoke test.",
+      "reopenTrigger": "Reopen if conflicting route parameters launch unintended content or the production bundle cannot enter Gravity Range."
+    },
+    {
+      "id": "LS-11-P03",
+      "summary": "Increase narrow-panel secondary and button typography if more vertical space becomes available.",
+      "reopenTrigger": "Reopen if target-device inspection or user testing finds the compact copy or controls difficult to read."
+    }
+  ]
+}

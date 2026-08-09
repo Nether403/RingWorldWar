@@ -1,7 +1,7 @@
 {
   "schema": "rww.criterion-review",
   "version": 1,
-  "reviewId": "ls-07-whole-ring-regression-review-2026-08-09",
+  "reviewId": "ls-07-gravity-range-regression-review-2026-08-09",
   "claimId": "LS-07",
   "contractSha256": "ad7bc4d75b8c5bc923f27bec6fefeb4bdc61a02c319766d496503f45beb12826",
   "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
@@ -10,10 +10,10 @@
   "independentContext": true,
   "reviewer": {
     "role": "independent-critic",
-    "taskId": "ses_019c5d29effeP7sebIoChzfuJP",
+    "taskId": "ses_0188b187effeZBoyU4R2zI82Tp",
     "model": "azure/gpt-5.6-sol",
-    "completedAt": "2026-08-09T13:24:00.000Z",
-    "sourceSnapshotSha256": "47e5c1370449d8ef7024e49e962b614f49f0064327829d2bbdb456436bf16075"
+    "completedAt": "2026-08-09T17:03:10.142Z",
+    "sourceSnapshotSha256": "5ddcf3970fb0a4f46f19f4eb93dda4b219c7ff578672db6f35a7cc6416a0f91c"
   },
   "scores": {
     "topology": { "score": 4, "checkId": "topology", "rationale": "Canonical pair and member ordering, standard pair identity, scenario resolution, and malformed-topology rejection satisfy the frozen topology contract." },
@@ -23,8 +23,8 @@
     "ai": { "score": 4, "checkId": "ai", "rationale": "Pair priorities and bonuses remain deterministic for both factions; strategic contacts permit movement but never blind target acquisition or conventional fire." },
     "persistence": { "score": 4, "checkId": "persistence", "rationale": "World v2 pair persistence, v1 migration, partial capture, AI orders, Dominance, and deterministic continuation remain supported with no persisted LS-09 contacts." },
     "presentation": { "score": 3, "checkId": "presentation", "rationale": "Hidden hostile mate and Alignment state remain protected in tactical and whole-ring presentation; minimap labels, ARIA, narrow layout, and canvas restoration pass." },
-    "regression": { "score": 4, "checkId": "regression", "rationale": "The exact 77-test focused lane, four browser tests, full check, and veteran-mirror core-match cohort pass against the refreshed LS-10 snapshot." },
-    "scope": { "score": 4, "checkId": "scope", "rationale": "The approved whole-ring successor view discloses no pair relation, remote mate detail, hostile Alignment state, or LS-07 gameplay consequence." }
+    "regression": { "score": 4, "checkId": "regression", "rationale": "The exact 77-test focused lane, four browser tests, full check, and veteran-mirror core-match cohort pass against the refreshed LS-11 snapshot." },
+    "scope": { "score": 4, "checkId": "scope", "rationale": "The approved Gravity Range successor discloses no pair relation, remote mate detail, hostile Alignment state, or LS-07 gameplay consequence." }
   },
   "dependencyReady": true,
   "blockers": [],

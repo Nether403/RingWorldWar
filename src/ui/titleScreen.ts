@@ -14,6 +14,7 @@ import './titleScreen.css';
 export type TitleAction =
   | { kind: 'new-skirmish'; playerFaction: Faction }
   | { kind: 'continue' }
+  | { kind: 'gravity-range' }
   | { kind: 'campaign'; missionId: CampaignMissionId; intent: 'start' | 'continue' | 'replay' };
 const INTRO_TIMEOUT_MILLISECONDS = 120_000;
 
@@ -36,6 +37,7 @@ export class TitleScreen {
   private readonly newSkirmish = document.createElement('button');
   private readonly continueGame = document.createElement('button');
   private readonly campaignButton = document.createElement('button');
+  private readonly gravityRange = document.createElement('button');
   private readonly settingsButton = document.createElement('button');
   private readonly faction = document.createElement('select');
   private readonly settingsClose = document.createElement('button');
@@ -129,9 +131,11 @@ export class TitleScreen {
     configureButton(this.continueGame, 'Continue');
     this.continueGame.classList.add('rww-title-continue');
     configureButton(this.campaignButton, 'Campaign');
+    configureButton(this.gravityRange, 'Gravity Range');
+    this.gravityRange.classList.add('rww-title-gravity-range');
     configureButton(this.settingsButton, 'Settings');
     this.continueGame.disabled = !options.hasSave;
-    actions.append(this.newSkirmish, this.campaignButton, this.continueGame, this.settingsButton);
+    actions.append(this.newSkirmish, this.campaignButton, this.gravityRange, this.continueGame, this.settingsButton);
     const footer = div('rww-title-footer');
     const location = document.createElement('span');
     location.textContent = 'HABITAT CONTROL: DEGRADED';
@@ -154,6 +158,7 @@ export class TitleScreen {
     this.newSkirmish.addEventListener('click', this.onNewSkirmish);
     this.continueGame.addEventListener('click', this.onContinue);
     this.campaignButton.addEventListener('click', this.openCampaign);
+    this.gravityRange.addEventListener('click', this.onGravityRange);
     this.campaignClose.addEventListener('click', this.closeCampaign);
     this.campaignPrimaryAction.addEventListener('click', this.onCampaignPrimaryAction);
     this.settingsButton.addEventListener('click', this.openSettings);
@@ -173,6 +178,7 @@ export class TitleScreen {
     this.newSkirmish.removeEventListener('click', this.onNewSkirmish);
     this.continueGame.removeEventListener('click', this.onContinue);
     this.campaignButton.removeEventListener('click', this.openCampaign);
+    this.gravityRange.removeEventListener('click', this.onGravityRange);
     this.campaignClose.removeEventListener('click', this.closeCampaign);
     this.campaignPrimaryAction.removeEventListener('click', this.onCampaignPrimaryAction);
     this.settingsButton.removeEventListener('click', this.openSettings);
@@ -487,6 +493,8 @@ export class TitleScreen {
   };
 
   private onContinue = (): void => this.finish({ kind: 'continue' });
+
+  private onGravityRange = (): void => this.finish({ kind: 'gravity-range' });
 
   private onCampaignPrimaryAction = (): void => {
     const intent = this.campaignPrimaryAction.dataset.campaignIntent;

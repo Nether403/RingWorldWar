@@ -5,7 +5,7 @@
   "command": "npx vitest run tests/render/cameraController.test.ts tests/render/strategicAnnulus.test.ts tests/ui/hud.test.ts",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "43070ec843d34e44ca479c982ba7ead39e2516d416586647309ed88ed3f26c20",
+  "sourceSnapshotSha256": "377a67fe888b0804af831a84addcd92cf47169cfee9600376b67056c2f6888ff",
   "passedTestIds": [
     "whole-ring-registration",
     "whole-ring-camera-restoration",

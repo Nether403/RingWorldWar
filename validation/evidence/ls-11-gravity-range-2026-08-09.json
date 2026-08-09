@@ -1,0 +1,69 @@
+{
+  "schema": "rww.ls-11-verification",
+  "version": 1,
+  "sliceId": "LS-11",
+  "contractSha256": "5d658b44b92dac708f4ef6e9e5aed398c8bc2887b834c455c1b57b0354be79aa",
+  "sourceRefs": [
+    { "path": "src/arcade/gravityRange.ts", "sha256": "dceced9dfe3b32ffd11361d2ab3f253be9c9459ae7a4772a55ec8fe5c3416390" },
+    { "path": "src/arcade/gravityRangeScenario.ts", "sha256": "33f0276e1dc1795c7ddfb80ffe91fcec746749c51529727cf202149f4eb4fc11" },
+    { "path": "src/scenario/runtimeScenario.ts", "sha256": "63de83b50cee12dfb147f9077bd642a88f4e4be151a08373825cfa79292ba586" },
+    { "path": "src/scenario/worldFactory.ts", "sha256": "d61f1dd1915edc252df9ee00193ae3781a079708fd109d3071f4f2b388c90aae" },
+    { "path": "src/sim/ballistics.ts", "sha256": "44d7d2e7aaecb671403434e7c894a6976d1475ba545c7e5b4c69cc953b30459e" },
+    { "path": "src/sim/data.ts", "sha256": "9a7ddb0325368dbb0de7233e65976066c6fe92d0ad08b19d6a524d840472bf7f" },
+    { "path": "src/sim/world.ts", "sha256": "4bc5d0c71ac8bfc06ec4b07c481d4e9bed3d38a588da42fda64a7b5f037f460f" },
+    { "path": "src/game.ts", "sha256": "b62fa820fac645a19587c16c618035abab7a2ca225605c0f3365d12bd554cc22" },
+    { "path": "src/main.ts", "sha256": "1669e961cb87c2b88a98b6c8cd53601786b109cc7e26a66bb4d7cc0f278070a4" },
+    { "path": "src/render/cameraController.ts", "sha256": "79658b3121942d7cfc454483d1cba2b1fa6d6e874349c3ecb51af453f94b3037" },
+    { "path": "src/ui/gravityRangePanel.ts", "sha256": "18f84bc576a0b713ff807de16fa042ea3f7cd9e4c05a1104cd81ff8b31997683" },
+    { "path": "src/ui/hud.ts", "sha256": "22279124c6ef1a8456f54ec80fcc65381932680806d283fb2111771dc11fb358" },
+    { "path": "src/ui/settingsMenu.ts", "sha256": "1e2bc928e92d2f252c69174ed9644b7d2015a18a2a4d5aefbfae379e80e8d899" },
+    { "path": "src/ui/titleScreen.ts", "sha256": "d112f11967ac3d58b7c9645622919876cf8cf64815be8d920e98839b799ee70d" },
+    { "path": "src/ui/titleScreen.css", "sha256": "3c3133935d0635345abd646234427167518b98fa8a6d6656c60972bcf73c94c6" },
+    { "path": "tests/arcade/gravityRange.test.ts", "sha256": "cf15ec2d701e11964d96b40d745d9dae08358e86e208167c89288e83adbf09e8" },
+    { "path": "tests/scenario/runtimeScenario.test.ts", "sha256": "b127be00fe7381aa250d97889e465f4e41119b339cf072784d78b29618566542" },
+    { "path": "tests/sim/artillery.test.ts", "sha256": "dcdb44d7188fa2e8ed49fbe1948d458501691524394ebd8598ee3e3c077dd24e" },
+    { "path": "tests/sim/ballistics.test.ts", "sha256": "82be030bbf8a97d2a5b4a8c1996e9ee5cd3c0a3dd829c67ff538009677cf7fe2" },
+    { "path": "e2e/gravity-range.spec.ts", "sha256": "039d272fe0ec20a6287206f7e38415142830c04966030a56bfd8882e88f773af" },
+    { "path": "e2e/whole-ring-strategic-view.spec.ts", "sha256": "67d85e4c8b35118765e501b24915115c0dd898f66d56e3e95b9d98baf3bd2edf" },
+    { "path": "e2e/title-screen.spec.ts", "sha256": "b08f046364858222afb221877e83e9c2909ad7de3960d3addd67d424d4daf093" }
+  ],
+  "runs": [
+    {
+      "id": "focused-unit",
+      "command": "npx vitest run tests/arcade/gravityRange.test.ts tests/sim/ballistics.test.ts tests/sim/artillery.test.ts tests/scenario/runtimeScenario.test.ts",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-11-focused-unit-2026-08-09.json", "sha256": "add788a470a91735be38c002695e0173800953977d639d5ebaa6738136a5779e" }
+    },
+    {
+      "id": "focused-browser",
+      "command": "npx playwright test e2e/gravity-range.spec.ts e2e/whole-ring-strategic-view.spec.ts e2e/title-screen.spec.ts --project=chromium-regression",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-11-focused-browser-2026-08-09.json", "sha256": "9cbd2f5637977ddac69267ecb4702528ba15f6e75653be723ea0baf3727998c5" }
+    },
+    {
+      "id": "full-check",
+      "command": "npm run check",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-11-full-check-2026-08-09.json", "sha256": "3a756561906b3b3c507e3da8ed3a3226eab26926bafb334c09513fe8154a4971" }
+    },
+    {
+      "id": "core-match",
+      "command": "npm run validate:core-match",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-11-core-match-2026-08-09.json", "sha256": "645686dc9ab1c1855631d008b6ec978b1252cf7201c7ba8a83b83666f10822b0" }
+    }
+  ],
+  "checks": [
+    { "id": "production-launch", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["gravity-range-setup", "gravity-range-production", "title-screen-regression"] },
+    { "id": "canonical-setup", "result": "passed", "runIds": ["focused-unit"], "testIds": ["gravity-range-setup", "directional-ballistics-regression", "runtime-scenario-regression"] },
+    { "id": "authoritative-loop", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["gravity-range-loop", "gravity-range-authority", "artillery-authority-regression", "gravity-range-production"] },
+    { "id": "direction-comprehension", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["gravity-range-loop", "gravity-range-production", "gravity-range-keyboard"] },
+    { "id": "input-observation", "result": "passed", "runIds": ["focused-browser"], "testIds": ["gravity-range-production", "gravity-range-keyboard", "whole-ring-strategic-view-regression"] },
+    { "id": "presentation-accessibility", "result": "passed", "runIds": ["focused-browser"], "testIds": ["gravity-range-production", "gravity-range-responsive", "gravity-range-keyboard"] },
+    { "id": "lifecycle-regression", "result": "passed", "runIds": ["focused-browser", "full-check", "core-match"], "testIds": ["gravity-range-keyboard", "gravity-range-lifecycle", "whole-ring-strategic-view-regression", "full-check", "core-match-cohorts"] }
+  ]
+}

@@ -5,7 +5,7 @@
   "command": "npm run validate:core-match",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "47e5c1370449d8ef7024e49e962b614f49f0064327829d2bbdb456436bf16075",
+  "sourceSnapshotSha256": "5ddcf3970fb0a4f46f19f4eb93dda4b219c7ff578672db6f35a7cc6416a0f91c",
   "passedTestIds": [
     "core-match-cohorts"
   ],

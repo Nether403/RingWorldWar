@@ -1,0 +1,18 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-browser",
+  "command": "npx playwright test e2e/gravity-range.spec.ts e2e/whole-ring-strategic-view.spec.ts e2e/title-screen.spec.ts --project=chromium-regression",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "5e9b8aa3e51b9dfd70797596f68293051a222a427014ed696e3a823cbb1667cb",
+  "passedTestIds": [
+    "gravity-range-production",
+    "gravity-range-responsive",
+    "gravity-range-keyboard",
+    "gravity-range-lifecycle",
+    "whole-ring-strategic-view-regression",
+    "title-screen-regression"
+  ],
+  "summary": "Twenty Chromium tests passed production launch, pointer and keyboard completion, retry, save isolation, lifecycle, 1280x720 and 320x568 presentation, whole-ring observation, and title regressions."
+}

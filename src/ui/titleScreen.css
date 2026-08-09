@@ -254,6 +254,11 @@
 .rww-title-action:focus-visible { box-shadow: inset 3px 0 var(--title-amber); }
 .rww-title-action:disabled { opacity: 0.34; cursor: not-allowed; }
 .rww-title-continue:disabled::after { content: 'NO ARCHIVE'; color: var(--title-muted); font-size: 8px; }
+.rww-title-gravity-range {
+  border-left-color: var(--title-cyan);
+  background: linear-gradient(90deg, rgba(24, 61, 70, 0.5), rgba(17, 21, 22, 0.72));
+}
+.rww-title-gravity-range::after { content: 'ARCADE'; color: var(--title-cyan); }
 .rww-title-intro-controls .rww-title-action::after { content: none; }
 
 .rww-title-footer {

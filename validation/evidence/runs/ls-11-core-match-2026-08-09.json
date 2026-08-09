@@ -1,0 +1,11 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "core-match",
+  "command": "npm run validate:core-match",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "5e9b8aa3e51b9dfd70797596f68293051a222a427014ed696e3a823cbb1667cb",
+  "passedTestIds": ["core-match-cohorts"],
+  "summary": "The protected veteran-mirror core-match qualification passed on the final LS-11 source snapshot without changing accepted gameplay semantics."
+}

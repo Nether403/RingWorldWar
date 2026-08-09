@@ -3,15 +3,15 @@
   "version": 1,
   "claimId": "LS-09",
   "acceptedState": "complete",
-  "issuedAt": "2026-08-09T08:44:58.340Z",
+  "issuedAt": "2026-08-09T17:03:10.142Z",
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-09-shadow-intelligence-2026-08-09.json",
-      "sha256": "5d5c7466c334647b4d4281e8845d750f76550160c6d1942fa1c72c19393900ce"
+      "sha256": "a89e8b3cbcdab7d9369f7ebeb5ea2e3e66bbdae30614e4cb2dd6a3257a0a380d"
     },
     {
       "path": "validation/evidence/reviews/ls-09-criterion-review-2026-08-09.json",
-      "sha256": "4efc51072f2331c316990f5ac8fa9aa2b9bc45d5accc0d85e8a60e2b9485c07f"
+      "sha256": "65720ef592351fe3e7c9f3a0771370bcc16d14dce9edac474fb44e083bde290e"
     },
     {
       "path": "docs/launch-scope/ls-09-shadow-timing-overhead-intelligence.md",
@@ -26,7 +26,7 @@
     {
       "id": "shadow-timing-overhead-intelligence",
       "result": "passed",
-      "summary": "All eight LS-09 categories pass the refreshed source-bound snapshot: shared shadow timing, launch signals, immutable strategic contacts, whole-ring authority separation, AI routing, accessible presentation, persistence, regressions, and scope."
+      "summary": "All eight LS-09 categories pass the refreshed source-bound snapshot: shared shadow timing, launch signals, immutable strategic contacts, Gravity Range authority separation, AI routing, accessible presentation, persistence, regressions, and scope."
     }
   ]
 }
