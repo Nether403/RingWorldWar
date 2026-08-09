@@ -388,7 +388,7 @@
 
       <section class="active-band" data-testid="active-slice" aria-labelledby="active-title">
         <div>
-          <p class="active-kicker">Current Active Slice</p>
+          <p class="active-kicker" id="active-kicker">Current Active Slice</p>
           <h2 id="active-title">Awaiting progress manifest</h2>
           <p id="active-evidence">The control page is establishing a local development link.</p>
         </div>
@@ -646,6 +646,10 @@
         const plan = data.plan;
         const active = plan.slices.find((slice) => slice.id === plan.activeSlice);
         if (!active) throw new Error('Active slice is missing');
+        const accepted = plan.slices.filter((slice) => slice.state === 'complete').at(-1);
+        byId('active-kicker').textContent = accepted
+          ? `Current Active Slice / Last Accepted ${accepted.id}`
+          : 'Current Active Slice';
         byId('active-title').textContent = active.title;
         byId('active-evidence').textContent = active.evidence;
         byId('active-ordinal').textContent = `${String(plan.slices.indexOf(active) + 1).padStart(2, '0')} / ${plan.slices.length}`;

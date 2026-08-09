@@ -5,10 +5,10 @@
   "command": "npm run test:e2e:ls12",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "64c88fe44a5e56a3d2e58bb8487ebe370a490c7b50fb71f5030672256305cad2",
+  "sourceSnapshotSha256": "afadbeec042087f67a1346f2056208d118cc33ae8d92d9c7223ffd68a55ff5cc",
   "passedTestIds": [
     "production-low-district-foundation",
     "production-quality-resource-authority"
   ],
-  "summary": "The built Vite application passed both 1280x720 production-preview tests with authored three-scale Low presentation, exact caps, a clean console, stable simulation authority, and bounded warmed resources."
+  "summary": "The built Vite application passed both 1280x720 LS-12 regression tests with palette-extended three-scale Low presentation, exact caps, a clean console, stable simulation authority, and bounded warmed resources."
 }

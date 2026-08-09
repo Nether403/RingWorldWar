@@ -1,0 +1,11 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "full-check",
+  "command": "npm run check",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "9e37d83ecdae52ee199d3d0d1ae20cd0416171825c96a2447f40bdf832be01c4",
+  "passedTestIds": ["full-check"],
+  "summary": "The complete repository check passed lint boundaries, TypeScript, the palette-extended test suite with one intentional performance skip, the exact evidence manifest, and the production build."
+}

@@ -6,7 +6,7 @@ import { BattlefieldDressing } from '../../src/render/battlefieldDressing';
 import { QUALITY } from '../../src/render/renderer';
 import { RING_CIRCUMFERENCE } from '../../src/core/constants';
 import { deltaS } from '../../src/core/ringMath';
-import { FOUNDATION_DISTRICT_PLAN, MAX_DISTRICT_SCATTER_ITEMS } from '../../src/render/districtPlan';
+import { DISTRICT_PALETTES, ENVIRONMENT_DISTRICT_PLAN, MAX_DISTRICT_SCATTER_ITEMS } from '../../src/render/districtPlan';
 
 describe('BattlefieldDressing', () => {
   it('rebuilds the same presentation-only ruin field for the same seed and anchor', () => {
@@ -44,22 +44,41 @@ describe('BattlefieldDressing', () => {
   });
 
   it('builds named authored layers at every density scale with fixed draw topology', () => {
-    const dressing = new BattlefieldDressing(44, FOUNDATION_DISTRICT_PLAN);
+    const dressing = new BattlefieldDressing(44, ENVIRONMENT_DISTRICT_PLAN);
     const diagnostics = dressing.diagnostics();
 
     expect(dressing.object.children).toHaveLength(4);
-    expect(diagnostics.districtIds).toEqual(FOUNDATION_DISTRICT_PLAN.districts.map((district) => district.id));
+    expect(diagnostics.districtIds).toEqual(ENVIRONMENT_DISTRICT_PLAN.districts.map((district) => district.id));
     expect(diagnostics.generatedByScale.overhead).toBeGreaterThan(0);
     expect(diagnostics.generatedByScale.tactical).toBeGreaterThan(0);
     expect(diagnostics.generatedByScale.micro).toBeGreaterThan(0);
     expect(diagnostics.generatedTotal).toBeLessThanOrEqual(MAX_DISTRICT_SCATTER_ITEMS);
   });
 
+  it('generates deterministic identities and colors for all four reusable palettes', () => {
+    const first = new BattlefieldDressing(441, ENVIRONMENT_DISTRICT_PLAN);
+    const second = new BattlefieldDressing(441, ENVIRONMENT_DISTRICT_PLAN);
+    const identity = (dressing: BattlefieldDressing) => dressing.generatedItems().map((item) => ({
+      palette: item.palette,
+      silhouette: item.silhouette,
+      color: item.color,
+      s: item.s,
+      z: item.z,
+      yaw: item.yaw,
+    }));
+
+    expect(identity(first)).toEqual(identity(second));
+    expect(new Set(first.generatedItems().map((item) => item.palette))).toEqual(new Set(DISTRICT_PALETTES));
+    for (const palette of DISTRICT_PALETTES) {
+      expect(first.generatedItems().filter((item) => item.palette === palette).length).toBeGreaterThan(0);
+    }
+  });
+
   it('keeps generated scatter inside wrapped districts and outside authored exclusions', () => {
-    const dressing = new BattlefieldDressing(45, FOUNDATION_DISTRICT_PLAN);
+    const dressing = new BattlefieldDressing(45, ENVIRONMENT_DISTRICT_PLAN);
 
     for (const item of dressing.generatedItems()) {
-      const district = FOUNDATION_DISTRICT_PLAN.districts.find((candidate) => candidate.id === item.districtId)!;
+      const district = ENVIRONMENT_DISTRICT_PLAN.districts.find((candidate) => candidate.id === item.districtId)!;
       expect(Math.abs(deltaS(district.centerS, item.s))).toBeLessThanOrEqual(district.halfLength);
       expect(item.z).toBeGreaterThanOrEqual(district.zMin);
       expect(item.z).toBeLessThanOrEqual(district.zMax);
@@ -74,13 +93,15 @@ describe('BattlefieldDressing', () => {
   it('preserves landmark and tactical identity on Low while adding bounded micro-detail on Ultra', () => {
     const anchor = new RenderAnchor();
     anchor.set(0, 0);
-    const dressing = new BattlefieldDressing(46, FOUNDATION_DISTRICT_PLAN);
+    const dressing = new BattlefieldDressing(46, ENVIRONMENT_DISTRICT_PLAN);
 
     dressing.setQuality(QUALITY.low.dressingDistance, QUALITY.low.dressingCap, false);
     dressing.update(anchor, flatTerrain());
     const low = dressing.diagnostics();
     expect(low.visibleByScale.overhead).toBeGreaterThan(0);
     expect(low.visibleByScale.tactical).toBeGreaterThan(0);
+    expect(low.visiblePalettes).toEqual(DISTRICT_PALETTES);
+    expect(Object.values(low.visibleByPalette).every((count) => count > 0)).toBe(true);
     expect(low.visibleTotal).toBeLessThanOrEqual(QUALITY.low.dressingCap);
 
     dressing.setQuality(QUALITY.ultra.dressingDistance, QUALITY.ultra.dressingCap, true);
@@ -93,7 +114,7 @@ describe('BattlefieldDressing', () => {
   it('applies per-layer slope ceilings and wrapped seam visibility', () => {
     const anchor = new RenderAnchor();
     anchor.set(RING_CIRCUMFERENCE - 20, 0);
-    const dressing = new BattlefieldDressing(47, FOUNDATION_DISTRICT_PLAN);
+    const dressing = new BattlefieldDressing(47, ENVIRONMENT_DISTRICT_PLAN);
     dressing.setQuality(500, 256, false);
     dressing.update(anchor, {
       heightAt: () => 7,
@@ -114,7 +135,7 @@ describe('BattlefieldDressing', () => {
       heightAt: () => 7,
       slopeAt: () => 0,
     } as unknown as Terrain;
-    const dressing = new BattlefieldDressing(48, FOUNDATION_DISTRICT_PLAN);
+    const dressing = new BattlefieldDressing(48, ENVIRONMENT_DISTRICT_PLAN);
     dressing.setQuality(1_400, 72, false);
     dressing.update(anchor, terrain);
     const item = dressing.visibleItems()[0]!;
@@ -132,6 +153,19 @@ describe('BattlefieldDressing', () => {
     dressing.update(anchor, terrain);
     dressing.dispose();
     expect(new Uint8Array(heights.buffer)).toEqual(before);
+  });
+
+  it('writes palette colors without expanding the four-bucket draw topology', () => {
+    const anchor = new RenderAnchor();
+    anchor.set(0, 0);
+    const dressing = new BattlefieldDressing(49, ENVIRONMENT_DISTRICT_PLAN);
+    dressing.setQuality(1_400, 72, false);
+    dressing.update(anchor, flatTerrain());
+    const meshes = dressing.object.children.filter((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
+
+    expect(meshes).toHaveLength(4);
+    expect(meshes.some((mesh) => mesh.instanceColor !== null && mesh.count > 0)).toBe(true);
+    expect(new Set(dressing.visibleItems().map((item) => item.color)).size).toBeGreaterThan(1);
   });
 });
 

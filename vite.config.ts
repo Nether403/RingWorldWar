@@ -165,6 +165,17 @@ export const CLAIM_EVIDENCE_POLICY = Object.freeze({
     ]),
     checkIds: Object.freeze(['layered-district-scatter-foundation']),
   }),
+  'LS-13': Object.freeze({
+    acceptedState: 'complete',
+    receiptPath: 'validation/evidence/launch-scope/LS-13.json',
+    sourcePaths: Object.freeze([
+      'validation/evidence/ls-13-environmental-district-palettes-2026-08-09.json',
+      'validation/evidence/reviews/ls-13-criterion-review-2026-08-09.json',
+      'docs/launch-scope/ls-13-environmental-district-palettes.md',
+      'docs/launch-scope-execution-policy.md',
+    ]),
+    checkIds: Object.freeze(['environmental-district-palettes']),
+  }),
   'G-01': Object.freeze({
     acceptedState: 'passed',
     receiptPath: 'validation/evidence/launch-scope/G-01.json',
@@ -477,6 +488,72 @@ export const LS12_CHECK_POLICY = Object.freeze({
   'presentation-acceptance': Object.freeze({ runIds: Object.freeze(['focused-browser'] as LS12RunId[]), testIds: Object.freeze(['production-low-district-foundation']) }),
 } as const);
 
+export const LS13_ACCEPTANCE_IDS = Object.freeze([
+  'strict-palette-contract',
+  'reusable-authored-coverage',
+  'deterministic-identity',
+  'fixed-render-topology',
+  'low-readability',
+  'authority-lifecycle',
+  'regression-review',
+] as const);
+
+export const LS13_REQUIRED_SOURCE_PATHS = Object.freeze([
+  'src/render/districtPlan.ts',
+  'src/render/battlefieldDressing.ts',
+  'tests/render/districtPlan.test.ts',
+  'tests/render/battlefieldDressing.test.ts',
+  'e2e/environmental-district-palettes.spec.ts',
+  'playwright.ls13.config.ts',
+] as const);
+
+export const LS13_RUN_POLICY = Object.freeze({
+  'focused-unit': Object.freeze({
+    command: 'npx vitest run tests/render/districtPlan.test.ts tests/render/battlefieldDressing.test.ts tests/render/disposal.test.ts tests/render/settings.test.ts',
+    artifactPath: 'validation/evidence/runs/ls-13-focused-unit-2026-08-09.json',
+  }),
+  'focused-browser': Object.freeze({
+    command: 'npm run test:e2e:ls13',
+    artifactPath: 'validation/evidence/runs/ls-13-focused-browser-2026-08-09.json',
+  }),
+  'full-check': Object.freeze({
+    command: 'npm run check',
+    artifactPath: 'validation/evidence/runs/ls-13-full-check-2026-08-09.json',
+  }),
+  'core-match': Object.freeze({
+    command: 'npm run validate:core-match',
+    artifactPath: 'validation/evidence/runs/ls-13-core-match-2026-08-09.json',
+  }),
+} as const);
+
+type LS13RunId = keyof typeof LS13_RUN_POLICY;
+
+export const LS13_RUN_TEST_IDS = Object.freeze({
+  'focused-unit': Object.freeze([
+    'strict-palette-contract',
+    'reusable-authored-coverage',
+    'deterministic-palette-identity',
+    'fixed-render-topology',
+    'authority-lifecycle',
+  ]),
+  'focused-browser': Object.freeze([
+    'production-low-four-palettes',
+    'production-palette-quality-authority',
+  ]),
+  'full-check': Object.freeze(['full-check']),
+  'core-match': Object.freeze(['core-match-cohorts']),
+} as const);
+
+export const LS13_CHECK_POLICY = Object.freeze({
+  'strict-palette-contract': Object.freeze({ runIds: Object.freeze(['focused-unit'] as LS13RunId[]), testIds: Object.freeze(['strict-palette-contract']) }),
+  'reusable-authored-coverage': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS13RunId[]), testIds: Object.freeze(['reusable-authored-coverage', 'production-low-four-palettes']) }),
+  'deterministic-identity': Object.freeze({ runIds: Object.freeze(['focused-unit'] as LS13RunId[]), testIds: Object.freeze(['deterministic-palette-identity']) }),
+  'fixed-render-topology': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS13RunId[]), testIds: Object.freeze(['fixed-render-topology', 'production-low-four-palettes']) }),
+  'low-readability': Object.freeze({ runIds: Object.freeze(['focused-browser'] as LS13RunId[]), testIds: Object.freeze(['production-low-four-palettes']) }),
+  'authority-lifecycle': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser', 'core-match'] as LS13RunId[]), testIds: Object.freeze(['authority-lifecycle', 'production-palette-quality-authority', 'core-match-cohorts']) }),
+  'regression-review': Object.freeze({ runIds: Object.freeze(['focused-browser', 'full-check', 'core-match'] as LS13RunId[]), testIds: Object.freeze(['production-palette-quality-authority', 'full-check', 'core-match-cohorts']) }),
+} as const);
+
 export const LS09_RUN_POLICY = Object.freeze({
   'focused-unit': Object.freeze({
     command: 'npx vitest run tests/core/shadow.test.ts tests/sim/shadowIntelligence.test.ts tests/sim/vision.test.ts tests/render/environment.test.ts tests/render/presentationEvents.test.ts tests/audio/audioEngine.test.ts tests/ai/strategist.test.ts tests/ui/hud.test.ts',
@@ -741,7 +818,7 @@ function isSafeImplementationPath(path: string): boolean {
   return !path.includes('\\')
     && !path.startsWith('/')
     && !segments.includes('..')
-    && (/^(?:src|tests|e2e)\/[A-Za-z0-9._/-]+$/.test(path) || path === 'playwright.ls12.config.ts');
+    && (/^(?:src|tests|e2e)\/[A-Za-z0-9._/-]+$/.test(path) || /^playwright\.ls(?:12|13)\.config\.ts$/.test(path));
 }
 
 function requireSha256(value: unknown, label: string): string {
@@ -1046,6 +1123,155 @@ export function ls12SourceSnapshotSha256(sourceRefsValue: unknown): string {
     sha256: requireSha256(source.sha256, `LS-12 source snapshot[${index}].sha256`),
   }));
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function ls13SourceSnapshotSha256(sourceRefsValue: unknown): string {
+  const sourceRefs = asArray(sourceRefsValue).map((source, index) =>
+    requireRecord(source, `LS-13 source snapshot[${index}]`));
+  const canonical = sourceRefs.map((source, index) => ({
+    path: requireNonEmptyString(source.path, `LS-13 source snapshot[${index}].path`),
+    sha256: requireSha256(source.sha256, `LS-13 source snapshot[${index}].sha256`),
+  }));
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function validateLS13EvidenceShape(
+  machineValue: unknown,
+  reviewValue: unknown,
+  runArtifactValues: Record<string, unknown>,
+  expectedHashes?: { contractSha256: string; policySha256: string },
+): void {
+  const machine = requireRecord(machineValue, 'LS-13 machine evidence');
+  requireExactKeys(machine, ['schema', 'version', 'sliceId', 'contractSha256', 'sourceRefs', 'runs', 'checks'], 'LS-13 machine evidence');
+  if (machine.schema !== 'rww.ls-13-verification' || machine.version !== 1 || machine.sliceId !== 'LS-13') {
+    throw new Error('LS-13 machine evidence has an invalid identity');
+  }
+  const contractSha256 = requireSha256(machine.contractSha256, 'LS-13 machine contractSha256');
+  if (expectedHashes && contractSha256 !== expectedHashes.contractSha256) {
+    throw new Error('LS-13 machine evidence does not bind the current contract');
+  }
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-13 machine sourceRefs[${index}]`));
+  const sourcePaths = sourceRefs.map((source, index) => {
+    requireExactKeys(source, ['path', 'sha256'], `LS-13 machine sourceRefs[${index}]`);
+    const path = requireNonEmptyString(source.path, `LS-13 machine sourceRefs[${index}].path`);
+    if (!isSafeImplementationPath(path)) throw new Error(`Unsafe LS-13 implementation source path: ${path}`);
+    requireSha256(source.sha256, `LS-13 machine sourceRefs[${index}].sha256`);
+    return path;
+  });
+  if (JSON.stringify(sourcePaths) !== JSON.stringify(LS13_REQUIRED_SOURCE_PATHS)) {
+    throw new Error('LS-13 machine evidence does not bind the exact implementation sources');
+  }
+  const sourceSnapshotSha256 = ls13SourceSnapshotSha256(sourceRefs);
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-13 machine runs[${index}]`));
+  const runIds = runs.map((run, index) => {
+    requireExactKeys(run, ['id', 'command', 'result', 'exitCode', 'artifact'], `LS-13 machine runs[${index}]`);
+    return requireNonEmptyString(run.id, `LS-13 machine runs[${index}].id`);
+  });
+  if (JSON.stringify(runIds) !== JSON.stringify(Object.keys(LS13_RUN_POLICY))) {
+    throw new Error('LS-13 machine runs do not match the exact verification policy');
+  }
+  const passedTestIdsByRun = new Map<string, Set<string>>();
+  for (const [index, run] of runs.entries()) {
+    const id = runIds[index] as LS13RunId;
+    const policy = LS13_RUN_POLICY[id];
+    if (run.command !== policy.command || run.result !== 'passed' || run.exitCode !== 0) {
+      throw new Error(`LS-13 verification run ${id} did not pass its exact command`);
+    }
+    const artifact = requireRecord(run.artifact, `LS-13 machine runs[${index}].artifact`);
+    requireExactKeys(artifact, ['path', 'sha256'], `LS-13 machine runs[${index}].artifact`);
+    if (artifact.path !== policy.artifactPath) throw new Error(`LS-13 verification run ${id} has the wrong artifact path`);
+    requireSha256(artifact.sha256, `LS-13 machine runs[${index}].artifact.sha256`);
+    const runArtifact = requireRecord(runArtifactValues[id], `LS-13 run artifact ${id}`);
+    requireExactKeys(runArtifact, ['schema', 'version', 'id', 'command', 'result', 'exitCode', 'sourceSnapshotSha256', 'passedTestIds', 'summary'], `LS-13 run artifact ${id}`);
+    if (runArtifact.schema !== 'rww.command-verification' || runArtifact.version !== 1 || runArtifact.id !== id
+      || runArtifact.command !== policy.command || runArtifact.result !== 'passed' || runArtifact.exitCode !== 0) {
+      throw new Error(`LS-13 run artifact ${id} does not prove the exact passing command`);
+    }
+    if (requireSha256(runArtifact.sourceSnapshotSha256, `LS-13 run artifact ${id}.sourceSnapshotSha256`) !== sourceSnapshotSha256) {
+      throw new Error(`LS-13 run artifact ${id} does not bind the implementation source snapshot`);
+    }
+    if (requireNonEmptyString(runArtifact.summary, `LS-13 run artifact ${id}.summary`).length < 20) {
+      throw new Error(`LS-13 run artifact ${id} lacks a substantive summary`);
+    }
+    const passedTestIds = requireStringArray(runArtifact.passedTestIds, `LS-13 run artifact ${id}.passedTestIds`);
+    if (JSON.stringify(passedTestIds) !== JSON.stringify(LS13_RUN_TEST_IDS[id])) {
+      throw new Error(`LS-13 run artifact ${id} does not contain the exact predeclared test IDs`);
+    }
+    passedTestIdsByRun.set(id, new Set(passedTestIds));
+  }
+  const checks = asArray(machine.checks).map((check, index) => requireRecord(check, `LS-13 machine checks[${index}]`));
+  const checkIds = checks.map((check, index) => {
+    requireExactKeys(check, ['id', 'result', 'runIds', 'testIds'], `LS-13 machine checks[${index}]`);
+    if (check.result !== 'passed') throw new Error(`LS-13 machine check ${String(check.id)} did not pass`);
+    return requireNonEmptyString(check.id, `LS-13 machine checks[${index}].id`);
+  });
+  if (JSON.stringify(checkIds) !== JSON.stringify(LS13_ACCEPTANCE_IDS)) {
+    throw new Error('LS-13 machine checks do not cover the exact acceptance matrix');
+  }
+  for (const [index, check] of checks.entries()) {
+    const id = checkIds[index] as keyof typeof LS13_CHECK_POLICY;
+    const policy = LS13_CHECK_POLICY[id];
+    const checkRunIds = requireStringArray(check.runIds, `LS-13 machine checks[${index}].runIds`);
+    const testIds = requireStringArray(check.testIds, `LS-13 machine checks[${index}].testIds`);
+    if (JSON.stringify(checkRunIds) !== JSON.stringify(policy.runIds)
+      || JSON.stringify(testIds) !== JSON.stringify(policy.testIds)) {
+      throw new Error(`LS-13 machine check ${id} does not match its exact run and test policy`);
+    }
+    for (const testId of testIds) {
+      if (!checkRunIds.some((runId) => passedTestIdsByRun.get(runId)?.has(testId))) {
+        throw new Error(`LS-13 machine check ${id} cannot prove test ID ${testId}`);
+      }
+    }
+  }
+  const review = requireRecord(reviewValue, 'LS-13 criterion review');
+  requireExactKeys(review, [
+    'schema', 'version', 'reviewId', 'claimId', 'contractSha256', 'policySha256', 'reviewRound',
+    'reviewType', 'independentContext', 'reviewer', 'scores', 'dependencyReady', 'blockers',
+    'requiredQualityFindings', 'humanValidation', 'polish',
+  ], 'LS-13 criterion review');
+  if (review.schema !== 'rww.criterion-review' || review.version !== 1 || review.claimId !== 'LS-13'
+    || review.reviewType !== 'platform-presentation-accessibility' || review.independentContext !== true) {
+    throw new Error('LS-13 criterion review has an invalid identity or review type');
+  }
+  if (!Number.isInteger(review.reviewRound) || Number(review.reviewRound) < 1 || Number(review.reviewRound) > 2) {
+    throw new Error('LS-13 criterion review exceeds the bounded review policy');
+  }
+  const reviewer = requireRecord(review.reviewer, 'LS-13 criterion review reviewer');
+  requireExactKeys(reviewer, ['role', 'taskId', 'model', 'completedAt', 'sourceSnapshotSha256'], 'LS-13 criterion review reviewer');
+  if (reviewer.role !== 'independent-critic' || !/^ses_[A-Za-z0-9]+$/.test(requireNonEmptyString(reviewer.taskId, 'LS-13 reviewer taskId'))
+    || !isoDateString(requireNonEmptyString(reviewer.completedAt, 'LS-13 reviewer completedAt'))
+    || requireSha256(reviewer.sourceSnapshotSha256, 'LS-13 reviewer sourceSnapshotSha256') !== sourceSnapshotSha256) {
+    throw new Error('LS-13 criterion review has invalid independent provenance');
+  }
+  requireNonEmptyString(reviewer.model, 'LS-13 reviewer model');
+  if (expectedHashes && (
+    requireSha256(review.contractSha256, 'LS-13 review contractSha256') !== expectedHashes.contractSha256
+    || requireSha256(review.policySha256, 'LS-13 review policySha256') !== expectedHashes.policySha256
+  )) throw new Error('LS-13 criterion review does not bind the current contract and execution policy');
+  const scores = requireRecord(review.scores, 'LS-13 criterion review scores');
+  requireExactKeys(scores, [...LS13_ACCEPTANCE_IDS], 'LS-13 criterion review scores');
+  for (const id of LS13_ACCEPTANCE_IDS) {
+    const score = requireRecord(scores[id], `LS-13 criterion review scores.${id}`);
+    requireExactKeys(score, ['score', 'checkId', 'rationale'], `LS-13 criterion review scores.${id}`);
+    if (score.checkId !== id || !Number.isInteger(score.score) || Number(score.score) < 3 || Number(score.score) > 4
+      || requireNonEmptyString(score.rationale, `LS-13 criterion review scores.${id}.rationale`).length < 20) {
+      throw new Error(`LS-13 criterion ${id} is below ship-ready or lacks rationale`);
+    }
+  }
+  if (review.dependencyReady !== true
+    || requireStringArray(review.blockers, 'LS-13 review blockers').length !== 0
+    || requireStringArray(review.requiredQualityFindings, 'LS-13 review requiredQualityFindings').length !== 0
+    || requireStringArray(review.humanValidation, 'LS-13 review humanValidation').length !== 0) {
+    throw new Error('LS-13 criterion review is not dependency-ready');
+  }
+  for (const [index, finding] of asArray(review.polish).entries()) {
+    const record = requireRecord(finding, `LS-13 criterion review polish[${index}]`);
+    requireExactKeys(record, ['id', 'summary', 'reopenTrigger'], `LS-13 criterion review polish[${index}]`);
+    requireNonEmptyString(record.id, `LS-13 criterion review polish[${index}].id`);
+    requireNonEmptyString(record.summary, `LS-13 criterion review polish[${index}].summary`);
+    requireNonEmptyString(record.reopenTrigger, `LS-13 criterion review polish[${index}].reopenTrigger`);
+  }
 }
 
 export function validateLS12EvidenceShape(
@@ -1750,6 +1976,47 @@ async function validateLS12CurrentSources(machineValue: unknown): Promise<void> 
   }));
 }
 
+async function validateLS13CurrentSources(machineValue: unknown): Promise<void> {
+  const machine = requireRecord(machineValue, 'LS-13 machine evidence');
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-13 machine sourceRefs[${index}]`));
+  await Promise.all(sourceRefs.map(async (source, index) => {
+    const path = requireNonEmptyString(source.path, `LS-13 machine sourceRefs[${index}].path`);
+    const expected = requireSha256(source.sha256, `LS-13 machine sourceRefs[${index}].sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+    } catch {
+      throw new Error(`LS-13 implementation source is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-13 implementation source SHA-256 mismatch: ${path}`);
+  }));
+}
+
+async function loadLS13RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
+  const machine = requireRecord(machineValue, 'LS-13 machine evidence');
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-13 machine runs[${index}]`));
+  const result: Record<string, unknown> = {};
+  for (const [index, run] of runs.entries()) {
+    const id = requireNonEmptyString(run.id, `LS-13 machine runs[${index}].id`);
+    const artifact = requireRecord(run.artifact, `LS-13 machine runs[${index}].artifact`);
+    const path = requireNonEmptyString(artifact.path, `LS-13 machine runs[${index}].artifact.path`);
+    if (!isSafeRepositoryPath(path) || !path.startsWith('validation/evidence/runs/')) {
+      throw new Error(`Unsafe LS-13 run artifact path: ${path}`);
+    }
+    const expected = requireSha256(artifact.sha256, `LS-13 machine runs[${index}].artifact.sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+      result[id] = await readJson(resolve(root, path));
+    } catch {
+      throw new Error(`LS-13 run artifact is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-13 run artifact SHA-256 mismatch: ${path}`);
+  }
+  return result;
+}
+
 async function loadLS12RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
   const machine = requireRecord(machineValue, 'LS-12 machine evidence');
   const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-12 machine runs[${index}]`));
@@ -2056,6 +2323,20 @@ export async function validateClaimEvidenceReceipt(
       policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
     });
     await validateLS12CurrentSources(machine);
+  }
+  if (claimId === 'LS-13') {
+    const digestByPath = new Map(sourceRefs.map((source, index) => [
+      sourcePaths[index]!,
+      requireSha256(source.sha256, `${claimId}.sourceRefs[${index}].sha256`),
+    ]));
+    const machine = await readJson(resolve(root, policy.sourcePaths[0]));
+    const review = await readJson(resolve(root, policy.sourcePaths[1]));
+    const runArtifacts = await loadLS13RunArtifacts(machine);
+    validateLS13EvidenceShape(machine, review, runArtifacts, {
+      contractSha256: digestByPath.get('docs/launch-scope/ls-13-environmental-district-palettes.md')!,
+      policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
+    });
+    await validateLS13CurrentSources(machine);
   }
   return receipt;
 }

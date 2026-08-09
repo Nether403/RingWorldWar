@@ -3,6 +3,45 @@ import { RING_CIRCUMFERENCE, RING_HALF_WIDTH } from '@core/constants';
 export type DistrictScale = 'overhead' | 'tactical' | 'micro';
 export type DistrictShape = 'tower' | 'slab' | 'pipe' | 'debris';
 export type DistrictPattern = 'anchors' | 'clusters' | 'rows' | 'scatter';
+export const DISTRICT_PALETTES = [
+  'arc-city',
+  'agricultural',
+  'spinal-industrial',
+  'breach-evacuation',
+] as const;
+export type DistrictPalette = typeof DISTRICT_PALETTES[number];
+
+const PALETTE_SILHOUETTES = {
+  'arc-city': ['civic-tower', 'shelter-block', 'transit-viaduct', 'shelter-light'],
+  agricultural: ['canopy-spire', 'terrace-bank', 'water-channel', 'farm-rig'],
+  'spinal-industrial': ['maintenance-pylon', 'gantry-deck', 'power-trunk', 'salvage-stack'],
+  'breach-evacuation': ['seal-wall', 'ruined-block', 'exposed-scrith', 'abandoned-convoy'],
+} as const satisfies Record<DistrictPalette, readonly string[]>;
+export type DistrictSilhouette = typeof PALETTE_SILHOUETTES[DistrictPalette][number];
+
+export interface DistrictSilhouetteStyle {
+  readonly shape: DistrictShape;
+  readonly color: number;
+}
+
+export const DISTRICT_SILHOUETTE_STYLES: Readonly<Record<DistrictSilhouette, DistrictSilhouetteStyle>> = Object.freeze({
+  'civic-tower': { shape: 'tower', color: 0x7896a2 },
+  'shelter-block': { shape: 'slab', color: 0x817869 },
+  'transit-viaduct': { shape: 'pipe', color: 0x4d8791 },
+  'shelter-light': { shape: 'debris', color: 0xd7a556 },
+  'canopy-spire': { shape: 'tower', color: 0x668358 },
+  'terrace-bank': { shape: 'slab', color: 0x7f8454 },
+  'water-channel': { shape: 'pipe', color: 0x477f8e },
+  'farm-rig': { shape: 'debris', color: 0xa17b42 },
+  'maintenance-pylon': { shape: 'tower', color: 0x707d80 },
+  'gantry-deck': { shape: 'slab', color: 0x726c5f },
+  'power-trunk': { shape: 'pipe', color: 0xb28a3d },
+  'salvage-stack': { shape: 'debris', color: 0x895943 },
+  'seal-wall': { shape: 'tower', color: 0x968b78 },
+  'ruined-block': { shape: 'slab', color: 0x74554e },
+  'exposed-scrith': { shape: 'pipe', color: 0x4d5558 },
+  'abandoned-convoy': { shape: 'debris', color: 0x9a603d },
+});
 
 export interface DistrictExclusion {
   centerS: number;
@@ -14,7 +53,7 @@ export interface DistrictExclusion {
 export interface DistrictLayer {
   id: string;
   scale: DistrictScale;
-  shape: DistrictShape;
+  silhouette: DistrictSilhouette;
   pattern: DistrictPattern;
   count: number;
   maxSlope: number;
@@ -25,6 +64,7 @@ export interface DistrictLayer {
 
 export interface DistrictDefinition {
   id: string;
+  palette: DistrictPalette;
   centerS: number;
   halfLength: number;
   zMin: number;
@@ -57,10 +97,12 @@ export function parseDistrictPlan(value: unknown): DistrictPlan {
   const districts = rawDistricts.map((raw, districtIndex): DistrictDefinition => {
     const path = `district plan districts[${districtIndex}]`;
     const district = record(raw, path);
-    exactKeys(district, ['id', 'centerS', 'halfLength', 'zMin', 'zMax', 'exclusions', 'layers'], path);
+    exactKeys(district, ['id', 'palette', 'centerS', 'halfLength', 'zMin', 'zMax', 'exclusions', 'layers'], path);
     const id = identifier(district.id, `${path}.id`);
     if (districtIds.has(id)) throw new Error(`Duplicate district id: ${id}`);
     districtIds.add(id);
+    if (!isPalette(district.palette)) throw new Error(`${path}.palette is invalid`);
+    const palette = district.palette;
     const centerS = finite(district.centerS, `${path}.centerS`);
     if (centerS < 0 || centerS >= RING_CIRCUMFERENCE) throw new Error(`${path}.centerS is outside the ring`);
     const halfLength = positive(district.halfLength, `${path}.halfLength`);
@@ -97,12 +139,14 @@ export function parseDistrictPlan(value: unknown): DistrictPlan {
     const layers = rawLayers.map((rawLayer, layerIndex): DistrictLayer => {
       const layerPath = `${path}.layers[${layerIndex}]`;
       const layer = record(rawLayer, layerPath);
-      exactKeys(layer, ['id', 'scale', 'shape', 'pattern', 'count', 'maxSlope', 'width', 'height', 'depth'], layerPath);
+      exactKeys(layer, ['id', 'scale', 'silhouette', 'pattern', 'count', 'maxSlope', 'width', 'height', 'depth'], layerPath);
       const layerId = identifier(layer.id, `${layerPath}.id`);
       if (layerIds.has(layerId)) throw new Error(`Duplicate layer id in ${id}: ${layerId}`);
       layerIds.add(layerId);
       if (!isScale(layer.scale)) throw new Error(`${layerPath}.scale is invalid`);
-      if (!isShape(layer.shape)) throw new Error(`${layerPath}.shape is invalid`);
+      if (!isSilhouetteForPalette(layer.silhouette, palette)) {
+        throw new Error(`${layerPath}.silhouette does not belong to ${palette}`);
+      }
       if (!isPattern(layer.pattern)) throw new Error(`${layerPath}.pattern is invalid`);
       const count = integer(layer.count, `${layerPath}.count`);
       if (count < 0 || count > MAX_ITEMS_PER_LAYER) throw new Error(`${layerPath}.count exceeds its bound`);
@@ -112,7 +156,7 @@ export function parseDistrictPlan(value: unknown): DistrictPlan {
       return {
         id: layerId,
         scale: layer.scale,
-        shape: layer.shape,
+        silhouette: layer.silhouette,
         pattern: layer.pattern,
         count,
         maxSlope,
@@ -121,7 +165,7 @@ export function parseDistrictPlan(value: unknown): DistrictPlan {
         depth: range(layer.depth, `${layerPath}.depth`),
       };
     });
-    return { id, centerS, halfLength, zMin, zMax, exclusions, layers };
+    return { id, palette, centerS, halfLength, zMin, zMax, exclusions, layers };
   });
   if (itemCount > MAX_DISTRICT_SCATTER_ITEMS) {
     throw new Error(`District plan count exceeds ${MAX_DISTRICT_SCATTER_ITEMS}`);
@@ -129,37 +173,76 @@ export function parseDistrictPlan(value: unknown): DistrictPlan {
   return { version: 1, districts };
 }
 
-const COMMON_LAYERS: DistrictLayer[] = [
-  { id: 'vertical-landmarks', scale: 'overhead', shape: 'tower', pattern: 'anchors', count: 8, maxSlope: 0.2, width: [14, 24], height: [30, 54], depth: [12, 22] },
-  { id: 'habitat-shells', scale: 'tactical', shape: 'slab', pattern: 'clusters', count: 28, maxSlope: 0.3, width: [8, 22], height: [4, 14], depth: [5, 13] },
-  { id: 'service-trunks', scale: 'tactical', shape: 'pipe', pattern: 'rows', count: 18, maxSlope: 0.26, width: [1, 2.6], height: [40, 76], depth: [1, 2.6] },
-  { id: 'bounded-deck-detail', scale: 'micro', shape: 'debris', pattern: 'scatter', count: 56, maxSlope: 0.36, width: [1, 5], height: [0.5, 2.6], depth: [1, 4] },
-];
+const PALETTE_LAYERS: Readonly<Record<DistrictPalette, readonly DistrictLayer[]>> = {
+  'arc-city': [
+    layer('occupied-towers', 'overhead', 'civic-tower', 'anchors', 8, 0.2, [14, 24], [34, 58], [12, 22]),
+    layer('shelter-blocks', 'tactical', 'shelter-block', 'clusters', 28, 0.3, [9, 24], [5, 15], [6, 14]),
+    layer('transit-viaducts', 'tactical', 'transit-viaduct', 'rows', 18, 0.26, [1.2, 2.8], [44, 80], [1.2, 2.8]),
+    layer('shelter-lights', 'micro', 'shelter-light', 'scatter', 56, 0.36, [1, 3], [0.8, 2.2], [1, 3]),
+  ],
+  agricultural: [
+    layer('canopy-spires', 'overhead', 'canopy-spire', 'clusters', 8, 0.24, [18, 32], [22, 40], [18, 32]),
+    layer('terrace-banks', 'tactical', 'terrace-bank', 'rows', 28, 0.22, [12, 30], [2, 7], [8, 18]),
+    layer('water-channels', 'tactical', 'water-channel', 'rows', 18, 0.18, [1.8, 3.6], [36, 68], [1.8, 3.6]),
+    layer('farm-rigs', 'micro', 'farm-rig', 'clusters', 56, 0.32, [1.5, 5], [0.8, 3], [1.5, 4]),
+  ],
+  'spinal-industrial': [
+    layer('maintenance-pylons', 'overhead', 'maintenance-pylon', 'anchors', 8, 0.18, [12, 20], [38, 64], [10, 18]),
+    layer('gantry-decks', 'tactical', 'gantry-deck', 'rows', 28, 0.25, [14, 32], [4, 10], [5, 12]),
+    layer('power-trunks', 'tactical', 'power-trunk', 'rows', 18, 0.22, [1.6, 3.2], [50, 88], [1.6, 3.2]),
+    layer('salvage-stacks', 'micro', 'salvage-stack', 'clusters', 56, 0.38, [2, 6], [1, 3.6], [1.5, 5]),
+  ],
+  'breach-evacuation': [
+    layer('seal-walls', 'overhead', 'seal-wall', 'rows', 8, 0.16, [16, 28], [24, 44], [8, 14]),
+    layer('ruined-blocks', 'tactical', 'ruined-block', 'clusters', 28, 0.34, [10, 26], [3, 12], [6, 16]),
+    layer('exposed-scrith', 'tactical', 'exposed-scrith', 'scatter', 18, 0.3, [1.4, 3], [32, 62], [1.4, 3]),
+    layer('abandoned-convoys', 'micro', 'abandoned-convoy', 'rows', 56, 0.3, [2, 7], [1.2, 3.2], [1.5, 4]),
+  ],
+};
 
-function authoredDistrict(id: string, centerS: number): DistrictDefinition {
+function layer(
+  id: string,
+  scale: DistrictScale,
+  silhouette: DistrictSilhouette,
+  pattern: DistrictPattern,
+  count: number,
+  maxSlope: number,
+  width: [number, number],
+  height: [number, number],
+  depth: [number, number],
+): DistrictLayer {
+  return { id, scale, silhouette, pattern, count, maxSlope, width, height, depth };
+}
+
+function authoredDistrict(id: string, palette: DistrictPalette, centerS: number): DistrictDefinition {
   return {
     id,
+    palette,
     centerS,
     halfLength: 650,
     zMin: -600,
     zMax: 600,
     exclusions: [{ centerS, halfLength: 130, zMin: -220, zMax: 220 }],
-    layers: COMMON_LAYERS.map((layer) => ({ ...layer, width: [...layer.width], height: [...layer.height], depth: [...layer.depth] })),
+    layers: PALETTE_LAYERS[palette].map((entry) => ({
+      ...entry,
+      width: [...entry.width],
+      height: [...entry.height],
+      depth: [...entry.depth],
+    })),
   };
 }
 
-/** Neutral authored coverage used until LS-13 supplies reusable visual palettes. */
-export const FOUNDATION_DISTRICT_PLAN: DistrictPlan = parseDistrictPlan({
+export const ENVIRONMENT_DISTRICT_PLAN: DistrictPlan = parseDistrictPlan({
   version: 1,
   districts: [
-    authoredDistrict('habitation-00', 0),
-    authoredDistrict('habitation-01', RING_CIRCUMFERENCE * 0.125),
-    authoredDistrict('habitation-02', RING_CIRCUMFERENCE * 0.25),
-    authoredDistrict('habitation-03', RING_CIRCUMFERENCE * 0.375),
-    authoredDistrict('habitation-04', RING_CIRCUMFERENCE * 0.5),
-    authoredDistrict('habitation-05', RING_CIRCUMFERENCE * 0.625),
-    authoredDistrict('habitation-06', RING_CIRCUMFERENCE * 0.75),
-    authoredDistrict('habitation-07', RING_CIRCUMFERENCE * 0.875),
+    authoredDistrict('arc-city-00', 'arc-city', RING_CIRCUMFERENCE - 600),
+    authoredDistrict('agricultural-00', 'agricultural', RING_CIRCUMFERENCE - 200),
+    authoredDistrict('spinal-industrial-00', 'spinal-industrial', 200),
+    authoredDistrict('breach-evacuation-00', 'breach-evacuation', 600),
+    authoredDistrict('arc-city-01', 'arc-city', RING_CIRCUMFERENCE * 0.5 - 600),
+    authoredDistrict('agricultural-01', 'agricultural', RING_CIRCUMFERENCE * 0.5 - 200),
+    authoredDistrict('spinal-industrial-01', 'spinal-industrial', RING_CIRCUMFERENCE * 0.5 + 200),
+    authoredDistrict('breach-evacuation-01', 'breach-evacuation', RING_CIRCUMFERENCE * 0.5 + 600),
   ],
 });
 
@@ -217,8 +300,12 @@ function isScale(value: unknown): value is DistrictScale {
   return value === 'overhead' || value === 'tactical' || value === 'micro';
 }
 
-function isShape(value: unknown): value is DistrictShape {
-  return value === 'tower' || value === 'slab' || value === 'pipe' || value === 'debris';
+function isPalette(value: unknown): value is DistrictPalette {
+  return typeof value === 'string' && DISTRICT_PALETTES.includes(value as DistrictPalette);
+}
+
+function isSilhouetteForPalette(value: unknown, palette: DistrictPalette): value is DistrictSilhouette {
+  return typeof value === 'string' && PALETTE_SILHOUETTES[palette].includes(value as never);
 }
 
 function isPattern(value: unknown): value is DistrictPattern {

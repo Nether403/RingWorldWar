@@ -1,0 +1,14 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-browser",
+  "command": "npm run test:e2e:ls13",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "9e37d83ecdae52ee199d3d0d1ae20cd0416171825c96a2447f40bdf832be01c4",
+  "passedTestIds": [
+    "production-low-four-palettes",
+    "production-palette-quality-authority"
+  ],
+  "summary": "The built application passed both LS-13 production tests at 1280x720 Low with four generated palettes, fixed colored buckets, exact caps, stable resources and world authority, and a clean console."
+}

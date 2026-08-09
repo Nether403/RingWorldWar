@@ -1,0 +1,17 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-unit",
+  "command": "npx vitest run tests/render/districtPlan.test.ts tests/render/battlefieldDressing.test.ts tests/render/disposal.test.ts tests/render/settings.test.ts",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "9e37d83ecdae52ee199d3d0d1ae20cd0416171825c96a2447f40bdf832be01c4",
+  "passedTestIds": [
+    "strict-palette-contract",
+    "reusable-authored-coverage",
+    "deterministic-palette-identity",
+    "fixed-render-topology",
+    "authority-lifecycle"
+  ],
+  "summary": "The focused LS-13 lane passed 26 tests covering four strict reusable palettes, deterministic identities, fixed colored buckets, quality priority, terrain authority, and disposal."
+}

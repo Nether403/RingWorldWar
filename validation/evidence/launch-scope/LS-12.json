@@ -3,15 +3,15 @@
   "version": 1,
   "claimId": "LS-12",
   "acceptedState": "complete",
-  "issuedAt": "2026-08-09T19:24:48.779Z",
+  "issuedAt": "2026-08-09T20:36:21.607Z",
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-12-layered-district-scatter-2026-08-09.json",
-      "sha256": "41577d15c503b0984710ab8f29d53b9285fbfd7cbeb70530f1e4fa389634021a"
+      "sha256": "766159ae302f47f19826e0bfe54b7d9fb97909bd16a89ae1a88c726d67cec2aa"
     },
     {
       "path": "validation/evidence/reviews/ls-12-criterion-review-2026-08-09.json",
-      "sha256": "541f4310cac05e26dbb1216347cb813fae73f94df61d0df4e629281924012680"
+      "sha256": "1bb9b004992c2bba251ad2b310c254fe68415f99cdb8cf7094d93364d93b860b"
     },
     {
       "path": "docs/launch-scope/ls-12-layered-district-scatter.md",
@@ -26,7 +26,7 @@
     {
       "id": "layered-district-scatter-foundation",
       "result": "passed",
-      "summary": "All seven LS-12 criteria pass one source-bound snapshot: strict authored layers, deterministic bounded scatter, seam-safe terrain planting, presentation-only authority, Low-priority readability, production resource stability, full check, core match, and independent review."
+      "summary": "All seven LS-12 criteria pass the refreshed LS-13 extension snapshot: strict authored layers, deterministic bounded scatter, seam-safe terrain planting, presentation-only authority, Low-priority readability, production resource stability, full check, core match, and independent review."
     }
   ]
 }

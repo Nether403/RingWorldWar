@@ -5,14 +5,18 @@ import type { Terrain } from '@gen/terrain';
 import type { RenderAnchor } from './anchor';
 import { disposeObject } from './disposeObject';
 import {
-  FOUNDATION_DISTRICT_PLAN,
+  DISTRICT_PALETTES,
+  DISTRICT_SILHOUETTE_STYLES,
+  ENVIRONMENT_DISTRICT_PLAN,
   MAX_DISTRICT_SCATTER_ITEMS,
   parseDistrictPlan,
   type DistrictDefinition,
   type DistrictPlan,
   type DistrictPattern,
+  type DistrictPalette,
   type DistrictScale,
   type DistrictShape,
+  type DistrictSilhouette,
 } from './districtPlan';
 
 const MAX_VISIBLE = 256;
@@ -21,8 +25,11 @@ const PLACEMENT_ATTEMPTS = 12;
 export interface GeneratedDressingItem {
   readonly districtId: string;
   readonly layerId: string;
+  readonly palette: DistrictPalette;
+  readonly silhouette: DistrictSilhouette;
   readonly scale: DistrictScale;
   readonly shape: DistrictShape;
+  readonly color: number;
   readonly s: number;
   readonly z: number;
   readonly yaw: number;
@@ -43,12 +50,17 @@ interface ScaleCounts {
   micro: number;
 }
 
+type PaletteCounts = Record<DistrictPalette, number>;
+
 export interface BattlefieldDressingDiagnostics {
   districtIds: string[];
   generatedTotal: number;
   generatedByScale: ScaleCounts;
+  generatedByPalette: PaletteCounts;
   visibleTotal: number;
   visibleByScale: ScaleCounts;
+  visibleByPalette: PaletteCounts;
+  visiblePalettes: DistrictPalette[];
   drawBuckets: number;
 }
 
@@ -62,7 +74,9 @@ export class BattlefieldDressing {
   private readonly visible: GeneratedDressingItem[] = [];
   private readonly plan: DistrictPlan;
   private readonly generatedCounts = emptyScaleCounts();
+  private readonly generatedPaletteCounts = emptyPaletteCounts();
   private visibleCounts = emptyScaleCounts();
+  private visiblePaletteCounts = emptyPaletteCounts();
   private lastAnchorVersion = -1;
   private readonly position = new THREE.Vector3();
   private readonly orientation = new THREE.Quaternion();
@@ -72,17 +86,18 @@ export class BattlefieldDressing {
   private readonly basis = new THREE.Matrix4();
   private readonly result = new THREE.Matrix4();
   private readonly tilt = new THREE.Quaternion();
+  private readonly color = new THREE.Color();
   private drawDistance = 2_400;
   private instanceCap = 192;
 
-  constructor(seed: number, plan: DistrictPlan = FOUNDATION_DISTRICT_PLAN) {
+  constructor(seed: number, plan: DistrictPlan = ENVIRONMENT_DISTRICT_PLAN) {
     this.plan = parseDistrictPlan(plan);
     this.object.name = 'layered-district-scatter';
     this.buckets = {
-      tower: this.createBucket('district-overhead-landmarks', new THREE.BoxGeometry(1, 1, 1), 0x8a7c60, 0.34),
-      slab: this.createBucket('district-tactical-shells', new THREE.BoxGeometry(1, 1, 1), 0x756c5c, 0.28),
-      pipe: this.createBucket('district-tactical-trunks', new THREE.CylinderGeometry(1, 1, 1, 7), 0x667275, 0.62),
-      debris: this.createBucket('district-bounded-detail', new THREE.BoxGeometry(1, 1, 1), 0x5f5d56, 0.4),
+      tower: this.createBucket('district-overhead-landmarks', new THREE.BoxGeometry(1, 1, 1), 0.34),
+      slab: this.createBucket('district-tactical-shells', new THREE.BoxGeometry(1, 1, 1), 0.28),
+      pipe: this.createBucket('district-tactical-trunks', new THREE.CylinderGeometry(1, 1, 1, 7), 0.62),
+      debris: this.createBucket('district-bounded-detail', new THREE.BoxGeometry(1, 1, 1), 0.4),
     };
     this.generate(seed);
   }
@@ -100,6 +115,7 @@ export class BattlefieldDressing {
     for (const mesh of Object.values(this.buckets)) mesh.count = 0;
     this.visible.length = 0;
     this.visibleCounts = emptyScaleCounts();
+    this.visiblePaletteCounts = emptyPaletteCounts();
     this.eligible.length = 0;
 
     const maximumDistanceSq = this.drawDistance * this.drawDistance;
@@ -113,16 +129,29 @@ export class BattlefieldDressing {
       || a.distanceSq - b.distanceSq
       || a.item.layerId.localeCompare(b.item.layerId));
 
+    const reserved = new Set<GeneratedDressingItem>();
+    for (const palette of DISTRICT_PALETTES) {
+      for (const scale of REQUIRED_LOW_SCALES) {
+        const representative = this.eligible.find(({ item }) =>
+          item.palette === palette
+          && item.scale === scale
+          && terrain.slopeAt(item.s, item.z) <= item.maxSlope);
+        if (!representative || this.visible.length >= this.instanceCap) continue;
+        this.addVisible(representative.item, anchor, terrain);
+        reserved.add(representative.item);
+      }
+    }
+
     for (const { item } of this.eligible) {
       if (this.visible.length >= this.instanceCap) break;
+      if (reserved.has(item)) continue;
       if (terrain.slopeAt(item.s, item.z) > item.maxSlope) continue;
-      const mesh = this.buckets[item.shape];
-      if (mesh.count >= MAX_VISIBLE) continue;
-      this.place(mesh, item, anchor, terrain);
-      this.visible.push(item);
-      this.visibleCounts[item.scale]++;
+      this.addVisible(item, anchor, terrain);
     }
-    for (const mesh of Object.values(this.buckets)) mesh.instanceMatrix.needsUpdate = true;
+    for (const mesh of Object.values(this.buckets)) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
   }
 
   diagnostics(): BattlefieldDressingDiagnostics {
@@ -130,8 +159,13 @@ export class BattlefieldDressing {
       districtIds: this.plan.districts.map((district) => district.id),
       generatedTotal: this.items.length,
       generatedByScale: { ...this.generatedCounts },
+      generatedByPalette: { ...this.generatedPaletteCounts },
       visibleTotal: this.visible.length,
       visibleByScale: { ...this.visibleCounts },
+      visibleByPalette: { ...this.visiblePaletteCounts },
+      visiblePalettes: Object.entries(this.visiblePaletteCounts)
+        .filter(([, count]) => count > 0)
+        .map(([palette]) => palette as DistrictPalette),
       drawBuckets: Object.keys(this.buckets).length,
     };
   }
@@ -153,11 +187,10 @@ export class BattlefieldDressing {
   private createBucket(
     name: string,
     geometry: THREE.BufferGeometry,
-    color: THREE.ColorRepresentation,
     metalness: number,
   ): THREE.InstancedMesh {
     const material = new THREE.MeshStandardMaterial({
-      color,
+      color: 0xffffff,
       emissive: 0x111311,
       emissiveIntensity: 0.18,
       roughness: 0.82,
@@ -177,6 +210,7 @@ export class BattlefieldDressing {
   private generate(seed: number): void {
     for (const district of this.plan.districts) {
       for (const layer of district.layers) {
+        const style = DISTRICT_SILHOUETTE_STYLES[layer.silhouette];
         const rng = new Rng(seed ^ hashSeed(`${district.id}:${layer.id}`) ^ 0x51a7d3);
         for (let index = 0; index < layer.count && this.items.length < MAX_DISTRICT_SCATTER_ITEMS; index++) {
           const point = samplePoint(rng, district, layer.pattern, index);
@@ -184,8 +218,11 @@ export class BattlefieldDressing {
           const item: GeneratedDressingItem = {
             districtId: district.id,
             layerId: layer.id,
+            palette: district.palette,
+            silhouette: layer.silhouette,
             scale: layer.scale,
-            shape: layer.shape,
+            shape: style.shape,
+            color: style.color,
             s: point.s,
             z: point.z,
             yaw: yawForPattern(rng, layer.pattern, index),
@@ -197,6 +234,7 @@ export class BattlefieldDressing {
           this.items.push(item);
           this.candidates.push({ item, distanceSq: 0 });
           this.generatedCounts[item.scale]++;
+          this.generatedPaletteCounts[item.palette]++;
         }
       }
     }
@@ -219,6 +257,16 @@ export class BattlefieldDressing {
     this.local.compose(LOCAL_CENTER.set(0, centerY, 0), this.localOrientation, this.scale);
     this.result.multiplyMatrices(this.basis, this.local);
     mesh.setMatrixAt(mesh.count++, this.result);
+    mesh.setColorAt(mesh.count - 1, this.color.setHex(item.color));
+  }
+
+  private addVisible(item: GeneratedDressingItem, anchor: RenderAnchor, terrain: Terrain): void {
+    const mesh = this.buckets[item.shape];
+    if (mesh.count >= MAX_VISIBLE) return;
+    this.place(mesh, item, anchor, terrain);
+    this.visible.push(item);
+    this.visibleCounts[item.scale]++;
+    this.visiblePaletteCounts[item.palette]++;
   }
 }
 
@@ -268,6 +316,15 @@ function emptyScaleCounts(): ScaleCounts {
   return { overhead: 0, tactical: 0, micro: 0 };
 }
 
+function emptyPaletteCounts(): PaletteCounts {
+  return {
+    'arc-city': 0,
+    agricultural: 0,
+    'spinal-industrial': 0,
+    'breach-evacuation': 0,
+  };
+}
+
 function scaleRank(scale: DistrictScale): number {
   if (scale === 'overhead') return 0;
   if (scale === 'tactical') return 1;
@@ -278,6 +335,7 @@ const ONE = new THREE.Vector3(1, 1, 1);
 const UP = new THREE.Vector3(0, 1, 0);
 const AXIAL = new THREE.Vector3(0, 0, 1);
 const LOCAL_CENTER = new THREE.Vector3();
+const REQUIRED_LOW_SCALES: readonly DistrictScale[] = ['overhead', 'tactical'];
 const DISTRICT_ANCHORS = [
   { s: 0.22, z: -0.48 },
   { s: 0.22, z: 0.48 },

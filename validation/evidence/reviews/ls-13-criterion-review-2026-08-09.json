@@ -1,0 +1,38 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-13-readability-remediation-review-2026-08-09",
+  "claimId": "LS-13",
+  "contractSha256": "14cf8ad485e5804537de3edce19f57b3e99fac8f155a649b39668ba2298709c3",
+  "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
+  "reviewRound": 2,
+  "reviewType": "platform-presentation-accessibility",
+  "independentContext": true,
+  "reviewer": {
+    "role": "independent-critic",
+    "taskId": "ses_0178ff313ffeflYml3oRR4ur7l",
+    "model": "azure/gpt-5.6-sol",
+    "completedAt": "2026-08-09T21:33:39.472Z",
+    "sourceSnapshotSha256": "9e37d83ecdae52ee199d3d0d1ae20cd0416171825c96a2447f40bdf832be01c4"
+  },
+  "scores": {
+    "strict-palette-contract": { "score": 4, "checkId": "strict-palette-contract", "rationale": "The parser declares exactly four stable palettes, owns four silhouettes per palette, rejects unknown fields, and fails closed on cross-palette silhouettes." },
+    "reusable-authored-coverage": { "score": 4, "checkId": "reusable-authored-coverage", "rationale": "Eight production districts reuse each palette exactly twice across overhead, tactical, and micro scales while remaining below the global generation bound." },
+    "deterministic-identity": { "score": 4, "checkId": "deterministic-identity", "rationale": "Per-layer seeded streams deterministically reproduce palette, silhouette, color, dimensions, positions, yaw, and final instance matrices." },
+    "fixed-render-topology": { "score": 4, "checkId": "fixed-render-topology", "rationale": "All palettes share four named instanced geometry buckets with per-instance colors and the unchanged 72, 112, 192, and 256 quality caps." },
+    "low-readability": { "score": 3, "checkId": "low-readability", "rationale": "The 1280x720 Low capture and diagnostics preserve overhead and tactical representatives from all four palettes, plus the Bastion, units, terrain corridor, command feedback, and HUD within 72 instances." },
+    "authority-lifecycle": { "score": 4, "checkId": "authority-lifecycle", "rationale": "Palettes remain renderer-owned and terrain-read-only; quality cycling, authoritative height placement, disposal, warmed resources, and unchanged world hash pass." },
+    "regression-review": { "score": 3, "checkId": "regression-review", "rationale": "Focused unit and production browser lanes, refreshed LS-12 browser regression, the constrained complete repository check, final protected core match, and independent remediation review pass." }
+  },
+  "dependencyReady": true,
+  "blockers": [],
+  "requiredQualityFindings": [],
+  "humanValidation": [],
+  "polish": [
+    {
+      "id": "LS-13-P01",
+      "summary": "Primitive silhouettes may receive stronger slab and debris color separation or a four-palette comparison capture during later art refinement.",
+      "reopenTrigger": "Do not reopen LS-13 unless a palette loses tactical readability, deterministic ownership, or the fixed four-bucket performance boundary."
+    }
+  ]
+}
