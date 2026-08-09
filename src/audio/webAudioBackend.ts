@@ -180,11 +180,12 @@ export class WebAudioBackend implements AudioBackend {
   }
 
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     this.reset();
     for (const source of this.ambientSources) stopQuietly(source);
     this.ambientSources.length = 0;
-    void this.context.close();
+    if (this.context.state !== 'closed') void this.context.close().catch(() => undefined);
   }
 
   private loadVoice(clip: VoiceClip): Promise<void> {

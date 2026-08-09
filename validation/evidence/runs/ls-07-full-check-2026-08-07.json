@@ -5,9 +5,9 @@
   "command": "npm run check",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "efa09267ae8e84182d629136f7b4f7fec7d9c0a53a706a6bc341445b7e8c8c5d",
+  "sourceSnapshotSha256": "07d5cee14f20cd645265719bfb06f9c3003fb96131e57b4aedbcb9e3c223f31d",
   "passedTestIds": [
     "full-check"
   ],
-  "summary": "Lint, TypeScript validation, 438 unit tests, and the Vite production build passed; one opt-in performance profile remained intentionally skipped."
+  "summary": "Lint, TypeScript validation, 440 unit tests, and the Vite production build passed; one opt-in performance profile remained intentionally skipped."
 }

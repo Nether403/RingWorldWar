@@ -1,7 +1,7 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { sha256File } from './rww/hash.mjs';
-import { collectGit, collectRuntime, runChild } from './rww/process.mjs';
+import { collectGit, collectRuntime, hasUsableGitProvenance, runChild } from './rww/process.mjs';
 import {
   buildReceipt,
   classifyExit,
@@ -10,13 +10,13 @@ import {
   writeReceipt,
 } from './rww/receipt.mjs';
 
-const EXPECTED_TESTS = 79;
+const EXPECTED_TESTS = 110;
 const cwd = process.cwd();
 const runsRoot = resolve(cwd, 'output', 'runs');
 const runId = createRunId();
 const runDirectory = resolveRunDirectory(runsRoot, runId);
 const reportPath = resolve(runDirectory, 'playwright-report.json');
-const source = await collectGit(cwd);
+const sourceBefore = await collectGit(cwd, { includeEvidence: true });
 
 await mkdir(runDirectory, { recursive: true });
 const startedAt = new Date();
@@ -28,7 +28,7 @@ const result = await runChild(
     env: {
       ...process.env,
       RWW_PLAYWRIGHT_JSON_OUTPUT: reportPath,
-      RWW_PLAYWRIGHT_METADATA: JSON.stringify({ source }),
+      RWW_PLAYWRIGHT_METADATA: JSON.stringify({ source: sourceBefore }),
     },
     timeoutMs: 30 * 60 * 1000,
     maximumOutputBytes: 64 * 1024 * 1024,
@@ -45,10 +45,12 @@ try {
 
 const stats = report?.stats ?? null;
 const sourceInReport = report?.config?.metadata?.source ?? null;
-const sourceMatched = sourceInReport !== null &&
-  sourceInReport.sourceBaseSha === source.sourceBaseSha &&
-  sourceInReport.trackedPatchSha256 === source.trackedPatchSha256 &&
-  sourceInReport.untrackedSourceManifestSha256 === source.untrackedSourceManifestSha256;
+const sourceAfter = await collectGit(cwd, { includeEvidence: true });
+const sourceMatched = hasUsableGitProvenance(sourceBefore) &&
+  hasUsableGitProvenance(sourceAfter) &&
+  sourceInReport !== null &&
+  JSON.stringify(sourceInReport) === JSON.stringify(sourceBefore) &&
+  JSON.stringify(sourceAfter) === JSON.stringify(sourceBefore);
 const passed = result.code === 0 &&
   stats?.expected === EXPECTED_TESTS &&
   stats?.unexpected === 0 &&
@@ -63,10 +65,11 @@ const receipt = buildReceipt({
   },
   deterministic: {
     expectedTests: EXPECTED_TESTS,
-    source,
+    source: sourceBefore,
+    sourceAfter,
   },
   environmental: {
-    git: source,
+    git: sourceAfter,
     runtime: collectRuntime(),
     playwright: {
       startedAt: startedAt.toISOString(),
@@ -76,6 +79,8 @@ const receipt = buildReceipt({
       reportError,
       stats,
       sourceMatched,
+      sourceBefore,
+      sourceAfter,
       processExitCode: result.code,
       timedOut: result.timedOut,
       outputLimitExceeded: result.outputLimitExceeded,

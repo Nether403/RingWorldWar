@@ -225,6 +225,8 @@ export class Game {
     this.entities.update(this.world, this.anchor, time, this.playerFaction, this.acc / SIM_DT);
     this.effects.update(dt, this.world, this.anchor, this.playerFaction, this.rig.camera);
     if (this.effects.shake > 0) this.rig.addShake(this.effects.shake);
+    const directionalArtilleryTargeting = this.artilleryTargeting &&
+      !WEAPONS[this.artilleryWeaponId]?.flightMode;
     this.markers.update(
       this.world,
       this.anchor,
@@ -233,7 +235,7 @@ export class Game {
       this.hud.placing,
       this.playerFaction,
       this.trajectoryPreview,
-      this.artilleryTargeting,
+      directionalArtilleryTargeting,
       this.artilleryResult,
       this.rig.camera,
       this.missionHudModel?.objectiveId === 'select-engineer' ? this.scenarioOpeningView : null,
@@ -251,6 +253,7 @@ export class Game {
       this.rig.z,
       this.artilleryTargeting,
       this.artilleryResult,
+      this.artilleryWeapon,
       this.mission?.hudModel() ?? null,
       this.mission?.debriefModel() ?? null,
       this.mission?.narrativeHudModel() ?? null,

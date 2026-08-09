@@ -1130,7 +1130,8 @@ export class World {
       if (u.ability) {
         u.ability.cooldown = Math.max(0, u.ability.cooldown - dt);
         const wasTransitioning = u.ability.transitionTimer > 0;
-        u.ability.transitionTimer = Math.max(0, u.ability.transitionTimer - dt);
+        const remainingTransition = u.ability.transitionTimer - dt;
+        u.ability.transitionTimer = remainingTransition <= 1e-9 ? 0 : remainingTransition;
         if (wasTransitioning && u.ability.transitionTimer === 0 && u.ability.id === 'siegeMode') {
           this.refreshSpeedMultiplier(u);
         }

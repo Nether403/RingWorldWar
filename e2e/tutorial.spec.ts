@@ -1,12 +1,22 @@
-import { expect, test } from 'playwright/test';
+import { expect, test, type Page } from 'playwright/test';
 import { readFileSync } from 'node:fs';
 
 const scenario = JSON.parse(readFileSync('validation/scenarios/first-contact.json', 'utf8'));
+
+async function useScenarioViewport(page: Page): Promise<void> {
+  await page.setViewportSize({ width: scenario.viewport.width, height: scenario.viewport.height });
+  await expect.poll(() => page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight,
+    deviceScaleFactor: devicePixelRatio,
+  }))).toEqual(scenario.viewport);
+}
 
 test('First Contact starts at tick zero, advances from a real selection, and restores mission progress', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', (error) => errors.push(error.message));
+  await useScenarioViewport(page);
   await page.goto(`/?seed=${scenario.worldSeed}&quality=${scenario.quality}&scenarioDriver=1`);
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: { testDriver?: unknown } }).RWW?.testDriver));
 
@@ -113,13 +123,17 @@ test('First Contact starts at tick zero, advances from a real selection, and res
 });
 
 test('First Contact completes through fixed-step construction, production, capture, deployment, and manual fire', async ({ page }) => {
+  await useScenarioViewport(page);
   await page.goto(`/?seed=${scenario.worldSeed}&quality=${scenario.quality}&scenarioDriver=1`);
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: { testDriver?: unknown } }).RWW?.testDriver));
 
-  const result = await page.evaluate(async (value) => {
+  const setup = await page.evaluate(async (value) => {
     const modulePath = '/e2e/support/scenario-driver.ts';
     const driver = await import(/* @vite-ignore */ modulePath);
     const ids = driver.applyBrowserScenario(value);
+    const rww = window.RWW! as unknown as {
+      testDriver: { renderFrame: (dt: number, visualTime: number) => void };
+    };
     const game = window.RWW!.game;
     const world = game.world;
     const engineer = world.units.find((unit) => unit.faction === 0 && unit.kind === 'engineer')!;
@@ -164,8 +178,6 @@ test('First Contact completes through fixed-step construction, production, captu
     foundry.queueTimer = 1_000;
     game.stepSimulationExactlyOnce();
     const longbow = world.units.find((unit) => !beforeLongbow.has(unit.id) && unit.kind === 'longbow')!;
-    longbow.ability!.active = true;
-    longbow.ability!.transitionTimer = 0;
     const target = world.structureById(ids['choir-power-core'])!;
     wisp.s = target.s;
     wisp.z = target.z;
@@ -173,22 +185,71 @@ test('First Contact completes through fixed-step construction, production, captu
     wisp.prevZ = target.z;
     game.stepSimulationExactlyOnce();
 
-    const objectiveBeforeFire = game.missionHudModel?.objectiveId;
-    const cooldownBeforeFire = longbow.cd[0];
+    game.selectAt(longbow.s, longbow.z, false);
+    rww.testDriver.renderFrame(0, 19.4);
     game.beginArtilleryTarget(longbow.id, 'siegeMortar');
-    const fired = game.fireArtilleryTarget(target.s, target.z);
+    const firedBeforeDeployment = game.fireArtilleryTarget(target.s, target.z);
+    const blockedResult = game.artilleryResult;
+    game.cancelArtilleryTarget();
     return {
-      fired,
-      objectiveBeforeFire,
-      cooldownBeforeFire,
-      artilleryResult: game.artilleryResult,
-      mission: game.missionHudModel,
-      shot: world.projectiles.find((projectile) => projectile.weapon === 'siegeMortar')?.weapon ?? null,
+      longbow: { id: longbow.id, s: longbow.s, z: longbow.z, cooldown: longbow.cd[0] },
+      target: { s: target.s, z: target.z },
+      objectiveBeforeDeployment: game.missionHudModel?.objectiveId,
+      targetButtonBeforeDeployment: Boolean(document.querySelector('[data-artillery-weapon="siegeMortar"]')),
+      firedBeforeDeployment,
+      blockedResult,
     };
   }, scenario);
 
-  expect(result.objectiveBeforeFire).toBe('fire-antispinward');
-  expect(result.cooldownBeforeFire).toBe(0);
+  expect(setup.objectiveBeforeDeployment).toBe('deploy-longbow');
+  expect(setup.longbow.cooldown).toBe(0);
+  expect(setup.targetButtonBeforeDeployment).toBe(false);
+  expect(setup.firedBeforeDeployment).toBe(false);
+  expect(setup.blockedResult).toMatchObject({ reason: 'longbow-not-deployed' });
+  await expect(page.locator('[aria-label="Siege Mode ability"]')).toBeVisible();
+  await page.locator('[aria-label="Siege Mode ability"]').click();
+
+  const deploying = await page.evaluate(() => {
+    const rww = (window as unknown as { RWW: any }).RWW;
+    rww.testDriver.renderFrame(0, 19.5);
+    const longbow = rww.game.world.units.find((unit: any) => unit.kind === 'longbow')!;
+    return {
+      active: longbow.ability.active,
+      transitionTimer: longbow.ability.transitionTimer,
+      targetButton: Boolean(document.querySelector('[data-artillery-weapon="siegeMortar"]')),
+    };
+  });
+  expect(deploying).toMatchObject({ active: true, targetButton: false });
+  expect(deploying.transitionTimer).toBeGreaterThan(0);
+
+  const deployed = await page.evaluate(() => {
+    const rww = (window as unknown as { RWW: any }).RWW;
+    for (let step = 0; step < 90; step++) rww.game.stepSimulationExactlyOnce();
+    rww.testDriver.renderFrame(0, 22.5);
+    const longbow = rww.game.world.units.find((unit: any) => unit.kind === 'longbow')!;
+    return {
+      active: longbow.ability.active,
+      transitionTimer: longbow.ability.transitionTimer,
+      mission: rww.game.missionHudModel,
+      targetButton: Boolean(document.querySelector('[data-artillery-weapon="siegeMortar"]')),
+    };
+  });
+  expect(deployed).toMatchObject({ active: true, transitionTimer: 0, targetButton: true });
+  expect(deployed.mission).toMatchObject({ objectiveId: 'fire-antispinward' });
+  await page.locator('[data-artillery-weapon="siegeMortar"]').click();
+
+  const result = await page.evaluate((value) => {
+    const game = window.RWW!.game;
+    game.updateCursor(value.target.s, value.target.z);
+    const fired = game.fireArtilleryTarget(value.target.s, value.target.z);
+    return {
+      fired,
+      artilleryResult: game.artilleryResult,
+      mission: game.missionHudModel,
+      shot: game.world.projectiles.find((projectile) => projectile.weapon === 'siegeMortar')?.weapon ?? null,
+    };
+  }, setup);
+
   expect(result.fired, JSON.stringify(result.artilleryResult)).toBe(true);
   expect(result.shot).toBe('siegeMortar');
   expect(result.mission).toMatchObject({ status: 'completed', objectiveId: null, progressText: '10 / 10' });

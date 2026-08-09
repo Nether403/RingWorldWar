@@ -63,7 +63,7 @@ export async function runChild(executable, args, options = {}) {
   });
 }
 
-export async function collectGit(cwd) {
+export async function collectGit(cwd, { includeEvidence = false } = {}) {
   const gitEnvironment = minimalGitEnvironment();
   const run = async (args) => (await execFileAsync('git', args, {
     cwd,
@@ -71,13 +71,13 @@ export async function collectGit(cwd) {
     env: gitEnvironment,
   })).stdout.trim();
   try {
+    const evidenceExclusions = includeEvidence ? [] : ['validation/evidence/**'];
+    const diffArgs = ['diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD', '--', '.'];
+    if (!includeEvidence) diffArgs.push(':(exclude)validation/evidence/**');
     const [sourceBaseSha, branch, trackedPatch, untrackedPaths, indexEntries, topLevel, gitVersion] = await Promise.all([
       run(['rev-parse', 'HEAD']),
       run(['branch', '--show-current']),
-      hashGitOutput(cwd, [
-        'diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD', '--', '.',
-        ':(exclude)validation/evidence/**',
-      ], gitEnvironment),
+      hashGitOutput(cwd, diffArgs, gitEnvironment),
       collectGitPaths(cwd, ['ls-files', '--others', '--exclude-standard', '-z'], gitEnvironment),
       run(['ls-files', '-v']),
       run(['rev-parse', '--show-toplevel']),
@@ -93,7 +93,7 @@ export async function collectGit(cwd) {
       .sort(comparePaths);
     const sourcePaths = untrackedPaths
       .map((path) => path.replaceAll('\\', '/'))
-      .filter((path) => !isEvidencePath(path))
+      .filter((path) => includeEvidence || !isEvidencePath(path))
       .sort(comparePaths);
     const untrackedSourceManifest = [];
     for (const path of sourcePaths) {
@@ -105,11 +105,11 @@ export async function collectGit(cwd) {
       branch: branch || null,
       dirty: trackedPatch.bytes > 0 || sourcePaths.length > 0 || hiddenTrackedEntries.length > 0,
       trackedPatchSha256: trackedPatch.sha256,
-      trackedPatchExclusions: ['validation/evidence/**'],
+      trackedPatchExclusions: evidenceExclusions,
       untrackedSourceManifest,
       untrackedSourceManifestSha256: sha256Json(untrackedSourceManifest),
       untrackedSourceCount: untrackedSourceManifest.length,
-      untrackedSourceExclusions: ['validation/evidence/**'],
+      untrackedSourceExclusions: evidenceExclusions,
       hiddenTrackedEntries,
       topLevel: resolve(topLevel),
       gitVersion,
@@ -121,17 +121,30 @@ export async function collectGit(cwd) {
       branch: null,
       dirty: null,
       trackedPatchSha256: null,
-      trackedPatchExclusions: ['validation/evidence/**'],
+      trackedPatchExclusions: includeEvidence ? [] : ['validation/evidence/**'],
       untrackedSourceManifest: [],
       untrackedSourceManifestSha256: null,
       untrackedSourceCount: null,
-      untrackedSourceExclusions: ['validation/evidence/**'],
+      untrackedSourceExclusions: includeEvidence ? [] : ['validation/evidence/**'],
       hiddenTrackedEntries: [],
       topLevel: null,
       gitVersion: null,
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+export function hasUsableGitProvenance(value) {
+  return value !== null && typeof value === 'object' &&
+    value.error === undefined &&
+    typeof value.sourceBaseSha === 'string' && /^[a-f0-9]{40,64}$/.test(value.sourceBaseSha) &&
+    typeof value.trackedPatchSha256 === 'string' && /^[a-f0-9]{64}$/.test(value.trackedPatchSha256) &&
+    typeof value.untrackedSourceManifestSha256 === 'string' && /^[a-f0-9]{64}$/.test(value.untrackedSourceManifestSha256) &&
+    typeof value.dirty === 'boolean' &&
+    Array.isArray(value.untrackedSourceManifest) &&
+    Array.isArray(value.hiddenTrackedEntries) &&
+    typeof value.topLevel === 'string' && value.topLevel.length > 0 &&
+    typeof value.gitVersion === 'string' && value.gitVersion.length > 0;
 }
 
 function minimalGitEnvironment() {

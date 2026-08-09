@@ -34,6 +34,11 @@ describe('launch progress manifest integrity', () => {
     });
   });
 
+  it('keeps the directional-overlay canvas restoration regression in LS-07 presentation evidence', () => {
+    expect(LS07_CHECK_POLICY.presentation.testIds).toContain('directional-overlay-canvas-state');
+    expect(LS07_RUN_TEST_IDS['focused-browser']).toContain('directional-overlay-canvas-state');
+  });
+
   it('requires semantic LS-07 category coverage, ship-ready scores, and no blocking findings', () => {
     const machine = ls07MachineEvidence();
     const review = ls07CriterionReview();
@@ -91,6 +96,7 @@ describe('launch progress manifest integrity', () => {
     candidate.slices[7].state = 'complete';
     candidate.slices[7].qualification = 'automation-passed';
     candidate.slices[7].disposition = 'clean';
+    candidate.gates[0].state = 'passed';
 
     await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-08.*evidenceRefs/i);
   });
@@ -234,6 +240,7 @@ describe('launch progress manifest integrity', () => {
     reusedReceipt.slices[7].state = 'complete';
     reusedReceipt.slices[7].qualification = 'automation-passed';
     reusedReceipt.slices[7].disposition = 'clean';
+    reusedReceipt.gates[0].state = 'passed';
     reusedReceipt.slices[7].evidenceRefs = ['validation/evidence/launch-scope/LS-01.json'];
     await expect(validateLaunchProgressManifest(reusedReceipt)).rejects.toThrow(/LS-08.*exact claim receipt/i);
 
@@ -241,8 +248,19 @@ describe('launch progress manifest integrity', () => {
     directRoadmap.slices[7].state = 'complete';
     directRoadmap.slices[7].qualification = 'automation-passed';
     directRoadmap.slices[7].disposition = 'clean';
+    directRoadmap.gates[0].state = 'passed';
     directRoadmap.slices[7].evidenceRefs = ['docs/roadmap.md'];
     await expect(validateLaunchProgressManifest(directRoadmap)).rejects.toThrow(/LS-08.*exact claim receipt/i);
+  });
+
+  it('rejects LS-08 completion until the required novice comprehension gate has passed', async () => {
+    const candidate = copyManifest();
+    candidate.slices[7].state = 'complete';
+    candidate.slices[7].qualification = 'automation-passed';
+    candidate.slices[7].disposition = 'clean';
+    candidate.slices[7].evidenceRefs = ['validation/evidence/launch-scope/LS-08.json'];
+
+    await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-08.*G-01/i);
   });
 
   it('rejects G-01 false promotion using G-07 receipt or roadmap evidence', async () => {

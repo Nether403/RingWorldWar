@@ -21,6 +21,8 @@ interface LifecycleApi {
   dispose(): void;
 }
 
+const QUALITY_THRASH_SEQUENCE = ['low', 'medium', 'high', 'ultra', 'high', 'medium', 'low'] as const;
+
 test('records startup through the first playable frame', async ({ page }, testInfo) => {
   await page.goto('/?seed=611&quality=low');
   await page.waitForFunction(() => {
@@ -240,7 +242,7 @@ test('bounds presentation events while rendering is starved', async ({ page }) =
   expect(pending).toBeLessThanOrEqual(4_096);
 });
 
-test('keeps heap and WebGL resources on a plateau during accelerated soak', async ({ page }) => {
+test('keeps heap and WebGL resources on a plateau during accelerated ten-minute quality-thrash soak', async ({ page }) => {
   await page.goto('/?seed=615&quality=low&scenarioDriver=1');
   await page.waitForFunction(() =>
     Boolean((window as unknown as { RWW?: LifecycleApi }).RWW?.testDriver));
@@ -250,23 +252,52 @@ test('keeps heap and WebGL resources on a plateau during accelerated soak', asyn
     geometries: number;
     textures: number;
     programs: number;
+    contextLost: boolean;
+    contextLosses: number;
+    recoveryVisible: boolean;
+    ticks: number;
+    quality: string;
+    qualityHashStable: boolean;
+    visitedQualities: string[];
   }> => {
-    await page.evaluate((count) => {
+    const progression = await page.evaluate(({ count, qualities }) => {
       const session = (window as unknown as { RWW: LifecycleApi }).RWW;
+      const renderer = session.renderer;
+      const visitedQualities = new Set<string>();
+      let qualityHashStable = true;
       session.testDriver.setAiEnabled(false);
       for (let index = 0; index < count; index++) {
         session.game.world.events.push({
           kind: 'impact', s: index % 400, z: 0, h: 0, faction: 0, scale: 1, id: 200_000 + session.game.world.tick,
         });
         session.game.stepSimulationExactlyOnce();
-        if (index % 30 === 29) {
+        if (session.game.world.tick % 300 === 0) {
+          const quality = qualities[(session.game.world.tick / 300) % qualities.length]!;
+          const beforeQualityFrame = session.game.world.stateHash();
+          renderer.setQuality(quality);
+          session.testDriver.presentFrame(1 / 30, session.game.world.time);
+          qualityHashStable &&= beforeQualityFrame === session.game.world.stateHash();
+          visitedQualities.add(quality);
+        } else if (index % 30 === 29) {
           session.testDriver.presentFrame(1 / 30, session.game.world.time);
         }
       }
+      const beforeLowFrame = session.game.world.stateHash();
+      renderer.setQuality('low');
       session.testDriver.presentFrame(1 / 30, session.game.world.time);
-    }, steps);
+      qualityHashStable &&= beforeLowFrame === session.game.world.stateHash();
+      return {
+        ticks: session.game.world.tick,
+        quality: renderer.quality,
+        qualityHashStable,
+        visitedQualities: [...visitedQualities],
+      };
+    }, {
+      count: steps,
+      qualities: QUALITY_THRASH_SEQUENCE,
+    });
     await page.requestGC();
-    return page.evaluate(() => {
+    const resources = await page.evaluate(() => {
       const renderer = (window as unknown as { RWW: LifecycleApi }).RWW.renderer;
       const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
       return {
@@ -274,16 +305,54 @@ test('keeps heap and WebGL resources on a plateau during accelerated soak', asyn
         geometries: renderer.gl.info.memory.geometries,
         textures: renderer.gl.info.memory.textures,
         programs: renderer.gl.info.programs?.length ?? 0,
+        contextLost: renderer.gl.getContext().isContextLost(),
+        contextLosses: (renderer.gl.domElement as HTMLCanvasElement & {
+          rwwQualityThrashContextLosses?: { count: number };
+        }).rwwQualityThrashContextLosses?.count ?? -1,
+        recoveryVisible: Boolean(document.querySelector('[data-rww-context-recovery]')),
       };
     });
+    return { ...resources, ...progression };
   };
 
-  const warm = await sample(1_200);
-  const later = await sample(2_400);
-  const final = await sample(2_400);
-  console.log('phase4d soak evidence', JSON.stringify({ warm, later, final, simulatedTicks: 6_000 }));
+  const initialTick = await page.evaluate(() => {
+    const renderer = (window as unknown as { RWW: LifecycleApi }).RWW.renderer;
+    const canvas = renderer.gl.domElement as HTMLCanvasElement & {
+      rwwQualityThrashContextLosses?: { count: number };
+    };
+    const losses = { count: 0 };
+    canvas.rwwQualityThrashContextLosses = losses;
+    canvas.addEventListener('webglcontextlost', () => { losses.count++; });
+    return (window as unknown as { RWW: LifecycleApi }).RWW.game.world.tick;
+  });
+  const warm = await sample(3_600);
+  const later = await sample(7_200);
+  const final = await sample(7_200);
+  console.log('phase4 soak evidence', JSON.stringify({ warm, later, final, simulatedTicks: final.ticks - initialTick }));
 
   expect(warm.heapBytes).toBeGreaterThan(0);
+  expect(warm.ticks - initialTick).toBe(3_600);
+  expect(final.ticks - initialTick).toBe(18_000);
+  expect(warm.quality).toBe('low');
+  expect(later.quality).toBe('low');
+  expect(final.quality).toBe('low');
+  expect(warm.qualityHashStable).toBe(true);
+  expect(later.qualityHashStable).toBe(true);
+  expect(final.qualityHashStable).toBe(true);
+  expect(warm.contextLost).toBe(false);
+  expect(later.contextLost).toBe(false);
+  expect(final.contextLost).toBe(false);
+  expect(warm.contextLosses).toBe(0);
+  expect(later.contextLosses).toBe(0);
+  expect(final.contextLosses).toBe(0);
+  expect(warm.recoveryVisible).toBe(false);
+  expect(later.recoveryVisible).toBe(false);
+  expect(final.recoveryVisible).toBe(false);
+  expect(warm.programs).toBeGreaterThan(0);
+  expect(later.programs).toBeGreaterThan(0);
+  expect(final.programs).toBeGreaterThan(0);
+  expect(new Set([...warm.visitedQualities, ...later.visitedQualities, ...final.visitedQualities]))
+    .toEqual(new Set(['low', 'medium', 'high', 'ultra']));
   expect(later.geometries).toBe(warm.geometries);
   expect(final.geometries).toBe(warm.geometries);
   expect(later.textures).toBe(warm.textures);

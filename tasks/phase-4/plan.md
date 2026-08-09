@@ -6,7 +6,7 @@
 - [x] Run three 72,000-tick standard headless samples.
 - [x] Run source-current T480s 30-second heavy-combat sample.
 - [x] Capture High/Ultra resource characterization.
-- [ ] Add ten-minute soak and quality-thrash scenarios.
+- [x] Add an accelerated ten-minute soak and quality-thrash regression (18,000 fixed ticks, repeated quality transitions, forced-GC heap/resource plateau, and simulation-hash guard). This is structural coverage, not the physical GTX Gate 4 soak.
 - [x] Record baseline report with exact source and hardware provenance.
 
 ## 4B Simulation

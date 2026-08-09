@@ -31,6 +31,14 @@ changing simulation authority. Local generation credentials remain in ignored
   startup timing, renderer identity, and source hashes.
 - Establish stable pinned-runner strategy before enforcing wall-clock CI limits.
 
+The source-current Chromium lifecycle suite now includes an accelerated
+18,000-tick (ten simulated minute) quality-thrash soak. It cycles Low, Medium,
+High, and Ultra through the production renderer path, settles to Low before
+forced-GC samples, verifies unchanged simulation hashes around each
+presentation-only transition, and holds heap, geometries, textures, and
+programs flat after warmup. It is a portable structural regression test, not
+evidence for the physical 1080p GTX 1660 maximum-frame gate.
+
 ### 4B - Requirement 17.5
 
 - Reprofile the 72,000-tick standard-terrain match.

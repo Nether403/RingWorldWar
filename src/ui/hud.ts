@@ -578,6 +578,7 @@ export class Hud {
     cameraZ: number,
     artilleryTargeting: boolean,
     artilleryResult: BallisticFireResult | null,
+    artilleryWeapon: string | null,
     mission: MissionHudModel | null = null,
     debrief: MissionDebriefModel | null = null,
     narrative: NarrativeHudModel | null = null,
@@ -613,8 +614,8 @@ export class Hud {
     this.mapWrap.classList.toggle('targeting', artilleryTargeting);
 
     this.drawResources(world, player);
-    this.drawSelection(world, player, selection);
-    this.drawMinimap(world, player, selection, cameraS, cameraZ, artilleryTargeting, artilleryResult);
+    this.drawSelection(world, player, selection, artilleryWeapon);
+    this.drawMinimap(world, player, selection, cameraS, cameraZ, artilleryTargeting, artilleryResult, artilleryWeapon);
     this.drawMission(mission);
     this.drawNarrative(narrative);
     this.drawEnd(world, player, narrative ? null : debrief);
@@ -779,7 +780,12 @@ export class Hud {
     }
   }
 
-  private drawSelection(world: World, player: Faction, selection: Set<number>): void {
+  private drawSelection(
+    world: World,
+    player: Faction,
+    selection: Set<number>,
+    artilleryWeapon: string | null,
+  ): void {
     const units: Unit[] = [];
     const structs: Structure[] = [];
     for (const id of selection) {
@@ -800,6 +806,7 @@ export class Hud {
       playerState.commandCap,
       [...playerState.unlocked].sort().join(','),
       this.placing ?? '',
+      artilleryWeapon ?? '',
       Math.round(world.sensorPowerScale(player) * 1_000),
       units
         .map((unit) =>
@@ -831,13 +838,14 @@ export class Hud {
         replacement?.focus();
       });
     }
-    const directional = this.selectedDirectionalArtillery(world, player, selection);
+    const directional = this.selectedDirectionalArtillery(world, player, selection, artilleryWeapon);
     const rangeCopy = directional
       ? `<p class="rww-directional-range" data-spinward-range="${directional.profile.spinward.toFixed(0)}" ` +
         `data-antispinward-range="${directional.profile.antispinward.toFixed(0)}">` +
-        `◀ ANTISPINWARD ${formatRange(directional.profile.antispinward)} · ` +
-        `SPINWARD ${formatRange(directional.profile.spinward)} ▶<br>` +
-        `<strong>ANTISPINWARD = LONG SHOT</strong></p>`
+         `◀ ANTISPINWARD ${formatRange(directional.profile.antispinward)} · ` +
+         `SPINWARD ${formatRange(directional.profile.spinward)} ▶<br>` +
+         `<strong>ANTISPINWARD = LONG SHOT</strong><br>` +
+         `<small>APPROXIMATE ENVELOPE - LIVE PREVIEW/FIRE CHECKS AUTHORITATIVE</small></p>`
       : '';
     const sensorSource = units.length + structs.length === 1 ? units[0] ?? structs[0] : undefined;
     const sensorCopy = sensorSource
@@ -917,7 +925,7 @@ export class Hud {
         this.addAbilityButton(first);
       }
       if (units.length === 1 && first.faction === player && first.ability?.id === 'siegeMode' &&
-          first.ability.active) {
+          first.ability.active && first.ability.transitionTimer <= 0) {
         this.addArtilleryButton(first, 'siegeMortar');
       }
     }
@@ -1107,6 +1115,7 @@ export class Hud {
     camZ: number,
     artilleryTargeting: boolean,
     artilleryResult: BallisticFireResult | null,
+    artilleryWeapon: string | null,
   ): void {
     const g = this.mapCtx;
     const W = this.map.width;
@@ -1142,7 +1151,7 @@ export class Hud {
 
     this.drawSensorCoverage(g, world, player, X, Y, W, H);
 
-    const directional = this.selectedDirectionalArtillery(world, player, selection);
+    const directional = this.selectedDirectionalArtillery(world, player, selection, artilleryWeapon);
     if (directional) {
       this.drawDirectionalRangeOverlay(
         g,
@@ -1262,7 +1271,8 @@ export class Hud {
     this.map.dataset.cameraWrapCopies = String(cameraCopies);
     const minimapDescription = directional
       ? `Ring minimap. Directional artillery range: antispinward ${formatRange(directional.profile.antispinward)}, ` +
-        `spinward ${formatRange(directional.profile.spinward)}. Antispinward equals long shot.`
+        `spinward ${formatRange(directional.profile.spinward)}. Antispinward equals long shot. ` +
+        `Approximate envelope; live preview and fire checks are authoritative.`
       : 'Ring minimap with nominal sensor coverage.';
     this.map.setAttribute(
       'aria-label',
@@ -1357,7 +1367,9 @@ export class Hud {
     world: World,
     player: Faction,
     selection: Set<number>,
+    artilleryWeapon: string | null,
   ): { source: Unit | Structure; weaponId: string; profile: DirectionalReachProfile } | null {
+    if (artilleryWeapon && WEAPONS[artilleryWeapon]?.flightMode) return null;
     if (selection.size !== 1) return null;
     const id = selection.values().next().value as number | undefined;
     if (!id) return null;
@@ -1381,6 +1393,7 @@ export class Hud {
     width: number,
     height: number,
   ): void {
+    g.save();
     const anti = (profile.antispinward / RING_CIRCUMFERENCE) * width;
     const spin = (profile.spinward / RING_CIRCUMFERENCE) * width;
     const half = Math.min(28, Math.max(14, height * 0.16));
@@ -1427,6 +1440,7 @@ export class Hud {
     this.map.dataset.spinwardRange = profile.spinward.toFixed(0);
     this.map.dataset.antispinwardRange = profile.antispinward.toFixed(0);
     this.map.dataset.wrapCopies = String(copies);
+    g.restore();
   }
 
   private drawEnd(world: World, player: Faction, debrief: MissionDebriefModel | null): void {

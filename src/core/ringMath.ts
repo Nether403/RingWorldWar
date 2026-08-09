@@ -224,8 +224,8 @@ export function gravityAt(h: number): number {
  *
  * Consequences, all of which are gameplay:
  *   - Rising projectiles are pushed spinward; falling ones antispinward.
- *   - Travelling spinward adds apparent lift, so spinward shots fly flatter
- *     and much further than identical antispinward shots.
+ *   - Travelling antispinward reduces apparent floorward loading, so
+ *     antispinward shots fly farther than identical spinward shots.
  *   - Drop something from a tower and it lands antispinward of straight down.
  */
 export function coriolisX(vy: number): number {

@@ -81,6 +81,28 @@ test('voice requests only follow accepted player actions', async ({ page }) => {
   expect(actions[1]).toMatchObject({ kind: 'order', faction: 0, order: 'move' });
 });
 
+test('disposes an independent Web Audio backend without unhandled rejections', async ({ page }) => {
+  await page.goto('/?menu=1&quality=low');
+  const rejections = await page.evaluate(async () => {
+    const modulePath = '/src/audio/webAudioBackend.ts';
+    const { WebAudioBackend } = await import(/* @vite-ignore */ modulePath);
+    const messages: string[] = [];
+    const onRejection = (event: PromiseRejectionEvent) => {
+      messages.push(String(event.reason));
+      event.preventDefault();
+    };
+    window.addEventListener('unhandledrejection', onRejection);
+    const backend = new WebAudioBackend(9);
+    backend.dispose();
+    backend.dispose();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    window.removeEventListener('unhandledrejection', onRejection);
+    return messages;
+  });
+
+  expect(rejections).toEqual([]);
+});
+
 async function audioState(page: import('playwright/test').Page): Promise<string> {
   return page.evaluate(() => (window as unknown as { RWW: any }).RWW.audio.state);
 }

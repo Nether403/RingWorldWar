@@ -96,7 +96,7 @@ export class Markers {
     placing: StructureKind | null,
     player: Faction,
     trajectory: readonly TrajectorySample[] | null,
-    artilleryTargeting: boolean,
+    directionalArtilleryTargeting: boolean,
     artilleryResult: BallisticFireResult | null,
     camera: THREE.Camera,
     openingGuidance: RuntimeScenarioResolvedOpeningView | null = null,
@@ -303,7 +303,10 @@ export class Markers {
     }
 
     // --- Player artillery trajectory -----------------------------------------
-    if (artilleryTargeting && cursor.valid) {
+    this.object.userData.artilleryTargetDirection = directionalArtilleryTargeting && cursor.valid
+      ? 'antispinward'
+      : null;
+    if (directionalArtilleryTargeting && cursor.valid) {
       const hasPreview = Boolean(trajectory && trajectory.length > 1);
       const resultMatchesCursor = artilleryResult?.targetS !== undefined &&
         artilleryResult.targetZ !== undefined &&

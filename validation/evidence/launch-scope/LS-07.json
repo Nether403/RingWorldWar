@@ -3,19 +3,19 @@
   "version": 1,
   "claimId": "LS-07",
   "acceptedState": "complete",
-  "issuedAt": "2026-08-07T15:28:39.039Z",
+  "issuedAt": "2026-08-09T00:43:16.234Z",
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-07-paired-nodes-2026-08-07.json",
-      "sha256": "7d95a9a469a424bbba09211ee3d55c0bd1f7a970dd59783e730d2f11c74ab731"
+      "sha256": "9e87068a3f2e3bab09ffc50cc5d47dfd1df48b70cd3351a832bdc47d573b885a"
     },
     {
       "path": "validation/evidence/reviews/ls-07-criterion-review-2026-08-07.json",
-      "sha256": "afb7c221bebaca19d33ef4fb34b4b875efbbfcf75b4c9faeade9884e5c8902b4"
+      "sha256": "457923ca74964d9b644f28f6e91bdc0c2118dd90a40603bcd2a203136afa9d7c"
     },
     {
       "path": "docs/launch-scope/ls-07-paired-spinal-nodes.md",
-      "sha256": "3d5062081a59f8cb89d8caa8533ee0de7fe539c4a440d39a524a1a5871772fac"
+      "sha256": "ad7bc4d75b8c5bc923f27bec6fefeb4bdc61a02c319766d496503f45beb12826"
     },
     {
       "path": "docs/launch-scope-execution-policy.md",
@@ -26,7 +26,7 @@
     {
       "id": "paired-spinal-node-alignment",
       "result": "passed",
-      "summary": "All nine bounded LS-07 categories pass against one source snapshot: explicit pair topology, two-stage capture, reversible Alignment, pair-only Dominance, AI completion/denial/defense, v1/v2 persistence, visibility-safe presentation, regressions, and exclusions."
+      "summary": "All nine bounded LS-07 categories pass against one source snapshot: explicit pair topology, two-stage capture, reversible Alignment, pair-only Dominance, AI completion/denial/defense, v1/v2 persistence, visibility-safe presentation with restored minimap canvas state, regressions, and exclusions."
     }
   ]
 }

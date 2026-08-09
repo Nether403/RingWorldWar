@@ -3,11 +3,11 @@
   "version": 1,
   "claimId": "LS-03",
   "acceptedState": "complete",
-  "issuedAt": "2026-08-07T00:00:00.000Z",
+  "issuedAt": "2026-08-09T00:43:16.234Z",
   "sourceRefs": [
     {
       "path": "docs/roadmap.md",
-      "sha256": "aa193398433241ce7c5ab919cca56b49a260e3e52ec1cd1ab6360a001066462d"
+      "sha256": "730632e629f33b1a1e69b4511c33bed4e5f7af6582e6e912fc47beb56895c2b7"
     }
   ],
   "checks": [

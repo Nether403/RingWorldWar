@@ -1,7 +1,7 @@
 {
   "schema": "rww.launch-scope-progress",
   "version": 2,
-  "statusDate": "2026-08-07",
+  "statusDate": "2026-08-09",
   "activeSlice": "LS-08",
   "states": ["complete", "active", "queued"],
   "qualifications": ["not-run", "pending", "automation-passed"],
@@ -15,7 +15,7 @@
     { "id": "LS-05", "milestone": 1, "title": "Mission registry and campaign profile", "state": "complete", "qualification": "automation-passed", "disposition": "polish-backlog", "evidence": "The twelve-mission registry, versioned profile, production campaign lifecycle, archive accessibility, and six ship-ready quality dimensions passed. Conventional Arrow/Home/End listbox navigation remains optional polish.", "evidenceRefs": ["validation/evidence/launch-scope/LS-05.json"] },
     { "id": "LS-06", "milestone": 1, "title": "Camera controller interface", "state": "complete", "qualification": "automation-passed", "disposition": "polish-backlog", "evidence": "The transactional camera lifecycle, capability-driven input isolation, resize/disposal behavior, and tactical/direct compatibility matrix passed. A consolidated throwing-controller Game integration test remains optional polish.", "evidenceRefs": ["validation/evidence/launch-scope/LS-06.json"] },
     { "id": "LS-07", "milestone": 2, "title": "Paired Spinal Nodes and alignment rules", "state": "complete", "qualification": "automation-passed", "disposition": "polish-backlog", "evidence": "Explicit operational pairs, two-stage neutralization/recapture, reversible local Alignment, pair-only Dominance, deterministic AI, v1/v2 persistence, and visibility-safe HUD/minimap representation passed the bounded contract. Compact ALIGN wrapping remains optional polish.", "evidenceRefs": ["validation/evidence/launch-scope/LS-07.json"] },
-    { "id": "LS-08", "milestone": 2, "title": "Directional advantage overlay and onboarding", "state": "active", "qualification": "pending", "disposition": "pending", "evidence": "Active after LS-07 qualification. Implementation must prepare the directional onboarding flow for the real four-of-five novice gate without fabricating human evidence." },
+    { "id": "LS-08", "milestone": 2, "title": "Directional advantage overlay and onboarding", "state": "active", "qualification": "automation-passed", "disposition": "pending", "evidence": "The bounded directional profile, conventional-flight gating, seam-safe overlay, non-color copy and ARIA, authoritative preview/fire agreement, real Siege Mode transition, First Contact completion path, and current regression lanes pass. G-01 remains the required real four-of-five novice gate; no human evidence is claimed." },
     { "id": "LS-09", "milestone": 2, "title": "Shadow timing rules and overhead intelligence", "state": "queued", "qualification": "not-run", "disposition": "pending", "evidence": "Atmosphere and shadow presentation foundations exist; launch gameplay rules and strategic intelligence remain unqualified." },
     { "id": "LS-10", "milestone": 2, "title": "Dedicated whole-ring strategic side view", "state": "queued", "qualification": "not-run", "disposition": "pending", "evidence": "Explicit launch scope with no completion receipt in the current roadmap." },
     { "id": "LS-11", "milestone": 2, "title": "Gravity Range mode", "state": "queued", "qualification": "not-run", "disposition": "pending", "evidence": "Explicit launch mode; current directional-artillery scenario is validation tooling, not a shipped mode." },

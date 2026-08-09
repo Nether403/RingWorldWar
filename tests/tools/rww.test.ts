@@ -17,7 +17,7 @@ import { buildReceipt, classifyExit, deterministicReceiptDigest, resolveRunDirec
 import { buildPlaytestNotes, waitForPlaySession } from '../../tools/rww/play.mjs';
 import { EventEmitter } from 'node:events';
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
-import { collectGit, runChild } from '../../tools/rww/process.mjs';
+import { collectGit, hasUsableGitProvenance, runChild } from '../../tools/rww/process.mjs';
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
 import { parseHeadlessDeterminismReport, parseHeadlessPerformanceReport, referenceRunnerFailures, selectBrowserBudget, writeSanitizedErrorArtifact } from '../../tools/rww/commands.mjs';
 
@@ -418,6 +418,7 @@ describe('RWW hashing and receipts', () => {
       await writeFile(join(directory, 'validation', 'evidence', 'receipt.json'), '{"self":"reference"}\n');
 
       const first = await collectGit(directory);
+      expect(hasUsableGitProvenance(first)).toBe(true);
       expect(first).toMatchObject({
         dirty: true,
         untrackedSourceCount: 1,
@@ -440,6 +441,24 @@ describe('RWW hashing and receipts', () => {
       const evidenceChanged = await collectGit(directory);
       expect(evidenceChanged.trackedPatchSha256).toBe(first.trackedPatchSha256);
       expect(evidenceChanged.untrackedSourceManifestSha256).toBe(first.untrackedSourceManifestSha256);
+
+      const evidenceIncluded = await collectGit(directory, { includeEvidence: true });
+      expect(hasUsableGitProvenance(evidenceIncluded)).toBe(true);
+      expect(evidenceIncluded.trackedPatchExclusions).toEqual([]);
+      expect(evidenceIncluded.untrackedSourceExclusions).toEqual([]);
+      expect(evidenceIncluded.trackedPatchSha256).not.toBe(first.trackedPatchSha256);
+
+      expect(hasUsableGitProvenance({
+        sourceBaseSha: null,
+        trackedPatchSha256: null,
+        untrackedSourceManifestSha256: null,
+        dirty: null,
+        untrackedSourceManifest: [],
+        hiddenTrackedEntries: [],
+        topLevel: null,
+        gitVersion: null,
+        error: 'git unavailable',
+      })).toBe(false);
 
       const originalGitDirectory = process.env.GIT_DIR;
       process.env.GIT_DIR = join(directory, 'adversarial-git-dir');

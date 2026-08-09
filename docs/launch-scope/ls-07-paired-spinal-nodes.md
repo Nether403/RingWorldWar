@@ -168,7 +168,7 @@ LS-07 is dependency-ready only when all of the following pass under `docs/launch
 4. **Gameplay consequence:** Command remains per Node; Dominance is exactly pair-only; existing victory conditions remain unchanged.
 5. **AI:** Deterministic completion, pre-emptive denial, active-pair denial, and visible-threat defense pass for both factions.
 6. **Persistence:** V2 round-trip, V1 migration, legacy game-save loading, partial capture continuation, pair identity, AI continuation, and strict rejection pass.
-7. **Presentation:** HUD summary, selected-Node detail, visibility-safe mate state, minimap pair index/outline, accessible labels, and player-relative events pass at 1280x720 Low and narrow layout.
+7. **Presentation:** HUD summary, selected-Node detail, visibility-safe mate state, minimap pair index/outline, accessible labels, player-relative events, and minimap canvas-state restoration after directional guidance pass at 1280x720 Low and narrow layout.
 8. **Regression:** Tutorial Node capture, seeded state hashes, core-match completion, existing Bastion/time-cap outcomes, typecheck, lint, build, and affected browser suites pass.
 9. **Scope:** No excluded LS-09/10, chord, air/cargo, stabilization, alternate-victory, or campaign behavior is introduced.
 

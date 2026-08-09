@@ -197,7 +197,12 @@ export const LS07_CHECK_POLICY = Object.freeze({
   }),
   presentation: Object.freeze({
     runIds: Object.freeze(['focused-browser'] as LS07RunId[]),
-    testIds: Object.freeze(['hud-minimap-pair-state', 'alignment-accessible-events', 'hidden-mate-no-leak']),
+    testIds: Object.freeze([
+      'hud-minimap-pair-state',
+      'alignment-accessible-events',
+      'hidden-mate-no-leak',
+      'directional-overlay-canvas-state',
+    ]),
   }),
   regression: Object.freeze({
     runIds: Object.freeze(['full-check', 'core-match'] as LS07RunId[]),
@@ -231,6 +236,7 @@ export const LS07_RUN_TEST_IDS = Object.freeze({
     'hud-minimap-pair-state',
     'alignment-accessible-events',
     'hidden-mate-no-leak',
+    'directional-overlay-canvas-state',
   ]),
   'full-check': Object.freeze(['full-check']),
   'core-match': Object.freeze(['core-match-cohorts']),
@@ -720,6 +726,10 @@ export async function validateLaunchProgressManifest(value: unknown): Promise<Re
     throw new Error('reviewPolicy must keep remediation rounds bounded at 2 total and 1 visual-only');
   }
 
+  const gates = asArray(plan.gates).map((gate, index) => requireRecord(gate, `gates[${index}]`));
+  validateOrderedIds(gates, 'G', 8, 'gates');
+  const gateStateById = new Map(gates.map((gate) => [String(gate.id), String(gate.state)]));
+
   const slices = asArray(plan.slices).map((slice, index) => requireRecord(slice, `slices[${index}]`));
   validateOrderedIds(slices, 'LS', 37, 'slices');
   let previousMilestone = -1;
@@ -746,6 +756,9 @@ export async function validateLaunchProgressManifest(value: unknown): Promise<Re
     if (state === 'complete' && !COMPLETE_DISPOSITIONS.has(disposition)) {
       throw new Error(`${id} disposition is invalid for complete state`);
     }
+    if (id === 'LS-08' && state === 'complete' && gateStateById.get('G-01') !== 'passed') {
+      throw new Error('LS-08 cannot complete until G-01 has passed');
+    }
     if (state === 'active' && !['pending', 'automation-passed'].includes(qualification)) {
       throw new Error(`${id} qualification is invalid for active state`);
     }
@@ -771,8 +784,6 @@ export async function validateLaunchProgressManifest(value: unknown): Promise<Re
   const activeSlice = requireNonEmptyString(plan.activeSlice, 'activeSlice');
   if (activeSlices[0]?.id !== activeSlice) throw new Error('activeSlice must match the sole active slice');
 
-  const gates = asArray(plan.gates).map((gate, index) => requireRecord(gate, `gates[${index}]`));
-  validateOrderedIds(gates, 'G', 8, 'gates');
   for (const gate of gates) {
     const id = String(gate.id);
     requireNonEmptyString(gate.title, `${id}.title`);

@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as a prototype. Automated behavior and rendering checks pass. One internal follow-up playtest understood the coverage/LOS distinction, blocked previews, minimap commands, and direction-dependent velocity. The broader five-player comprehension cohort remains the release gate for the USP.
+The bounded automation contract in `docs/launch-scope/ls-08-directional-advantage.md` passes on current source: directional profile, conventional-flight gating, target cue, seam-safe minimap, non-color copy and ARIA, authoritative preview/fire agreement, and First Contact's real Siege Mode transition are covered. One internal follow-up playtest understood the coverage/LOS distinction, blocked previews, minimap commands, and direction-dependent velocity. The broader five-player comprehension cohort remains the release gate for the USP.
 
 ## Player-Facing Behavior
 
@@ -37,7 +37,7 @@ The target marker adds a pooled three-segment arrow pointing antispinward. It ad
 
 - A Longbow gets a `Siege Mortar` ground-target button only when Siege Mode is active and its transition timer is zero.
 - `Game.beginArtilleryTarget` accepts either a unit or structure through the same ballistic capability path.
-- Targeting cancels if the source dies, disappears, becomes invalid, or starts undeploying.
+- Targeting cancels if the source dies, disappears, or becomes invalid. Starting to undeploy retains the target context and reports the transition blocker until deployment is available again or the player cancels.
 - Preview and firing still enforce visibility, cooldown, power, terrain, and exact ballistic reach.
 
 ## Validation Scenario

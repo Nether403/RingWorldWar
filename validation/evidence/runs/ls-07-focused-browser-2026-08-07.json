@@ -5,11 +5,12 @@
   "command": "npx playwright test e2e/spinal-alignment.spec.ts --project=chromium-regression",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "efa09267ae8e84182d629136f7b4f7fec7d9c0a53a706a6bc341445b7e8c8c5d",
+  "sourceSnapshotSha256": "07d5cee14f20cd645265719bfb06f9c3003fb96131e57b4aedbcb9e3c223f31d",
   "passedTestIds": [
     "hud-minimap-pair-state",
     "alignment-accessible-events",
-    "hidden-mate-no-leak"
+    "hidden-mate-no-leak",
+    "directional-overlay-canvas-state"
   ],
-  "summary": "The three focused Chromium tests passed at 1280x720 Low and the declared narrow layout without Alignment information leakage."
+  "summary": "Four focused Chromium tests passed at 1280x720 Low and the declared narrow layout without Alignment leakage or directional-overlay canvas-state residue."
 }

@@ -1,6 +1,6 @@
 # Current Roadmap And Status
 
-**Status date:** 2026-08-07
+**Status date:** 2026-08-09
 
 This is the authoritative source for current delivery status and near-term sequencing. `tasks/plan.md` and `tasks/todo.md` preserve earlier planning history; unchecked or future-looking items there do not override this document.
 
@@ -10,7 +10,7 @@ The project now targets a solo/AI-assisted PC release with a browser demo. The a
 
 The current implementation milestone is the Ring USP slice. LS-04 delivered the strict runtime scenario definition and deterministic world factory, LS-05 delivered the twelve-mission registry and versioned campaign profile, and LS-06 delivered the transactional camera-controller interface. Their exact receipts are tracked in `validation/evidence/launch-scope/`.
 
-LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-spinal-nodes.md`: explicit operational pairs, reversible local Spinal Alignment, pair-only Dominance, deterministic pair-aware AI, v1/v2 persistence, and visibility-safe HUD/minimap representation passed. LS-08 directional advantage overlay and onboarding is now active; its external novice gate remains pending real human evidence.
+LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-spinal-nodes.md`: explicit operational pairs, reversible local Spinal Alignment, pair-only Dominance, deterministic pair-aware AI, v1/v2 persistence, and visibility-safe HUD/minimap representation passed. LS-08 directional advantage overlay and onboarding has passed its bounded automation contract in `docs/launch-scope/ls-08-directional-advantage.md`; its external novice gate remains pending real human evidence.
 
 ## Current Status
 
@@ -21,7 +21,7 @@ LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-
 | LS-05 mission registry/campaign profile | Complete, polish backlog | Exact claim receipt in `validation/evidence/launch-scope/LS-05.json`; conventional listbox arrow navigation remains optional polish |
 | LS-06 camera controller interface | Complete, polish backlog | Exact claim receipt in `validation/evidence/launch-scope/LS-06.json`; one consolidated fault-injection integration test remains optional polish |
 | LS-07 paired Spinal Nodes | Complete, polish backlog | Exact claim receipt in `validation/evidence/launch-scope/LS-07.json`; compact desktop ALIGN wrapping remains optional polish |
-| LS-08 directional overlay/onboarding | Active, human gate pending | Automated implementation work may proceed, but G-01 requires four of five real uncoached novices to identify and exploit the favorable direction |
+| LS-08 directional overlay/onboarding | Active, automation passed; human gate pending | G-01 still requires four of five real uncoached novices to identify and exploit the favorable direction |
 | Gate 1 technical playable slice | Passed | Automated and technical receipt in `docs/gate-1.md` |
 | Phase 2 systems implementation | Delivered | AI tiers, weapons, abilities, faction modifiers, save/load, quality settings, and headless orchestration are summarized in `tasks/phase-2-systems-depth/execution-report.md` |
 | Gate 2 gameplay cohorts | Passed | Veteran mirror, Veteran vs Recruit, and Commander vs Veteran cohorts all pass the configured gameplay gates in `docs/core-match-validation-results.md` |

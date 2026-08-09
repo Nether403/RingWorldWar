@@ -94,3 +94,46 @@ test('[hidden-mate-no-leak] keeps an unseen hostile mate and hostile Alignment o
   await expect(minimap).toHaveAttribute('aria-label', /Friendly Alignment: 0 of 2 Spinal pairs controlled/);
   await expect(minimap).not.toHaveAttribute('aria-label', /hostile|enemy/i);
 });
+
+test('[directional-overlay-canvas-state] restores pair-label drawing after artillery guidance', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const rww = (window as unknown as { RWW: any }).RWW;
+    const pair = rww.game.world.spinalPairs.find((candidate: any) => candidate.id === 'standard-axis');
+    for (const id of pair.members) {
+      const node = rww.game.world.structureById(id);
+      node.faction = 0;
+      node.capture = -1;
+    }
+    const longbow = rww.game.world.spawnUnit(0, 'longbow', 0, 0);
+    longbow.ability.active = true;
+    longbow.ability.transitionTimer = 0;
+    rww.game.world.recomputeCommandCaps();
+    rww.game.selection.clear();
+    rww.game.selection.add(longbow.id);
+    rww.game.hud.invalidate();
+    rww.testDriver.presentFrame(0, 3);
+    const map = document.querySelector<HTMLCanvasElement>('.rww-map canvas')!;
+    const context = (rww.game.hud as { mapCtx: CanvasRenderingContext2D }).mapCtx;
+    const overlayBaseline = context.textBaseline;
+
+    rww.game.selection.clear();
+    rww.game.selection.add(pair.members[0]);
+    rww.game.hud.invalidate();
+    rww.testDriver.presentFrame(0, 3.1);
+    return {
+      overlay: map.dataset.artilleryOverlay ?? null,
+      overlayBaseline,
+      pairBaseline: context.textBaseline,
+      visiblePairs: map.dataset.visiblePairIndices,
+      outlinedPairs: map.dataset.outlinedPairIndices,
+      aria: map.getAttribute('aria-label'),
+    };
+  });
+
+  expect(result.overlay).toBe(null);
+  expect(result.overlayBaseline).toBe('alphabetic');
+  expect(result.pairBaseline).toBe('alphabetic');
+  expect(result.visiblePairs).toMatch(/(^|,)1(,|$)/);
+  expect(result.outlinedPairs).toMatch(/(^|,)1(,|$)/);
+  expect(result.aria).toMatch(/Friendly Alignment: 1 of 2 Spinal pairs controlled/);
+});

@@ -1,10 +1,25 @@
-import { expect, test } from 'playwright/test';
+import { expect, test, type Page } from 'playwright/test';
 import { readFileSync } from 'node:fs';
 
 const scenario = JSON.parse(readFileSync('validation/scenarios/signature-lance.json', 'utf8'));
 const directionalScenario = JSON.parse(readFileSync('validation/scenarios/directional-artillery.json', 'utf8'));
-const EXPECTED_PRE_SETUP_HASH = 'a4edc7b0';
-const EXPECTED_APPLIED_HASH = 'a8809baa';
+const EXPECTED_PRE_SETUP_HASH = '1f413b87';
+const EXPECTED_APPLIED_HASH = '5c174281';
+
+async function useScenarioViewport(
+  page: Page,
+  scenarioDefinition: typeof directionalScenario,
+): Promise<void> {
+  await page.setViewportSize({
+    width: scenarioDefinition.viewport.width,
+    height: scenarioDefinition.viewport.height,
+  });
+  await expect.poll(() => page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight,
+    deviceScaleFactor: devicePixelRatio,
+  }))).toEqual(scenarioDefinition.viewport);
+}
 
 test('drives a deterministic browser scenario without page errors', async ({ page }) => {
   const errors: string[] = [];
@@ -76,6 +91,7 @@ test('deployed Longbow exposes wrapped directional range and authoritative targe
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', (error) => errors.push(error.message));
+  await useScenarioViewport(page, directionalScenario);
   await page.goto(`/?seed=${directionalScenario.worldSeed}&quality=${directionalScenario.quality}&scenarioDriver=1`);
   await page.waitForFunction(() => Boolean((window as unknown as { RWW?: { testDriver?: unknown } }).RWW?.testDriver));
 
@@ -98,6 +114,8 @@ test('deployed Longbow exposes wrapped directional range and authoritative targe
   await expect(page.locator('.rww-sel')).toContainText(/SENSOR .* EFFECTIVE/);
   await expect(page.locator('.rww-sel')).toContainText('EXACT LOS CHECKED SEPARATELY');
   await expect(page.locator('.rww-sel')).toContainText('ANTISPINWARD = LONG SHOT');
+  await expect(page.locator('.rww-sel')).toContainText('APPROXIMATE ENVELOPE');
+  await expect(map).toHaveAttribute('aria-label', /Approximate envelope; live preview and fire checks are authoritative/i);
 
   const targetButton = page.locator('[data-artillery-weapon="siegeMortar"]');
   await expect(targetButton).toBeVisible();
@@ -151,4 +169,52 @@ test('deployed Longbow exposes wrapped directional range and authoritative targe
   expect(authority.undeployBlocker).toBe('longbow-transitioning');
   expect(authority.targetButtonAfterUndeploy).toBe(false);
   expect(errors).toEqual([]);
+});
+
+test('keeps directional guidance exclusive to conventional ballistic fire', async ({ page }) => {
+  await useScenarioViewport(page, directionalScenario);
+  await page.goto(`/?seed=${directionalScenario.worldSeed}&quality=${directionalScenario.quality}&scenarioDriver=1`);
+  await page.waitForFunction(() => Boolean((window as unknown as { RWW?: { testDriver?: unknown } }).RWW?.testDriver));
+
+  const guidance = await page.evaluate(async (value) => {
+    const modulePath = '/e2e/support/scenario-driver.ts';
+    const driver = await import(/* @vite-ignore */ modulePath);
+    driver.applyBrowserScenario(value);
+    const rww = (window as unknown as { RWW: any }).RWW;
+    const game = rww.game;
+    const battery = game.world.spawnStructure(0, 'rocketBattery', 700, 360, 1);
+    const silo = game.world.spawnStructure(0, 'silo', 920, 360, 1);
+    const read = () => {
+      const map = document.querySelector<HTMLCanvasElement>('.rww-map canvas')!;
+      return {
+        overlay: map.dataset.artilleryOverlay ?? null,
+        selection: document.querySelector('.rww-sel')?.textContent ?? '',
+        targetDirection: game.markers.object.userData.artilleryTargetDirection ?? null,
+      };
+    };
+
+    game.selectAt(battery.s, battery.z, false);
+    rww.testDriver.renderFrame(0, 19.1);
+    const conventional = read();
+
+    game.beginArtilleryTarget(battery.id, 'cruiseMissile');
+    game.updateCursor(1_100, 360);
+    rww.testDriver.renderFrame(0, 19.2);
+    const cruise = read();
+
+    game.cancelArtilleryTarget();
+    game.selectAt(silo.s, silo.z, false);
+    game.beginArtilleryTarget(silo.id, 'chordShot');
+    game.updateCursor(1_300, 360);
+    rww.testDriver.renderFrame(0, 19.3);
+    const chord = read();
+    return { conventional, cruise, chord };
+  }, directionalScenario);
+
+  expect(guidance.conventional).toMatchObject({ overlay: 'directional' });
+  expect(guidance.conventional.selection).toContain('ANTISPINWARD = LONG SHOT');
+  expect(guidance.cruise).toMatchObject({ overlay: null, targetDirection: null });
+  expect(guidance.cruise.selection).not.toContain('ANTISPINWARD = LONG SHOT');
+  expect(guidance.chord).toMatchObject({ overlay: null, targetDirection: null });
+  expect(guidance.chord.selection).not.toContain('ANTISPINWARD = LONG SHOT');
 });
