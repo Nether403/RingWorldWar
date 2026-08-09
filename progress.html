@@ -188,6 +188,43 @@
       .metric-value { display: block; font-family: var(--font-mono); font-size: 1.08rem; }
       .metric-label { display: block; margin-top: 3px; color: var(--muted); }
 
+      .remaining-panel { margin-bottom: 16px; }
+
+      .remaining-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+      }
+
+      .remaining-stream { min-width: 0; }
+      .remaining-stream + .remaining-stream { border-left: 1px solid var(--line); }
+      .stream-label { margin: 0; padding: 10px 14px; color: var(--muted); border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; }
+
+      .milestone-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+      .milestone {
+        min-width: 0;
+        padding: 12px 14px;
+        border-bottom: 1px solid #1c252a;
+      }
+
+      .milestone:nth-child(odd) { border-right: 1px solid #1c252a; }
+      .milestone-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+      .milestone h3 { margin: 0; font-size: 0.82rem; font-weight: 620; letter-spacing: 0.035em; }
+      .milestone-count { color: var(--muted); font-family: var(--font-mono); font-size: 0.67rem; white-space: nowrap; }
+      .milestone progress { display: block; width: 100%; height: 4px; margin: 9px 0 8px; accent-color: var(--green); }
+      .milestone-list { margin: 0; padding: 0; list-style: none; }
+      .milestone-list li { overflow: hidden; color: #aab4b9; font-size: 0.73rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+      .milestone-list li + li { margin-top: 3px; }
+      .milestone-list .active-work { color: var(--amber); }
+      .more-work { color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
+
+      .gate-watch { margin: 0; padding: 0; list-style: none; }
+      .gate-watch-item { padding: 10px 14px; border-bottom: 1px solid #1c252a; }
+      .gate-watch-item:last-child { border-bottom: 0; }
+      .gate-watch-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .gate-watch-title { min-width: 0; overflow: hidden; font-size: 0.76rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+      .gate-watch-item p { margin: 5px 0 0; color: var(--muted); font-size: 0.69rem; line-height: 1.32; }
+
       .console-grid {
         display: grid;
         grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.8fr);
@@ -305,6 +342,8 @@
 
       @media (max-width: 900px) {
         .console-grid { grid-template-columns: 1fr; }
+        .remaining-grid { grid-template-columns: 1fr; }
+        .remaining-stream + .remaining-stream { border-top: 1px solid var(--line); border-left: 0; }
         .slices { grid-template-columns: 1fr; }
         .slice:nth-child(odd) { border-right: 0; }
       }
@@ -324,6 +363,8 @@
         .slice { grid-template-columns: 3.7rem minmax(0, 1fr); }
         .slice-statuses { grid-column: 2; justify-content: flex-start; }
         .source-strip { grid-template-columns: 1fr; }
+        .milestone-grid { grid-template-columns: 1fr; }
+        .milestone:nth-child(odd) { border-right: 0; }
       }
 
       @media (prefers-reduced-motion: no-preference) {
@@ -359,6 +400,20 @@
         <div class="metric"><span class="metric-value" id="metric-open">--</span><span class="metric-label">Slices Remaining</span></div>
         <div class="metric"><span class="metric-value" id="metric-gates">--</span><span class="metric-label">Gates Passed</span></div>
         <div class="metric"><span class="metric-value" id="metric-receipts">--</span><span class="metric-label">Claim Receipts Verified</span></div>
+      </section>
+
+      <section class="panel remaining-panel" data-testid="remaining-work" aria-labelledby="remaining-title">
+        <div class="panel-head"><h2 id="remaining-title">Remaining Work</h2><span class="section-code" id="remaining-summary">Awaiting plan</span></div>
+        <div class="remaining-grid">
+          <section class="remaining-stream" aria-labelledby="milestones-title">
+            <h3 class="stream-label" id="milestones-title">Milestone Queue</h3>
+            <div class="milestone-grid" id="remaining-milestones"></div>
+          </section>
+          <section class="remaining-stream" aria-labelledby="gate-watch-title">
+            <h3 class="stream-label" id="gate-watch-title">Gate Watchlist</h3>
+            <ul class="gate-watch" id="gate-watch"></ul>
+          </section>
+        </div>
       </section>
 
       <div class="console-grid">
@@ -442,6 +497,59 @@
           item.append(top, element('p', '', gate.evidence));
           return item;
         }));
+      }
+
+      function renderRemaining(plan) {
+        const remaining = plan.slices.filter((slice) => slice.state !== 'complete');
+        const milestones = new Map();
+        for (const slice of plan.slices) {
+          if (!milestones.has(slice.milestone)) milestones.set(slice.milestone, []);
+          milestones.get(slice.milestone).push(slice);
+        }
+        const cards = [...milestones.entries()]
+          .map(([milestone, slices]) => ({
+            milestone,
+            slices,
+            remaining: slices.filter((slice) => slice.state !== 'complete'),
+          }))
+          .filter((group) => group.remaining.length > 0)
+          .map((group) => {
+            const card = element('article', 'milestone');
+            card.dataset.milestone = String(group.milestone);
+            const top = element('div', 'milestone-top');
+            top.append(
+              element('h3', '', `M${group.milestone} / ${group.remaining[0].title.split(':')[0]}`),
+              element('span', 'milestone-count', `${group.remaining.length} remaining`),
+            );
+            const progress = element('progress');
+            progress.max = group.slices.length;
+            progress.value = group.slices.length - group.remaining.length;
+            progress.setAttribute('aria-label', `Milestone ${group.milestone}: ${group.remaining.length} of ${group.slices.length} slices remaining`);
+            const list = element('ul', 'milestone-list');
+            group.remaining.slice(0, 3).forEach((slice) => {
+              const item = element('li', slice.id === plan.activeSlice ? 'active-work' : '', `${slice.id} / ${slice.title}`);
+              list.append(item);
+            });
+            if (group.remaining.length > 3) {
+              list.append(element('li', 'more-work', `+ ${group.remaining.length - 3} more queued`));
+            }
+            card.append(top, progress, list);
+            return card;
+          });
+        replaceChildren('remaining-milestones', cards.length === 0
+          ? [element('p', 'empty', 'No remaining launch slices.')]
+          : cards);
+
+        const openGates = plan.gates.filter((gate) => gate.state !== 'passed');
+        replaceChildren('gate-watch', openGates.map((gate) => {
+          const item = element('li', 'gate-watch-item');
+          item.dataset.remainingGate = gate.id;
+          const top = element('div', 'gate-watch-top');
+          top.append(element('span', 'gate-watch-title', `${gate.id} / ${gate.title}`), stateBadge(gate.state));
+          item.append(top, element('p', '', gate.target));
+          return item;
+        }));
+        byId('remaining-summary').textContent = `${remaining.length} slices / ${openGates.length} gates unresolved`;
       }
 
       function renderReferences(references) {
@@ -549,6 +657,7 @@
           ...plan.gates.filter((gate) => gate.state === 'passed' && gate.evidenceRefs?.length === 1),
         ];
         byId('metric-receipts').textContent = String(verifiedClaims.length).padStart(2, '0');
+        renderRemaining(plan);
         renderSlices(plan);
         renderGates(plan.gates);
         renderReferences(plan.references);

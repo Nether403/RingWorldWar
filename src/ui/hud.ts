@@ -17,6 +17,7 @@
 
 import { RING_CIRCUMFERENCE, RING_HALF_WIDTH } from '@core/constants';
 import { deltaS } from '@core/ringMath';
+import type { ShadowTiming } from '@core/shadow';
 import {
   BUILDABLE,
   canFactionFieldUnit,
@@ -33,7 +34,7 @@ import {
 } from '@sim/data';
 import type { AbilityId } from '@sim/abilities';
 import type { DirectionalReachProfile } from '@sim/ballistics';
-import type { BallisticFireResult, SimEvent, Structure, Unit, World } from '@sim/world';
+import type { BallisticFireResult, SimEvent, StrategicContact, Structure, Unit, World } from '@sim/world';
 import type { MissionHudModel } from '../tutorial/mission';
 import type { MissionDebriefModel } from '../tutorial/mission';
 import type { NarrativeHudModel } from '../tutorial/narrative';
@@ -55,6 +56,7 @@ const CSS = `
   border-right: 1px solid rgba(150,180,210,0.12); }
 .rww-res:last-child { border-right: 0; }
 .rww-res b { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rww-res[data-resource="shadow"] b { font-size: 12px; white-space: nowrap; }
 .rww-res span { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.24em; opacity: 0.5; }
 .rww-warn b { color: #ff7a5e; }
 .rww-warn span::before { content:'! '; color:#ff8b73; }
@@ -253,6 +255,33 @@ const CSS = `
 
 export type BuildRequest = { kind: StructureKind } | null;
 
+export function shadowTimingCopy(timing: ShadowTiming): string {
+  const state = timing.state === 'day' ? 'DAY' : timing.state === 'shadow' ? 'DEEP SHADOW' : 'PENUMBRA';
+  const next = timing.nextState === 'day'
+    ? 'DAYLIGHT'
+    : timing.nextState === 'shadow'
+      ? 'DEEP SHADOW'
+      : 'PENUMBRA';
+  return `${state} · ${next} IN ${Math.ceil(timing.secondsToTransition)}s`;
+}
+
+export function strategicContactSummary(contacts: readonly StrategicContact[]): string {
+  const labels: Record<StrategicContact['category'], string> = {
+    bastion: 'Bastion',
+    'launch-site': 'launch site',
+    'active-node': 'active Node',
+    'major-construction': 'major construction',
+  };
+  const order: StrategicContact['category'][] = ['bastion', 'launch-site', 'active-node', 'major-construction'];
+  return order
+    .map((category) => {
+      const count = contacts.filter((contact) => contact.category === category).length;
+      return count === 0 ? '' : `${count} ${labels[category]}${count === 1 ? '' : 's'}`;
+    })
+    .filter(Boolean)
+    .join(', ');
+}
+
 const ARTILLERY_LABEL: Record<string, string> = {
   batteryGun: 'Standard Rocket',
   siegeMortar: 'Siege Mortar',
@@ -286,6 +315,7 @@ export class Hud {
   private map: HTMLCanvasElement;
   private mapCtx: CanvasRenderingContext2D;
   private targetStatusEl: HTMLDivElement;
+  private sensorLabelEl: HTMLDivElement;
   private mapWrap: HTMLDivElement;
   private selectionBoxEl: HTMLDivElement;
   private missionEl: HTMLDivElement;
@@ -343,7 +373,7 @@ export class Hud {
     this.root = el('div', 'rww-root');
 
     const top = el('div', 'rww-top rww-panel');
-    for (const key of ['salvage', 'power', 'command', 'alignment', 'clock']) {
+    for (const key of ['salvage', 'power', 'command', 'alignment', 'shadow', 'clock']) {
       const root = el('div', 'rww-res');
       root.dataset.resource = key;
       const value = document.createElement('b');
@@ -370,6 +400,7 @@ export class Hud {
     mapWrap.appendChild(lbl);
     const sensorLabel = el('div', 'rww-sensor-lbl');
     sensorLabel.textContent = 'SENSOR COVERAGE';
+    this.sensorLabelEl = sensorLabel;
     mapWrap.appendChild(sensorLabel);
     this.targetStatusEl = el('div', 'rww-target-status');
     this.targetStatusEl.hidden = true;
@@ -383,7 +414,7 @@ export class Hud {
     this.map.setAttribute('aria-label', minimapAriaLabel('Ring minimap with nominal sensor coverage.', 0, 0));
     mapWrap.appendChild(this.map);
     const mapLegend = el('div', 'rww-map-legend');
-    mapLegend.innerHTML = '<span>● friendly</span><span>◆ hostile</span><span>□ camera</span><span>○ sensor</span>';
+    mapLegend.innerHTML = '<span>● friendly</span><span>◆ hostile</span><span>◇ strategic signal</span><span>□ camera</span><span>○ sensor</span>';
     mapWrap.appendChild(mapLegend);
     this.mapCtx = this.map.getContext('2d')!;
     this.root.appendChild(mapWrap);
@@ -764,6 +795,9 @@ export class Hud {
     const alignedPairs = world.alignedPairCount(player);
     patch('alignment', `ALIGN ${alignedPairs}/${world.spinalPairs.length}`, false,
       `Alignment: ${alignedPairs} of ${world.spinalPairs.length} Spinal pairs controlled`);
+    const shadow = world.shadowTimingAt(this.cameraS);
+    const shadowCopy = shadowTimingCopy(shadow);
+    patch('shadow', shadowCopy, shadow.state === 'shadow', `Tactical view: ${shadowCopy}`);
 
     const mins = Math.floor(world.time / 60);
     const secs = Math.floor(world.time % 60);
@@ -807,7 +841,7 @@ export class Hud {
       [...playerState.unlocked].sort().join(','),
       this.placing ?? '',
       artilleryWeapon ?? '',
-      Math.round(world.sensorPowerScale(player) * 1_000),
+      ...[...selection].map((id) => Math.round(world.effectiveSensorRange(id, player) * 10)),
       units
         .map((unit) =>
           `${unit.id}:${Math.ceil(unit.hp / 25)}:${unit.order.kind}:` +
@@ -965,9 +999,9 @@ export class Hud {
   private sensorRangeCopy(world: World, player: Faction, source: Unit | Structure): string {
     const effective = world.effectiveSensorRange(source.id, player);
     if (effective <= 0) return '';
-    const reduction = Math.round((1 - world.sensorPowerScale(player)) * 100);
+    const reduction = Math.round((1 - effective / source.vision) * 100);
     return `<p class="rww-sensor-range" data-effective-sensor-range="${effective.toFixed(0)}">` +
-      `SENSOR ${formatRange(effective)} EFFECTIVE · POWER REDUCTION ${reduction}%<br>` +
+      `SENSOR ${formatRange(effective)} EFFECTIVE · SHADOW/POWER REDUCTION ${reduction}%<br>` +
         `NOMINAL RADIUS · EXACT LOS CHECKED SEPARATELY</p>`;
   }
 
@@ -1175,6 +1209,30 @@ export class Hud {
     g.lineWidth = 1;
     g.strokeRect(0.5, 0.5, W - 1, H - 1);
 
+    const strategicContacts = world.strategicContacts(player);
+    const strategicSignals = strategicContacts.filter((contact) => !world.isEntityVisible(player, contact.entityId));
+    const strategicSummary = strategicContactSummary(strategicContacts);
+    this.map.dataset.strategicContactCount = String(strategicContacts.length);
+    this.map.dataset.strategicContactCategories = [...new Set(strategicContacts.map((contact) => contact.category))]
+      .sort()
+      .join(',');
+    this.sensorLabelEl.textContent = strategicSummary
+      ? `SENSOR · ${strategicSummary.toUpperCase()}`
+      : 'SENSOR COVERAGE';
+    for (const contact of strategicSignals) {
+      const x = X(contact.s);
+      const y = Y(contact.z);
+      const radius = contact.category === 'bastion' ? 6 : 4.5;
+      g.save();
+      g.translate(x, y);
+      g.rotate(Math.PI / 4);
+      g.strokeStyle = '#f6d28b';
+      g.lineWidth = 2;
+      g.setLineDash([3, 2]);
+      g.strokeRect(-radius, -radius, radius * 2, radius * 2);
+      g.restore();
+    }
+
     // Deposits.
     let depositGuidanceCount = 0;
     const placingExtractor = this.placing === 'extractor';
@@ -1269,11 +1327,15 @@ export class Hud {
       cameraCopies++;
     }
     this.map.dataset.cameraWrapCopies = String(cameraCopies);
+    const shadowDescription = shadowTimingCopy(world.shadowTimingAt(camS));
+    const contactDescription = strategicContacts.length === 0
+      ? 'No strategic contacts'
+      : `${strategicContacts.length} strategic contacts: ${strategicSummary}`;
     const minimapDescription = directional
       ? `Ring minimap. Directional artillery range: antispinward ${formatRange(directional.profile.antispinward)}, ` +
         `spinward ${formatRange(directional.profile.spinward)}. Antispinward equals long shot. ` +
-        `Approximate envelope; live preview and fire checks are authoritative.`
-      : 'Ring minimap with nominal sensor coverage.';
+        `Approximate envelope; live preview and fire checks are authoritative. ${shadowDescription}. ${contactDescription}.`
+      : `Ring minimap with nominal sensor coverage. ${shadowDescription}. ${contactDescription}.`;
     this.map.setAttribute(
       'aria-label',
       minimapAriaLabel(minimapDescription, friendlyAlignedPairs, declaredPairs),

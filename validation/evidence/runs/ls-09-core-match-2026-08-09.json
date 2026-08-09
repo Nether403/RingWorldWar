@@ -1,0 +1,11 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "core-match",
+  "command": "npm run validate:core-match",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "4886fa5ce752671ea367dcd408adbb15999412617ea77a7f98e69a569345cea6",
+  "passedTestIds": ["core-match-cohorts"],
+  "summary": "The veteran-mirror deterministic core-match cohort passed in 472.48 seconds on the final LS-09 source snapshot."
+}

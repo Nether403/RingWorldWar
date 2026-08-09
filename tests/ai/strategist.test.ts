@@ -102,6 +102,25 @@ describe('scoreStrategicGoals', () => {
 });
 
 describe('strategist information and resource boundaries', () => {
+  it('[ai-strategic-contact-boundary] may march toward a contact without gaining exact combat visibility', () => {
+    const world = emptyWorld();
+    world.spawnStructure(Faction.Compact, 'bastion', 0, 0, 1);
+    const hostile = world.spawnStructure(Faction.Choir, 'silo', 5_000, 0, 1);
+    for (let index = 0; index < 8; index++) {
+      world.spawnUnit(Faction.Compact, 'vanguard', 100 + index * 12, 0);
+    }
+    world.players[Faction.Compact].salvage = 0;
+    const opponent = new AiOpponent(Faction.Compact, 'commander', 209);
+
+    for (let tick = 0; tick < 120 && !opponent.exportPersistenceState().pushTarget; tick++) {
+      opponent.update(world, SIM_DT);
+    }
+
+    expect(opponent.exportPersistenceState().pushTarget).toEqual({ s: hostile.s, z: hostile.z });
+    expect(world.isEntityVisible(Faction.Compact, hostile.id)).toBe(false);
+    expect(world.units.find((unit) => unit.faction === Faction.Compact)?.targetId).toBe(0);
+  });
+
   it('counts enemy strength only after that enemy becomes visible', () => {
     const world = emptyWorld();
     world.spawnStructure(Faction.Compact, 'bastion', 0, 0, 1);

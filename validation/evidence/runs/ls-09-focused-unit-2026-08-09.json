@@ -1,0 +1,30 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-unit",
+  "command": "npx vitest run tests/core/shadow.test.ts tests/sim/shadowIntelligence.test.ts tests/sim/vision.test.ts tests/render/environment.test.ts tests/render/presentationEvents.test.ts tests/audio/audioEngine.test.ts tests/ai/strategist.test.ts tests/ui/hud.test.ts",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "4886fa5ce752671ea367dcd408adbb15999412617ea77a7f98e69a569345cea6",
+  "passedTestIds": [
+    "shadow-cycle-authority",
+    "shadow-transition-timing",
+    "shadow-boundary-semantics",
+    "render-shadow-parity",
+    "solar-shadow-output",
+    "source-local-shadow-sensors",
+    "deep-shadow-launch-signal",
+    "deep-shadow-projectile-plume",
+    "deep-shadow-launch-audio",
+    "strategic-contact-categories",
+    "strategic-contact-live-state",
+    "strategic-contact-los-independence",
+    "strategic-contact-authority-boundary",
+    "ai-strategic-contact-boundary",
+    "shadow-timing-copy",
+    "strategic-contact-category-copy",
+    "shadow-save-continuation",
+    "ls09-scope-exclusions"
+  ],
+  "summary": "Eight focused Vitest files passed 73 shadow, intelligence, authority, audio, AI, persistence, rendering, and accessibility tests."
+}

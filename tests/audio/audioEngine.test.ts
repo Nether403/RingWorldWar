@@ -88,6 +88,20 @@ describe('ProceduralAudio', () => {
     expect(backend.resetCount).toBe(1);
   });
 
+  it('[deep-shadow-launch-audio] presents a hidden hostile launch signal in deep shadow', async () => {
+    const backend = new RecordingBackend();
+    const audio = new ProceduralAudio(231, () => backend);
+    await audio.resumeFromGesture();
+
+    audio.consume(
+      [event('weaponFired', Faction.Choir, { id: 92, weapon: 'batteryGun', s: 10_000 })],
+      frame({ shadowState: 'shadow' }),
+      true,
+    );
+
+    expect(backend.cues.map((cue) => cue.kind)).toEqual(['ballistic-launch']);
+  });
+
   it('delegates reviewed voice clips to the shared backend', async () => {
     const backend = new RecordingBackend();
     const audio = new ProceduralAudio(24, () => backend);
@@ -200,11 +214,12 @@ class RecordingBackend implements AudioBackend {
   dispose(): void {}
 }
 
-function frame(options: { visibleIds?: Set<number> } = {}) {
+function frame(options: { visibleIds?: Set<number>; shadowState?: 'day' | 'shadow' } = {}) {
   const visibleIds = options.visibleIds ?? new Set<number>();
   const world = {
     isEntityVisible: (_viewer: Faction, id: number) => visibleIds.has(id),
     isVisible: () => false,
+    shadowTimingAt: () => ({ state: options.shadowState ?? 'day' }),
   } as unknown as World;
   return {
     world,

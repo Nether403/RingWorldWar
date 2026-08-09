@@ -5,9 +5,9 @@
   "command": "npm run validate:core-match",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "07d5cee14f20cd645265719bfb06f9c3003fb96131e57b4aedbcb9e3c223f31d",
+  "sourceSnapshotSha256": "65507830239fad72a8532694245471f268e7a411d6fe3f5d3ac2abefa7a4dfbf",
   "passedTestIds": [
     "core-match-cohorts"
   ],
-  "summary": "The veteran-mirror core-match validation completed its 20-match cohort and passed every configured gameplay gate in 414 seconds."
+  "summary": "The veteran-mirror core-match validation completed its cohort and passed every configured gameplay gate in 472.48 seconds."
 }

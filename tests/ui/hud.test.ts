@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Faction } from '@sim/data';
-import { ballisticFireMessage, hudEventText } from '@ui/hud';
+import { ballisticFireMessage, hudEventText, shadowTimingCopy, strategicContactSummary } from '@ui/hud';
 
 describe('artillery fire messages', () => {
   it('maps every authoritative reason to concise player copy', () => {
@@ -24,6 +24,25 @@ describe('artillery fire messages', () => {
     expect(ballisticFireMessage({ ok: false, reason: 'no-ballistic-solution' }))
       .toBe('NO VALID TRAJECTORY FROM THIS SIDE');
     expect(ballisticFireMessage({ ok: true, reason: 'success' })).toBe('READY TO FIRE');
+  });
+});
+
+describe('shadow timing copy', () => {
+  it('[shadow-timing-copy] names every state and next transition without relying on color', () => {
+    expect(shadowTimingCopy({ state: 'day', nextState: 'transition', secondsToTransition: 12, daylight: 1 }))
+      .toBe('DAY · PENUMBRA IN 12s');
+    expect(shadowTimingCopy({ state: 'transition', nextState: 'shadow', secondsToTransition: 8, daylight: 0.7 }))
+      .toBe('PENUMBRA · DEEP SHADOW IN 8s');
+    expect(shadowTimingCopy({ state: 'shadow', nextState: 'transition', secondsToTransition: 31, daylight: 0.28 }))
+      .toBe('DEEP SHADOW · PENUMBRA IN 31s');
+  });
+
+  it('[strategic-contact-category-copy] summarizes categories with visible, accessible wording', () => {
+    expect(strategicContactSummary([
+      { entityId: 1, s: 0, z: 0, faction: Faction.Choir, category: 'bastion' },
+      { entityId: 2, s: 0, z: 0, faction: Faction.Choir, category: 'launch-site' },
+      { entityId: 3, s: 0, z: 0, faction: Faction.Choir, category: 'launch-site' },
+    ])).toBe('1 Bastion, 2 launch sites');
   });
 });
 

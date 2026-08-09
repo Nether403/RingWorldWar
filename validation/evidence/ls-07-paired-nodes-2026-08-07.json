@@ -4,17 +4,17 @@
   "sliceId": "LS-07",
   "contractSha256": "ad7bc4d75b8c5bc923f27bec6fefeb4bdc61a02c319766d496503f45beb12826",
   "sourceRefs": [
-    { "path": "src/sim/data.ts", "sha256": "9d2e37fcdd5126760034bafe2bf4e1fd09e5b4601736fec93c7a8180d4a0980b" },
-    { "path": "src/sim/world.ts", "sha256": "bcbfdc92c894df78c854da26f39f1486a754c1ce23c84d19a753436d9a0573b0" },
+    { "path": "src/sim/data.ts", "sha256": "9a7ddb0325368dbb0de7233e65976066c6fe92d0ad08b19d6a524d840472bf7f" },
+    { "path": "src/sim/world.ts", "sha256": "4bc5d0c71ac8bfc06ec4b07c481d4e9bed3d38a588da42fda64a7b5f037f460f" },
     { "path": "src/sim/serialize.ts", "sha256": "1e4ceff0c4b27aa6b8294b50ec677a2d93a684f8bbd0403ad592fc2baeb2a2c9" },
     { "path": "src/scenario/runtimeScenario.ts", "sha256": "63de83b50cee12dfb147f9077bd642a88f4e4be151a08373825cfa79292ba586" },
     { "path": "src/scenario/worldFactory.ts", "sha256": "d61f1dd1915edc252df9ee00193ae3781a079708fd109d3071f4f2b388c90aae" },
     { "path": "src/scenario/firstContact.ts", "sha256": "cddb8789daa1a98ecc820af36400734e26ba3714e61c68d225288ed0a0e9c468" },
-    { "path": "src/ai/opponent.ts", "sha256": "fd493fcb6ea91ca94dae96c709c8499ed11e8e26ba5673c38138d33f8963298a" },
-    { "path": "src/ui/hud.ts", "sha256": "c04c38f3d1aff2c691f6eae0b42acb5fd9ce80acc7394a9578774e5be3540bb6" },
+    { "path": "src/ai/opponent.ts", "sha256": "71f4d08b6aacdab6deb941b4e364aa76cdc0a66a51c6cde573daf6755e298e16" },
+    { "path": "src/ui/hud.ts", "sha256": "d26eb00b21d08a03624a11309d5b9ad8405b1a0020bbe90a42252bdd488e7385" },
     { "path": "tests/sim/spinalAlignment.test.ts", "sha256": "86ac65775f76c2254bed2b2fb9ab0e452cb640c53a21e59ac03295e974a3d571" },
     { "path": "tests/sim/serialize.test.ts", "sha256": "533dd06541301ec7e3bc268481af1c3928b7dc3da53b8fdedf71765b6a6dc1a1" },
-    { "path": "tests/ai/strategist.test.ts", "sha256": "622c50c84d2ed1e95ef581c08a56dcae7883e1cc41e049b0f90ca4bca4f321f6" },
+    { "path": "tests/ai/strategist.test.ts", "sha256": "6a576def090dd0ff86f44e2eabd8902a62079ebcfd62d944a1409336636ed095" },
     { "path": "tests/scenario/runtimeScenario.test.ts", "sha256": "b127be00fe7381aa250d97889e465f4e41119b339cf072784d78b29618566542" },
     { "path": "e2e/spinal-alignment.spec.ts", "sha256": "4fbc31dfd3b31df6809e3bd2d52f1624c531eed26388437463fec59448631be8" }
   ],
@@ -24,28 +24,28 @@
       "command": "npx vitest run tests/sim/spinalAlignment.test.ts tests/sim/serialize.test.ts tests/ai/strategist.test.ts tests/scenario/runtimeScenario.test.ts",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-07-focused-unit-2026-08-07.json", "sha256": "a3469764a6d6d025189157f70ea9783960dc53496fedb5ffa99e4c4481d39d7d" }
+      "artifact": { "path": "validation/evidence/runs/ls-07-focused-unit-2026-08-07.json", "sha256": "73df32da8d8bc76c939c5b43d75818eb672f0cff5a4a8be81017e0cf21f38ce8" }
     },
     {
       "id": "focused-browser",
       "command": "npx playwright test e2e/spinal-alignment.spec.ts --project=chromium-regression",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-07-focused-browser-2026-08-07.json", "sha256": "0b06452a54d90d901e30e4b77bad13848ea68d4ea4fc921a945808da7f49ad53" }
+      "artifact": { "path": "validation/evidence/runs/ls-07-focused-browser-2026-08-07.json", "sha256": "c3ff2e5042f15128a9fb0e75a152d2d925d0f3d1b2ea96d08851e4245f7188a0" }
     },
     {
       "id": "full-check",
       "command": "npm run check",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-07-full-check-2026-08-07.json", "sha256": "f8cb08d366a172e069b1e1ea3ac38d30277573755764778c6fa3dd7e82f4abae" }
+      "artifact": { "path": "validation/evidence/runs/ls-07-full-check-2026-08-07.json", "sha256": "6ed8c79fe20ba8760bdfaee8aee8277b227324f1a47d6691276cd697f2e4563a" }
     },
     {
       "id": "core-match",
       "command": "npm run validate:core-match",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-07-core-match-2026-08-07.json", "sha256": "93ecd31aa8e7d4b5e490d8a091b44a9cc116b4f9f1d66d8c0fa641529e4a2136" }
+      "artifact": { "path": "validation/evidence/runs/ls-07-core-match-2026-08-07.json", "sha256": "66c63544893cb5104851806cc33120f14e390140f8523789bfd5fc7fb154d8c5" }
     }
   ],
   "checks": [

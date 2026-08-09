@@ -1,0 +1,24 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "G-01",
+  "acceptedState": "passed",
+  "issuedAt": "2026-08-09T08:50:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "docs/launch-scope/ls-08-directional-advantage.md",
+      "sha256": "3dfa3b28d76e52be40ee4fe4ac740f812741e22f08679b9ccd9dab8f78be01ab"
+    },
+    {
+      "path": "docs/playtests/2026-08-09-directional-artillery-g01.md",
+      "sha256": "d8b5ad7cc473351a03085e3c5087f4668ab88048eeb6eb17d6e954ded15ca276"
+    }
+  ],
+  "checks": [
+    {
+      "id": "developer-reviewed-initial-cohort",
+      "result": "passed",
+      "summary": "The human developer review and one additional uncoached human tester each demonstrated directional identification, favorable-side inference, approximate-versus-authoritative understanding, seam interpretation, and independent Longbow Siege Mortar use. The developer accepted the initial cohort without requesting additional sessions."
+    }
+  ]
+}

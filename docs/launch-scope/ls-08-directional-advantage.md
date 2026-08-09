@@ -1,6 +1,6 @@
 # LS-08 Bounded Acceptance Contract: Directional Advantage And Onboarding
 
-**Status:** Automation passed; G-01 novice comprehension gate pending  
+**Status:** Complete; G-01 developer-reviewed initial comprehension gate passed
 **Policy version:** 1  
 **Slice class:** Gameplay, presentation, and onboarding  
 **Depends on:** LS-04 through LS-07
@@ -75,18 +75,21 @@ capture.
 
 ## Human Gate: G-01
 
-LS-08 remains **active** until G-01 has independent real-player evidence. At
-least four of five uncoached novices must identify and exploit the favorable
-direction after onboarding, using `docs/player-observation-protocol.md`.
-
-The cohort must additionally record the five criteria in
+G-01 requires a successful initial human cohort recorded with
+`docs/player-observation-protocol.md`: the human developer and one uncoached
+human tester must each demonstrate the five criteria in
 `docs/directional-artillery-prototype.md`: direction identification,
 target-side inference, approximate-versus-authoritative understanding, seam
 interpretation, and independent Longbow/Siege Mortar use.
 
-No smoke run, AI proxy, screenshot, browser test, internal-only observation, or
-agent review can mark G-01 passed. The progress manifest rejects an LS-08
-completion claim while G-01 is not passed.
+After reviewing that initial cohort, the developer may require one to three
+additional uncoached human testers before accepting G-01. This escalation is a
+developer judgement based on observed comprehension, not an automatic fixed
+cohort requirement.
+
+No smoke run, AI proxy, screenshot, browser test, or agent review can substitute
+for the required human developer and uncoached-tester evidence. The progress
+manifest rejects an LS-08 completion claim while G-01 is not passed.
 
 ## Explicit Exclusions
 

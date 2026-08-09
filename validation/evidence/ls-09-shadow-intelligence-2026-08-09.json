@@ -1,0 +1,68 @@
+{
+  "schema": "rww.ls-09-verification",
+  "version": 1,
+  "sliceId": "LS-09",
+  "contractSha256": "d8778afa89b2ca451178e06e2070ebdd3131cadc540a2394ca452aee2452ada3",
+  "sourceRefs": [
+    { "path": "src/core/shadow.ts", "sha256": "4c3a50d412c7e509aeaf26012bc2ad1bede6879462ad9eb783aec4ca118b568f" },
+    { "path": "src/sim/data.ts", "sha256": "9a7ddb0325368dbb0de7233e65976066c6fe92d0ad08b19d6a524d840472bf7f" },
+    { "path": "src/sim/world.ts", "sha256": "4bc5d0c71ac8bfc06ec4b07c481d4e9bed3d38a588da42fda64a7b5f037f460f" },
+    { "path": "src/game.ts", "sha256": "f358b2003ac9a56028b55456deccef3cea10f37bc4f34853635bd9eda8feb9d6" },
+    { "path": "src/main.ts", "sha256": "a719a3606d634af03818a37f39806c5e9db7c28da1f7c6e8c537b9d315eb5881" },
+    { "path": "src/render/environment.ts", "sha256": "83240ad07568c64e6a71f854f8f13d74dac629bbbb1cb1bd338befb7408b089d" },
+    { "path": "src/render/effects.ts", "sha256": "0295a176b972de443f305437d4006ad0ef6fa1f92c347e2e70070ca46f3520ca" },
+    { "path": "src/render/presentationEvents.ts", "sha256": "9b10dd3601a775f81e99c62f16f1576dbe47b4ef09096c40082b927fc8552014" },
+    { "path": "src/audio/audioEngine.ts", "sha256": "739f949fd5c0a5f44b15d861950909df6e6503689034c541781c7fca21495445" },
+    { "path": "src/ai/opponent.ts", "sha256": "71f4d08b6aacdab6deb941b4e364aa76cdc0a66a51c6cde573daf6755e298e16" },
+    { "path": "src/ui/hud.ts", "sha256": "d26eb00b21d08a03624a11309d5b9ad8405b1a0020bbe90a42252bdd488e7385" },
+    { "path": "tests/core/shadow.test.ts", "sha256": "c8769a56ccf95c0c3d2d88a2c7aedbf48ce70934ae59d745cf0af6f938d9c799" },
+    { "path": "tests/sim/shadowIntelligence.test.ts", "sha256": "58280a5225f4471e17289be2de83310a2b7a08c8f53f7a34603e8b479227862d" },
+    { "path": "tests/sim/vision.test.ts", "sha256": "de264638e2163d6fa2ddb57931650cbbc039172ee56c73ee6e70b4fb76c96fe0" },
+    { "path": "tests/render/environment.test.ts", "sha256": "faa18163d8b4ea2793eadd87f4fa4578abe28ad6d4fa92fb6dc50175dff62f78" },
+    { "path": "tests/render/presentationEvents.test.ts", "sha256": "efe938dc1a5d29839087a156cf234bc2f1526def4d402c28c40aa34b7779b764" },
+    { "path": "tests/audio/audioEngine.test.ts", "sha256": "0f08c056c378b850c9c574abd81a4da9b0897bbfa79b8e52c3079ebeb5e74e67" },
+    { "path": "tests/ai/strategist.test.ts", "sha256": "6a576def090dd0ff86f44e2eabd8902a62079ebcfd62d944a1409336636ed095" },
+    { "path": "tests/ui/hud.test.ts", "sha256": "d0257236fb889bce3304331f51b4fb38e231604ca8ae8ebb6cc1a4a01af8a809" },
+    { "path": "e2e/shadow-intelligence.spec.ts", "sha256": "30246ba7589ebdf8b30fd580ad698f7ee88df5aba4b57cb30b7b583be73c6d31" }
+  ],
+  "runs": [
+    {
+      "id": "focused-unit",
+      "command": "npx vitest run tests/core/shadow.test.ts tests/sim/shadowIntelligence.test.ts tests/sim/vision.test.ts tests/render/environment.test.ts tests/render/presentationEvents.test.ts tests/audio/audioEngine.test.ts tests/ai/strategist.test.ts tests/ui/hud.test.ts",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-09-focused-unit-2026-08-09.json", "sha256": "353495c7e0d14df63af6aa414fcc2511ab9bba5b5ef5facaec36d2de4e4e874e" }
+    },
+    {
+      "id": "focused-browser",
+      "command": "npx playwright test e2e/shadow-intelligence.spec.ts --project=chromium-regression",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-09-focused-browser-2026-08-09.json", "sha256": "06115d3ad4469a21ab1a470bffe54baab05a153b2927ffe602c95406aa1aa4e2" }
+    },
+    {
+      "id": "full-check",
+      "command": "npm run check",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-09-full-check-2026-08-09.json", "sha256": "7a055df639bd939a9a9f76c3c5355e3b7e4a7bef0dc4f7fc514d0861ad051f27" }
+    },
+    {
+      "id": "core-match",
+      "command": "npm run validate:core-match",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-09-core-match-2026-08-09.json", "sha256": "f058b0cd579786cbb06b07208ddc62d2d7d86a190166729008f2f1040bac721d" }
+    }
+  ],
+  "checks": [
+    { "id": "shadow-authority", "result": "passed", "runIds": ["focused-unit"], "testIds": ["shadow-cycle-authority", "shadow-transition-timing", "shadow-boundary-semantics", "render-shadow-parity"] },
+    { "id": "gameplay-consequences", "result": "passed", "runIds": ["focused-unit"], "testIds": ["solar-shadow-output", "source-local-shadow-sensors"] },
+    { "id": "launch-intelligence", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["deep-shadow-launch-signal", "deep-shadow-projectile-plume", "deep-shadow-launch-audio", "global-shadow-launch-production"] },
+    { "id": "strategic-contacts", "result": "passed", "runIds": ["focused-unit"], "testIds": ["strategic-contact-categories", "strategic-contact-live-state", "strategic-contact-los-independence"] },
+    { "id": "authority-ai", "result": "passed", "runIds": ["focused-unit"], "testIds": ["strategic-contact-authority-boundary", "ai-strategic-contact-boundary"] },
+    { "id": "presentation-accessibility", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["shadow-timing-copy", "strategic-contact-category-copy", "shadow-intelligence-hud"] },
+    { "id": "persistence-regression", "result": "passed", "runIds": ["focused-unit", "full-check", "core-match"], "testIds": ["shadow-save-continuation", "full-check", "core-match-cohorts"] },
+    { "id": "scope", "result": "passed", "runIds": ["focused-unit"], "testIds": ["ls09-scope-exclusions"] }
+  ]
+}

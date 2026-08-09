@@ -5,7 +5,7 @@
   "command": "npx vitest run tests/sim/spinalAlignment.test.ts tests/sim/serialize.test.ts tests/ai/strategist.test.ts tests/scenario/runtimeScenario.test.ts",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "07d5cee14f20cd645265719bfb06f9c3003fb96131e57b4aedbcb9e3c223f31d",
+  "sourceSnapshotSha256": "65507830239fad72a8532694245471f268e7a411d6fe3f5d3ac2abefa7a4dfbf",
   "passedTestIds": [
     "canonical-pair-topology",
     "scenario-pair-identity",
@@ -23,5 +23,5 @@
     "legacy-game-save-compatibility",
     "ls07-scope-exclusions"
   ],
-  "summary": "Four focused Vitest files passed all 76 LS-07 simulation, persistence, AI, scenario, and scope tests."
+  "summary": "Four focused Vitest files passed all 77 LS-07 simulation, persistence, AI, scenario, and scope tests after LS-09 integration."
 }

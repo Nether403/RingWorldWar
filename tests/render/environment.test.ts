@@ -1,10 +1,19 @@
 import * as THREE from 'three';
 import { RING_OMEGA, RING_RADIUS } from '@core/constants';
 import { RenderAnchor } from '@render/anchor';
-import { Environment, sampleAtmosphere } from '@render/environment';
+import { Environment, sampleAtmosphere, shadowFactor } from '@render/environment';
+import { shadowFactorAtAngle } from '@core/shadow';
 import { describe, expect, it, vi } from 'vitest';
 
 describe('inertial starfield', () => {
+  it('[render-shadow-parity] delegates every render sample to the core shadow authority', () => {
+    for (const time of [0, 91, 420, 839.5]) {
+      for (const theta of [0, 0.1, 1.7, Math.PI * 2]) {
+        expect(shadowFactor(theta, time)).toBe(shadowFactorAtAngle(theta, time));
+      }
+    }
+  });
+
   it('moves opposite physical ring rotation around the ring axis', () => {
     const environment = new Environment(27);
     const anchor = new RenderAnchor();

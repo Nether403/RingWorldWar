@@ -495,6 +495,10 @@ export interface StructureDef {
   hotkey?: string;
   /** Laser-grid coverage in either arc direction, metres. */
   coverageArc?: number;
+  /** Persistent reduced overhead-intelligence category. */
+  overheadIntel?: 'bastion' | 'launch-site';
+  /** Incomplete instances appear only as broad major-construction contacts. */
+  majorConstruction?: boolean;
 }
 
 export const STRUCTURES: Record<StructureKind, StructureDef> = {
@@ -512,6 +516,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     weapons: ['bastionGun'],
     energy: 6,
     produces: ['engineer'],
+    overheadIntel: 'bastion',
+    majorConstruction: true,
   },
   extractor: {
     kind: 'extractor',
@@ -533,7 +539,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   solarArray: {
     kind: 'solarArray',
     name: 'Solar Array',
-    role: 'Cheap power, but it stops when a shadow square passes over.',
+    role: 'Cheap power whose output falls as a shadow square passes over.',
     cost: { salvage: 130 },
     buildTime: 10,
     hp: 620,
@@ -594,6 +600,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     produces: ['wisp', 'vanguard', 'aegis', 'longbow', 'bulwark', 'needle'],
     requires: 'fabricator',
     hotkey: 'M',
+    majorConstruction: true,
   },
   rocketBattery: {
     kind: 'rocketBattery',
@@ -673,6 +680,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     energy: -12,
     requires: 'mechFoundry',
     hotkey: 'C',
+    overheadIntel: 'launch-site',
+    majorConstruction: true,
   },
   spinalNode: {
     kind: 'spinalNode',

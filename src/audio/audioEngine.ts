@@ -1,7 +1,7 @@
 import { deltaS } from '@core/ringMath';
 import { WEAPONS, type Faction } from '@sim/data';
 import type { SimEvent, World } from '@sim/world';
-import { isPresentationEventEligible, isPresentationEventInRange } from '@render/presentationEvents';
+import { isPresentationEventEligible } from '@render/presentationEvents';
 import type { VoiceClip } from './voiceDirector';
 
 export type AudioState = 'idle' | 'starting' | 'running' | 'unavailable';
@@ -121,7 +121,7 @@ export class ProceduralAudio {
     const cues: AudioCue[] = [];
     for (const event of events) {
       const eligible = visibilityPrevalidated
-        ? isPresentationEventInRange(event, frame.anchorS)
+        ? true
         : isPresentationEventEligible(event, frame.world, frame.anchorS, frame.viewer);
       if (!eligible) continue;
       const cue = cueForEvent(this.seed, event, frame);

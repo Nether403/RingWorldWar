@@ -20,6 +20,12 @@ import {
 } from '@core/constants';
 import { deltaS, surfaceDist, surfaceDistSq, wrapS } from '@core/ringMath';
 import { Rng } from '@core/rng';
+import {
+  shadowFactorAtAngle,
+  shadowTimingAtSurface,
+  SHADOW_MAX_OCCLUSION,
+  type ShadowTiming,
+} from '@core/shadow';
 import type { Terrain } from '@gen/terrain';
 import {
   BASE_ENERGY,
@@ -215,6 +221,20 @@ export interface Deposit {
 export interface SpinalPair {
   id: string;
   members: [number, number];
+}
+
+export type StrategicContactCategory =
+  | 'bastion'
+  | 'launch-site'
+  | 'active-node'
+  | 'major-construction';
+
+export interface StrategicContact {
+  readonly entityId: number;
+  readonly s: number;
+  readonly z: number;
+  readonly faction: Faction;
+  readonly category: StrategicContactCategory;
 }
 
 export type SimEventKind =
@@ -835,7 +855,11 @@ export class World {
   /** Direct sunlight fraction at an arc position. Mirrors the render side. */
   daylightAt(s: number): number {
     const theta = (s / RING_CIRCUMFERENCE) * Math.PI * 2;
-    return shadowFactorSim(theta, this.time);
+    return shadowFactorAtAngle(theta, this.time);
+  }
+
+  shadowTimingAt(s: number): ShadowTiming {
+    return shadowTimingAtSurface(s, this.time);
   }
 
   /** 1 when power is sufficient, dropping toward 0 during a brownout.
@@ -2886,18 +2910,28 @@ export class World {
     return 0.55 + this.powerRatio(faction) * 0.45;
   }
 
+  sensorShadowScaleAt(faction: Faction, s: number): number {
+    const minimum = faction === Faction.Choir ? 0.8 : 0.65;
+    const occlusion = Math.min(1, (1 - this.daylightAt(s)) / SHADOW_MAX_OCCLUSION);
+    return 1 - occlusion * (1 - minimum);
+  }
+
   effectiveSensorRange(entityId: number, faction: Faction): number {
     const unit = this.unitById(entityId);
-    if (unit) return unit.faction === faction ? unit.vision * this.sensorPowerScale(faction) : 0;
+    if (unit) {
+      return unit.faction === faction
+        ? unit.vision * this.sensorPowerScale(faction) * this.sensorShadowScaleAt(faction, unit.s)
+        : 0;
+    }
     const structure = this.structureById(entityId);
     if (!structure || structure.faction !== faction || structure.progress < 1) return 0;
-    return structure.vision * this.sensorPowerScale(faction);
+    return structure.vision * this.sensorPowerScale(faction) * this.sensorShadowScaleAt(faction, structure.s);
   }
 
   hasExactSensorContactFrom(entityId: number, faction: Faction, s: number, z: number): boolean {
     const unit = this.unitById(entityId);
     if (!unit || unit.faction !== faction) return false;
-    const range = unit.vision * this.sensorPowerScale(faction);
+    const range = this.effectiveSensorRange(unit.id, faction);
     return surfaceDistSq(unit.s, unit.z, s, z) < range * range &&
       this.hasLineOfSight(unit.s, unit.z, UNITS[unit.kind].height * 0.8, s, z);
   }
@@ -2906,11 +2940,11 @@ export class World {
     nominal: boolean;
     exactLineOfSight: boolean;
   } {
-    const scale = this.sensorPowerScale(faction);
     let nominal = false;
     for (const unit of this.units) {
       if (!unit.alive || unit.faction !== faction) continue;
-      if (surfaceDistSq(unit.s, unit.z, s, z) >= (unit.vision * scale) ** 2) continue;
+      const range = this.effectiveSensorRange(unit.id, faction);
+      if (surfaceDistSq(unit.s, unit.z, s, z) >= range ** 2) continue;
       nominal = true;
       if (this.hasLineOfSight(unit.s, unit.z, UNITS[unit.kind].height * 0.8, s, z)) {
         return { nominal: true, exactLineOfSight: true };
@@ -2918,7 +2952,8 @@ export class World {
     }
     for (const structure of this.structures) {
       if (!structure.alive || structure.faction !== faction || structure.progress < 1) continue;
-      if (surfaceDistSq(structure.s, structure.z, s, z) >= (structure.vision * scale) ** 2) continue;
+      const range = this.effectiveSensorRange(structure.id, faction);
+      if (surfaceDistSq(structure.s, structure.z, s, z) >= range ** 2) continue;
       nominal = true;
       if (this.hasLineOfSight(
         structure.s,
@@ -2987,10 +3022,42 @@ export class World {
     return (
       projectile.faction === faction ||
       (projectile.flightMode === 'chord' && projectile.p.h > ATMOSPHERE_HEIGHT) ||
+      (projectile.ballistic && this.shadowTimingAt(projectile.p.s).state === 'shadow') ||
       (projectile.targetId !== 0 && this.isEntityVisible(faction, projectile.targetId)) ||
       this.isVisible(faction, projectile.p.s, projectile.p.z) ||
       (projectile.ballistic && this.isVisible(faction, projectile.impactS, projectile.impactZ))
     );
+  }
+
+  strategicContacts(viewer: Faction): readonly StrategicContact[] {
+    const hostile = other(viewer);
+    const contacts: StrategicContact[] = [];
+    for (const structure of this.structures) {
+      if (!structure.alive || structure.faction !== hostile) continue;
+      const def = STRUCTURES[structure.kind];
+      let category: StrategicContactCategory | null = null;
+      if (structure.progress < 1 && def.majorConstruction) category = 'major-construction';
+      else if (structure.progress >= 1 && def.overheadIntel) category = def.overheadIntel;
+      else if (structure.progress >= 1 && structure.kind === 'spinalNode') category = 'active-node';
+      if (category) {
+        contacts.push(Object.freeze({
+          entityId: structure.id,
+          s: structure.s,
+          z: structure.z,
+          faction: hostile,
+          category,
+        }));
+      }
+    }
+    return Object.freeze(contacts);
+  }
+
+  strategicContactFor(viewer: Faction, entityId: number): StrategicContact | undefined {
+    return this.strategicContacts(viewer).find((contact) => contact.entityId === entityId);
+  }
+
+  hasStrategicContact(viewer: Faction, entityId: number): boolean {
+    return this.strategicContactFor(viewer, entityId) !== undefined;
   }
 
   private clearVisibilityCache(): void {
@@ -3136,26 +3203,6 @@ export function turnToward(from: number, to: number, maxStep: number): number {
   return from + Math.sign(d) * maxStep;
 }
 
-/**
- * Shadow-square occlusion, duplicated from the render side deliberately: the
- * simulation must not import anything from `@render`, and this is a handful of
- * lines of pure maths. The two are kept in step by `tests/sim/economy.test.ts`.
- */
-const PANEL_COUNT = 5;
-const PANEL_SPACING = (Math.PI * 2) / PANEL_COUNT;
-const PANEL_HALF_SPAN = 0.19;
-const PANEL_PHASE_OFFSET = PANEL_SPACING * 0.5;
-const DAY_LEN = 420;
-const MAX_OCC = 0.72;
-
 export function shadowFactorSim(theta: number, t: number): number {
-  const phase = (t / (DAY_LEN * PANEL_COUNT)) * Math.PI * 2 + PANEL_PHASE_OFFSET;
-  let rel = (theta - phase) % PANEL_SPACING;
-  if (rel < 0) rel += PANEL_SPACING;
-  const d = Math.min(rel, PANEL_SPACING - rel);
-  const t0 = PANEL_HALF_SPAN * 0.5;
-  const t1 = PANEL_HALF_SPAN;
-  const x = clamp((d - t0) / (t1 - t0), 0, 1);
-  const smooth = x * x * (3 - 2 * x);
-  return clamp(1 - (1 - smooth) * MAX_OCC, 0, 1);
+  return shadowFactorAtAngle(theta, t);
 }

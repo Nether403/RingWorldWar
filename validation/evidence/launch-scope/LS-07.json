@@ -3,15 +3,15 @@
   "version": 1,
   "claimId": "LS-07",
   "acceptedState": "complete",
-  "issuedAt": "2026-08-09T00:43:16.234Z",
+  "issuedAt": "2026-08-09T08:42:21.890Z",
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-07-paired-nodes-2026-08-07.json",
-      "sha256": "9e87068a3f2e3bab09ffc50cc5d47dfd1df48b70cd3351a832bdc47d573b885a"
+      "sha256": "bc583e3f9d60a9ddd2b35f811b4264f45bbc533c38ece5761bbc3775430dc76d"
     },
     {
       "path": "validation/evidence/reviews/ls-07-criterion-review-2026-08-07.json",
-      "sha256": "457923ca74964d9b644f28f6e91bdc0c2118dd90a40603bcd2a203136afa9d7c"
+      "sha256": "f3eb166a77478faf93342c221c1460b4920051a11ad5c611f2a17b2bc244c8af"
     },
     {
       "path": "docs/launch-scope/ls-07-paired-spinal-nodes.md",
@@ -26,7 +26,7 @@
     {
       "id": "paired-spinal-node-alignment",
       "result": "passed",
-      "summary": "All nine bounded LS-07 categories pass against one source snapshot: explicit pair topology, two-stage capture, reversible Alignment, pair-only Dominance, AI completion/denial/defense, v1/v2 persistence, visibility-safe presentation with restored minimap canvas state, regressions, and exclusions."
+      "summary": "All nine LS-07 categories pass on the refreshed source snapshot; LS-09 strategic contacts preserve exact hidden-mate and hostile-Alignment boundaries, deterministic pair AI, persistence, presentation, and scope."
     }
   ]
 }

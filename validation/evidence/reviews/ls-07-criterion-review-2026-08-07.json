@@ -1,7 +1,7 @@
 {
   "schema": "rww.criterion-review",
   "version": 1,
-  "reviewId": "ls-07-directional-overlay-regression-review-2026-08-09",
+  "reviewId": "ls-07-shadow-intelligence-regression-review-2026-08-09",
   "claimId": "LS-07",
   "contractSha256": "ad7bc4d75b8c5bc923f27bec6fefeb4bdc61a02c319766d496503f45beb12826",
   "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
@@ -10,21 +10,21 @@
   "independentContext": true,
   "reviewer": {
     "role": "independent-critic",
-    "taskId": "ses_01c45960cffePwWpQ2FvLnmOLX",
-    "model": "azure/gpt-5.6-terra",
-    "completedAt": "2026-08-09T00:43:16.234Z",
-    "sourceSnapshotSha256": "07d5cee14f20cd645265719bfb06f9c3003fb96131e57b4aedbcb9e3c223f31d"
+    "taskId": "ses_01a5645dbffe6CUoDZV6uAhEIa",
+    "model": "azure/gpt-5.6-sol",
+    "completedAt": "2026-08-09T08:38:32.792Z",
+    "sourceSnapshotSha256": "65507830239fad72a8532694245471f268e7a411d6fe3f5d3ac2abefa7a4dfbf"
   },
   "scores": {
     "topology": { "score": 4, "checkId": "topology", "rationale": "Canonical pair and member ordering, standard pair identity, scenario resolution, and malformed-topology rejection satisfy the frozen topology contract." },
     "capture": { "score": 4, "checkId": "capture", "rationale": "Neutral capture, contested freeze, friendly repair, two-stage takeover, exact timing, and damage neutralization match the approved state machine." },
     "alignment": { "score": 4, "checkId": "alignment", "rationale": "Alignment remains derived and reversible with deterministic begin and break ordering, no duplicate events, and no persisted activation state." },
     "gameplay-consequence": { "score": 4, "checkId": "gameplay-consequence", "rationale": "Command remains per Node, Dominance is exactly pair-only at two per second, and the existing Bastion and time-cap outcomes remain authoritative." },
-    "ai": { "score": 4, "checkId": "ai", "rationale": "Scout completion and denial priorities, main-force bonuses, visible-threat defense, stable tie-breaks, and timed Bastion commitment satisfy both factions deterministically." },
-    "persistence": { "score": 4, "checkId": "persistence", "rationale": "World v2 pair persistence, strict runtime scenario v2, deterministic v1 migration, partial-state continuation, and legacy envelope compatibility all pass." },
-    "presentation": { "score": 3, "checkId": "presentation", "rationale": "HUD summary and Node details, visibility-safe mate state, minimap indices and outlines, ARIA text, alerts, desktop Low, narrow containment, and directional-overlay canvas-state restoration are ship-ready." },
-    "regression": { "score": 4, "checkId": "regression", "rationale": "Focused tests, full lint and build checks, 440 unit tests, and the fresh veteran-mirror core-match cohort pass against the same source snapshot." },
-    "scope": { "score": 4, "checkId": "scope", "rationale": "No chord bonus, overhead intelligence, transport, stabilization, alternate victory, strategic annulus, shadow expansion, or campaign-finale behavior was introduced." }
+    "ai": { "score": 4, "checkId": "ai", "rationale": "Pair priorities and bonuses remain deterministic for both factions; strategic contacts permit movement but never blind target acquisition or conventional fire." },
+    "persistence": { "score": 4, "checkId": "persistence", "rationale": "World v2 pair persistence, v1 migration, partial capture, AI orders, Dominance, and deterministic continuation remain supported with no persisted LS-09 contacts." },
+    "presentation": { "score": 3, "checkId": "presentation", "rationale": "Hidden hostile mate and Alignment state remain protected despite generic active-Node contacts; minimap labels, ARIA, narrow layout, and canvas restoration pass." },
+    "regression": { "score": 4, "checkId": "regression", "rationale": "The exact 77-test focused lane, four browser tests, full check, and veteran-mirror core-match cohort pass against one refreshed source snapshot." },
+    "scope": { "score": 4, "checkId": "scope", "rationale": "LS-09 overhead intelligence is an approved successor slice and discloses no pair relation, remote mate detail, hostile Alignment state, or LS-07 gameplay consequence." }
   },
   "dependencyReady": true,
   "blockers": [],

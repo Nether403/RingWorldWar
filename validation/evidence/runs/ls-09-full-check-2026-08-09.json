@@ -1,0 +1,11 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "full-check",
+  "command": "npm run check",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "4886fa5ce752671ea367dcd408adbb15999412617ea77a7f98e69a569345cea6",
+  "passedTestIds": ["full-check"],
+  "summary": "npm run check passed lint, the complete unit suite, typecheck, and the production Vite build against the final LS-09 snapshot."
+}

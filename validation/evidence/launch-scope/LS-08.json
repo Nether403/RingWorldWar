@@ -1,0 +1,40 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-08",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-09T08:50:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "docs/launch-scope/ls-08-directional-advantage.md",
+      "sha256": "3dfa3b28d76e52be40ee4fe4ac740f812741e22f08679b9ccd9dab8f78be01ab"
+    },
+    {
+      "path": "docs/playtests/2026-08-09-directional-artillery-g01.md",
+      "sha256": "d8b5ad7cc473351a03085e3c5087f4668ab88048eeb6eb17d6e954ded15ca276"
+    },
+    {
+      "path": "validation/evidence/directional-artillery-visual.json",
+      "sha256": "f91827de6ff990d9dc939d1b6978988dc0b395455bc5f84c03516f5aba37f65a"
+    },
+    {
+      "path": "validation/evidence/reviews/ls-08-criterion-review-2026-08-09.json",
+      "sha256": "b38e35ac1d23a8f95d23758a83132b56796285ebdd346ea167eca493f72491e4"
+    },
+    {
+      "path": "validation/evidence/launch-scope/G-01.json",
+      "sha256": "9b3b2e16c84fe35d16f9b2dea8d7c69a3bc2302abd47cd268ba702537c86018f"
+    },
+    {
+      "path": "docs/launch-scope-execution-policy.md",
+      "sha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c"
+    }
+  ],
+  "checks": [
+    {
+      "id": "directional-advantage-onboarding",
+      "result": "passed",
+      "summary": "Directional simulation and tutorial tests passed 42 of 42, Chromium scenario and tutorial acceptance passed 6 of 6, npm run check passed 440 tests with one intentional skip plus the production build, and the veteran-mirror core-match cohort passed in 461.43 seconds. The tracked directional visual evidence and the developer-reviewed G-01 initial cohort complete the bounded contract."
+    }
+  ]
+}

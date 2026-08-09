@@ -20,7 +20,6 @@
 
 import * as THREE from 'three';
 import {
-  DAY_LENGTH,
   RING_OMEGA,
   RING_CIRCUMFERENCE,
   RING_HALF_WIDTH,
@@ -28,6 +27,12 @@ import {
   SHADOW_SQUARE_COUNT,
 } from '@core/constants';
 import { Rng } from '@core/rng';
+import {
+  panelPhaseAt,
+  shadowFactorAtAngle,
+  SHADOW_PANEL_HALF_SPAN,
+  SHADOW_PANEL_SPACING,
+} from '@core/shadow';
 import { clamp01, smoothstep } from '@gen/noise';
 import type { RenderAnchor } from './anchor';
 import { disposeObject } from './disposeObject';
@@ -41,18 +46,6 @@ const FILAMENT_OFFSET = 0.34;
  *  size. Their radius does not affect the shadow they cast, because the light
  *  radiates from the axis -- only their angular span does. */
 const PANEL_RADIUS = 0.26;
-
-/** Angular half-width of each shadow panel, radians. */
-const PANEL_HALF_SPAN = 0.19;
-
-const PANEL_SPACING = (Math.PI * 2) / SHADOW_SQUARE_COUNT;
-
-/** Offset the panel pattern so a match opens at midday rather than in shade. */
-const PANEL_PHASE_OFFSET = PANEL_SPACING * 0.5;
-
-/** Deepest the shadow squares ever get. Night has to stay readable -- an RTS
- *  the player cannot see is not atmospheric, it is broken. */
-const MAX_OCCLUSION = 0.72;
 
 // ---------------------------------------------------------------------------
 // Day cycle
@@ -155,19 +148,7 @@ export class DayCycle {
  * so the lighting the player sees and the power they get cannot disagree.
  */
 export function shadowFactor(theta: number, t: number): number {
-  const panelPhase = panelPhaseAt(t);
-  // Angle to the nearest panel centre.
-  let rel = (theta - panelPhase) % PANEL_SPACING;
-  if (rel < 0) rel += PANEL_SPACING;
-  const d = Math.min(rel, PANEL_SPACING - rel);
-  // 1 inside the panel's shadow, 0 outside, with a soft penumbra.
-  const occluded = 1 - smoothstep(PANEL_HALF_SPAN * 0.5, PANEL_HALF_SPAN, d);
-  return clamp01(1 - occluded * MAX_OCCLUSION);
-}
-
-/** Angular position of the shadow-square pattern at time t. */
-export function panelPhaseAt(t: number): number {
-  return (t / (DAY_LENGTH * SHADOW_SQUARE_COUNT)) * Math.PI * 2 + PANEL_PHASE_OFFSET;
+  return shadowFactorAtAngle(theta, t);
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +322,7 @@ export class Environment {
     // around the ring. Long the other way, it would shade the whole world at
     // once and nothing would ever move.
     const axialLength = RING_HALF_WIDTH * 4.5;
-    const spinWidth = 2 * RING_RADIUS * PANEL_RADIUS * Math.sin(PANEL_HALF_SPAN);
+    const spinWidth = 2 * RING_RADIUS * PANEL_RADIUS * Math.sin(SHADOW_PANEL_HALF_SPAN);
 
     // Plane in XY -> lay it flat so width runs spinward (x) and length runs
     // axially (z), with the faces pointing up and down.
@@ -480,7 +461,7 @@ export class Environment {
 
     // --- Shadow panels -------------------------------------------------------
     for (let i = 0; i < this.panels.length; i++) {
-      const a = this.cycle.filamentAngle + i * PANEL_SPACING - anchorAngle;
+      const a = this.cycle.filamentAngle + i * SHADOW_PANEL_SPACING - anchorAngle;
       const pr = RING_RADIUS * PANEL_RADIUS;
       this.panels[i]!.position.set(pr * Math.sin(a), RING_RADIUS - pr * Math.cos(a), 0);
       this.panels[i]!.rotation.set(0, 0, -a);

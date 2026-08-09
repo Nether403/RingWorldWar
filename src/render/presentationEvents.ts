@@ -22,7 +22,13 @@ export function isPresentationEventEligible(
   anchorS: number,
   viewer: Faction,
 ): boolean {
-  return isPresentationEventInRange(event, anchorS) && isPresentationEventVisible(event, world, viewer);
+  const deepShadowLaunch = event.kind === 'weaponFired'
+    && event.faction !== viewer
+    && event.faction >= 0
+    && world.shadowTimingAt(event.s).state === 'shadow';
+  return deepShadowLaunch || (
+    isPresentationEventInRange(event, anchorS) && isPresentationEventVisible(event, world, viewer)
+  );
 }
 
 export function isPresentationEventInRange(event: SimEvent, anchorS: number): boolean {

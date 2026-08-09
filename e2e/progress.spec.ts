@@ -12,11 +12,12 @@ test('renders the live launch plan from the fixed progress endpoint', async ({ p
       slices: Array<{
         id: string;
         title: string;
+        milestone: number;
         state: string;
         qualification: string;
         disposition: string;
       }>;
-      gates: Array<{ state: string; evidenceRefs?: string[] }>;
+      gates: Array<{ id: string; title: string; state: string; evidenceRefs?: string[] }>;
       references: unknown[];
     };
     receipts: unknown[];
@@ -38,7 +39,16 @@ test('renders the live launch plan from the fixed progress endpoint', async ({ p
   await expect(page.locator(`[data-slice="${active!.id}"]`)).toContainText(active!.qualification.replace(/-/g, ' '));
   await expect(page.locator(`[data-slice="${active!.id}"]`)).toContainText(active!.disposition.replace(/-/g, ' '));
   await expect(page.getByText('Dependency Ready', { exact: true })).toBeVisible();
-  await expect(page.getByText('Claim Receipts Verified', { exact: true })).toBeVisible();
+    await expect(page.getByText('Claim Receipts Verified', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('remaining-work')).toBeVisible();
+    const outstandingMilestones = new Set(data.plan.slices
+      .filter((slice) => slice.state !== 'complete')
+      .map((slice) => String(slice.milestone)));
+    await expect(page.locator('[data-milestone]')).toHaveCount(outstandingMilestones.size);
+    await expect(page.locator('[data-remaining-gate]')).toHaveCount(
+      data.plan.gates.filter((gate) => gate.state !== 'passed').length,
+    );
+    await expect(page.locator('#remaining-milestones')).toContainText(active!.title);
   const verifiedClaims = data.plan.slices.filter((slice) => slice.state === 'complete').length
     + data.plan.gates.filter((gate) => gate.state === 'passed' && gate.evidenceRefs?.length === 1).length;
   await expect(page.locator('#metric-receipts')).toHaveText(String(verifiedClaims).padStart(2, '0'));

@@ -53,6 +53,6 @@ The follow-up internal playtest passed the four comprehension checks:
   velocity outcomes. The mechanic required some acclimation, but was described
   as original and functional rather than arbitrary.
 
-This is sufficient evidence to begin the tutorial alpha. It is one internal
-observation, not the full five-player USP cohort, so final tutorial copy and
-balance remain provisional.
+This was sufficient evidence to begin the tutorial alpha. It was one internal
+observation and did not satisfy the G-01 policy in force at the time; the
+developer-reviewed initial cohort is recorded separately.

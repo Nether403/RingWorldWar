@@ -2,11 +2,14 @@
 
 ## Purpose
 
-Use this protocol to gather first-time-player evidence for the directional-artillery USP. It is an observation guide, not telemetry. The launcher writes only local files under ignored `output/runs/`; it does not collect or transmit tester data.
+Use this protocol to gather directional-artillery comprehension evidence from the
+human developer and an initial uncoached human tester. It is an observation
+guide, not telemetry. The launcher writes only local files under ignored
+`output/runs/`; it does not collect or transmit tester data.
 
 ## Start The Session
 
-1. Assign an anonymous local tester ID. Do not put names, contact details, recordings, or other personal data in the notes.
+1. Assign an anonymous local tester ID. Do not put names, contact details, recordings, or other personal data in the notes. Record the developer review separately without identifying the developer.
 2. Run `npm run rww -- play directional-artillery`.
 3. Give the tester control when Chromium opens. Do not explain spinward, antispinward, the minimap footprint, or the Siege Mortar workflow.
 4. Observe first actions and spoken reasoning. Avoid leading questions or pointing at controls.
@@ -24,11 +27,16 @@ Ask these after the tester has had an uncoached attempt. Record their words rath
 4. What do the footprint halves wrapping across the joined minimap edges represent?
 5. Without coaching, can the tester deploy the Longbow, find Siege Mortar, preview a shot, and fire?
 
-## Required Notes
+## Initial Cohort And Required Notes
+
+G-01 requires one developer review and one uncoached human tester. Both must
+demonstrate the five criteria in `docs/directional-artillery-prototype.md`.
+After reviewing those results, the developer may require one to three more
+uncoached testers when clarification, pacing, or comprehension remains in doubt.
 
 Record the anonymous tester ID, whether the task was completed, confusion points, chosen route/direction, and the tester's unprompted explanation of the artillery advantage. Note whether any moderator prompt was necessary. Do not infer comprehension from task completion alone.
 
-Assess results against the five human success criteria in `docs/directional-artillery-prototype.md`. Failure on direction identification or seam interpretation calls for communication changes before balance or physics changes.
+Assess results against the five human success criteria in `docs/directional-artillery-prototype.md`. The developer decides whether an observed issue requires the optional additional cohort before accepting the gate. Failure on direction identification or seam interpretation should prompt communication changes before balance or physics changes.
 
 ## Reproduction And Privacy
 

@@ -1,0 +1,11 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-browser",
+  "command": "npx playwright test e2e/shadow-intelligence.spec.ts --project=chromium-regression",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "4886fa5ce752671ea367dcd408adbb15999412617ea77a7f98e69a569345cea6",
+  "passedTestIds": ["shadow-intelligence-hud", "global-shadow-launch-production"],
+  "summary": "Chromium passed target-resolution shadow timing, category ARIA, strategic-signal, authority, layout, and global night-launch production checks."
+}

@@ -2,7 +2,7 @@
 
 ## Status
 
-The bounded automation contract in `docs/launch-scope/ls-08-directional-advantage.md` passes on current source: directional profile, conventional-flight gating, target cue, seam-safe minimap, non-color copy and ARIA, authoritative preview/fire agreement, and First Contact's real Siege Mode transition are covered. One internal follow-up playtest understood the coverage/LOS distinction, blocked previews, minimap commands, and direction-dependent velocity. The broader five-player comprehension cohort remains the release gate for the USP.
+The bounded automation contract in `docs/launch-scope/ls-08-directional-advantage.md` passes on current source: directional profile, conventional-flight gating, target cue, seam-safe minimap, non-color copy and ARIA, authoritative preview/fire agreement, and First Contact's real Siege Mode transition are covered. The developer review and one additional uncoached human tester passed the initial G-01 comprehension gate. The developer may request one to three more uncoached testers if later evidence makes that necessary.
 
 ## Player-Facing Behavior
 
@@ -61,15 +61,17 @@ The durable visual signature, renderer metadata, scenario hash, artifact hashes,
 
 ## Human Success Criteria
 
-One internal comprehension pass is recorded in `docs/playtests/2026-08-02-first-ux-observation.md`. A moderated or instrumented cohort should still pass all of these criteria before treating the USP as broadly validated:
+The completed initial G-01 cohort is recorded in `docs/playtests/2026-08-09-directional-artillery-g01.md`. The developer and the initial uncoached tester both passed all of these criteria:
 
-1. On first selection, at least 4 of 5 players identify antispinward as the longer shot direction within five seconds without coaching.
-2. At least 4 of 5 players correctly choose which side of a target is favorable after seeing the target-side arrow once.
-3. At least 4 of 5 players understand that the minimap footprint is approximate and the live trajectory preview is authoritative.
-4. No participant interprets the seam-wrapped halves as two launchers or two separate firing zones.
-5. Players can deploy a Longbow, find the Siege Mortar target command, preview a shot, and fire without being told where the command appears.
+1. On first selection, identify antispinward as the longer shot direction without coaching.
+2. Correctly choose which side of a target is favorable after seeing the target-side arrow.
+3. Understand that the minimap footprint is approximate and the live trajectory preview is authoritative.
+4. Do not interpret the seam-wrapped halves as two launchers or two separate firing zones.
+5. Deploy a Longbow, find the Siege Mortar target command, preview a shot, and fire without being told where the command appears.
 
-Failure on criteria 1 or 4 should trigger a minimap communication revision before any balance or physics changes are considered.
+The developer may require one to three further uncoached testers after reviewing
+the initial cohort. Failure on criteria 1 or 4 should trigger a minimap
+communication revision before any balance or physics changes are considered.
 
 Ask these five questions without explaining the mechanic first:
 

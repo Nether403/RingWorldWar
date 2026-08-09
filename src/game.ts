@@ -27,7 +27,7 @@ import { CameraRig } from '@render/cameraRig';
 import { CameraController } from '@render/cameraController';
 import { EntityRenderer } from '@render/entityRenderer';
 import { Effects } from '@render/effects';
-import { isPresentationEventVisible } from '@render/presentationEvents';
+import { isPresentationEventEligible } from '@render/presentationEvents';
 import { ballisticFireMessage, Hud } from '@ui/hud';
 import { Markers } from '@render/markers';
 import {
@@ -276,7 +276,9 @@ export class Game {
     this.mission?.advanceTick(this.world, events);
     this.notifyMissionResult();
     for (const event of events) {
-      if (isPresentationEventVisible(event, this.world, this.playerFaction)) this.presentationEvents.push(event);
+      if (isPresentationEventEligible(event, this.world, this.rig.s, this.playerFaction)) {
+        this.presentationEvents.push(event);
+      }
     }
     if (this.presentationEvents.length > MAX_PENDING_PRESENTATION_EVENTS) {
       this.presentationEvents.splice(0, this.presentationEvents.length - MAX_PENDING_PRESENTATION_EVENTS);

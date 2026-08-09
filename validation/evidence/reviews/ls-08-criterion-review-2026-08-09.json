@@ -1,0 +1,39 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-08-developer-initial-cohort-review-2026-08-09",
+  "claimId": "LS-08",
+  "reviewRound": 1,
+  "reviewerRole": "human-developer",
+  "reviewedAt": "2026-08-09T08:50:00.000Z",
+  "contractSha256": "3dfa3b28d76e52be40ee4fe4ac740f812741e22f08679b9ccd9dab8f78be01ab",
+  "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
+  "scores": {
+    "directional-profile": {
+      "score": 4,
+      "rationale": "The explanatory profile consistently distinguishes the longer antispinward reach from the shorter spinward reach."
+    },
+    "weapon-mode-gate": {
+      "score": 4,
+      "rationale": "Conventional rocket and deployed Longbow states show the directional guidance while cruise and Chord modes remain excluded."
+    },
+    "presentation-accessibility": {
+      "score": 3,
+      "rationale": "Wrapped minimap copies, arrows, text, selection copy, and ARIA communicate the directional envelope without relying on color alone."
+    },
+    "authoritative-targeting": {
+      "score": 4,
+      "rationale": "The displayed envelope remains explanatory while preview and firing retain canonical trajectory, visibility, terrain, power, and cooldown checks."
+    },
+    "onboarding": {
+      "score": 3,
+      "rationale": "First Contact reaches the real deployed Longbow Siege Mortar action, and the developer-reviewed initial human cohort completed the comprehension criteria."
+    },
+    "regression-scope": {
+      "score": 3,
+      "rationale": "Focused simulation, browser acceptance, full repository checks, and the veteran-mirror cohort passed without introducing excluded launch-scope behavior."
+    }
+  },
+  "blockers": [],
+  "humanValidation": ["G-01"]
+}

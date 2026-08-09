@@ -20,7 +20,7 @@ import { FACTION_COLOR, Faction, WEAPONS } from '@sim/data';
 import type { SimEvent, World } from '@sim/world';
 import type { RenderAnchor } from './anchor';
 import { disposeObject } from './disposeObject';
-import { combatPresentationKind, isPresentationEventEligible, isPresentationEventInRange } from './presentationEvents';
+import { combatPresentationKind, isPresentationEventEligible } from './presentationEvents';
 
 const MAX_TRAIL_POINTS = 90;
 const MAX_TRAILS = 96;
@@ -425,9 +425,9 @@ export class Effects {
     visibilityPrevalidated = false,
   ): void {
     this.shake = 0;
-    const eligibleEvents = events.filter((event) => visibilityPrevalidated
-      ? isPresentationEventInRange(event, anchor.s)
-      : isPresentationEventEligible(event, world, anchor.s, viewer));
+    const eligibleEvents = visibilityPrevalidated
+      ? events
+      : events.filter((event) => isPresentationEventEligible(event, world, anchor.s, viewer));
     const deathEvents = eligibleEvents.filter((event) => event.kind === 'unitDied' || event.kind === 'structureDied');
     const recentImpacts = eligibleEvents
       .filter((event) => event.kind === 'impact' && !(event.weapon === 'chordShot' && event.scale <= 0.7))

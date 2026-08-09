@@ -10,7 +10,7 @@ The project now targets a solo/AI-assisted PC release with a browser demo. The a
 
 The current implementation milestone is the Ring USP slice. LS-04 delivered the strict runtime scenario definition and deterministic world factory, LS-05 delivered the twelve-mission registry and versioned campaign profile, and LS-06 delivered the transactional camera-controller interface. Their exact receipts are tracked in `validation/evidence/launch-scope/`.
 
-LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-spinal-nodes.md`: explicit operational pairs, reversible local Spinal Alignment, pair-only Dominance, deterministic pair-aware AI, v1/v2 persistence, and visibility-safe HUD/minimap representation passed. LS-08 directional advantage overlay and onboarding has passed its bounded automation contract in `docs/launch-scope/ls-08-directional-advantage.md`; its external novice gate remains pending real human evidence.
+LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-spinal-nodes.md`: explicit operational pairs, reversible local Spinal Alignment, pair-only Dominance, deterministic pair-aware AI, v1/v2 persistence, and visibility-safe HUD/minimap representation passed. LS-08 directional advantage overlay and onboarding is complete under `docs/launch-scope/ls-08-directional-advantage.md`: automation, the developer review, and the initial uncoached human tester passed G-01.
 
 ## Current Status
 
@@ -21,15 +21,15 @@ LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-
 | LS-05 mission registry/campaign profile | Complete, polish backlog | Exact claim receipt in `validation/evidence/launch-scope/LS-05.json`; conventional listbox arrow navigation remains optional polish |
 | LS-06 camera controller interface | Complete, polish backlog | Exact claim receipt in `validation/evidence/launch-scope/LS-06.json`; one consolidated fault-injection integration test remains optional polish |
 | LS-07 paired Spinal Nodes | Complete, polish backlog | Exact claim receipt in `validation/evidence/launch-scope/LS-07.json`; compact desktop ALIGN wrapping remains optional polish |
-| LS-08 directional overlay/onboarding | Active, automation passed; human gate pending | G-01 still requires four of five real uncoached novices to identify and exploit the favorable direction |
+| LS-08 directional overlay/onboarding | Complete | G-01 passed with the developer review and one initial uncoached human tester; the developer may request one to three further uncoached sessions if needed |
 | Gate 1 technical playable slice | Passed | Automated and technical receipt in `docs/gate-1.md` |
 | Phase 2 systems implementation | Delivered | AI tiers, weapons, abilities, faction modifiers, save/load, quality settings, and headless orchestration are summarized in `tasks/phase-2-systems-depth/execution-report.md` |
 | Gate 2 gameplay cohorts | Passed | Veteran mirror, Veteran vs Recruit, and Commander vs Veteran cohorts all pass the configured gameplay gates in `docs/core-match-validation-results.md` |
 | Requirement 17.5 | Passed | Protected run `30990813691` passed at a 9.369-second warm median with clean stable source and matching timeline/result hashes |
-| Human playtesting | Internal pass | One follow-up internal observation passed the four first-player UX checks; the broader five-player cohort remains open |
+| Human playtesting | Initial directional gate passed | The developer review and one uncoached human tester passed G-01; the developer retains discretion to require one to three additional uncoached sessions |
 | Validation CLI and visual scenario tooling | Completed | Direct `doctor`, `run`, `visual`, `play`, and `perf` workflows are documented in `docs/cli.md` |
 | T480s 720p Low rendering gate | Completed | The candidate hard gate passes with evidence in `docs/t480s-low-performance.md` |
-| Directional artillery prototype | Internal comprehension pass | Automated validation and the first successful internal observation are recorded; broader cohort validation remains open |
+| Directional artillery prototype | Initial comprehension gate passed | Automated validation, developer review, and an uncoached human tester are recorded; optional additional sessions remain a developer decision |
 | First Contact tutorial alpha | Internal completion pass | One tester reported completing all ten objectives with zero gameplay confusion or mechanical faults; broader pacing/copy cohort remains open |
 | Break the Line core-loop mission | Automated completion pass | Normal commands complete the established-base loop in 15:45; human pacing runs now determine whether a speed experiment is warranted |
 | Counterfire defensive mission | Internal completion pass | Human play completed without blockers; defensive power, interception, ammunition adaptation, and debrief behavior are accepted in baseline `2cf2727` |
@@ -83,7 +83,7 @@ Work proceeds in this order. Later steps must not be pulled forward when they de
 
 ## Open Exit Evidence
 
-- A broader recorded first-time-player cohort with match outcomes, durations, points of confusion, artillery-direction comprehension, and unprompted observations.
+- Developer-requested follow-up first-time-player sessions when later evidence warrants one to three additional uncoached observations.
 - A go, rebalance, or re-scope decision based on that human evidence.
 
 ## Historical Sources

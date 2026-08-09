@@ -75,6 +75,19 @@ describe('presentation event eligibility', () => {
     expect(combatPresentationKind({ ...event(Faction.Compact, 3, 0, 0), weapon: 'batteryGun' }))
       .toBe('impact');
   });
+
+  it('[deep-shadow-launch-signal] exposes a hostile deep-shadow launch globally without revealing day launches', () => {
+    const world = {
+      isEntityVisible: () => false,
+      isVisible: () => false,
+      shadowTimingAt: (s: number) => ({ state: s === 100 ? 'shadow' : 'day' }),
+    } as unknown as World;
+    const nightLaunch = { ...event(Faction.Choir, 7, 100, 0), kind: 'weaponFired' as const, weapon: 'batteryGun' };
+    const dayLaunch = { ...event(Faction.Choir, 8, 200, 0), kind: 'weaponFired' as const, weapon: 'batteryGun' };
+
+    expect(isPresentationEventEligible(nightLaunch, world, RING_CIRCUMFERENCE * 0.5, Faction.Compact)).toBe(true);
+    expect(isPresentationEventEligible(dayLaunch, world, 0, Faction.Compact)).toBe(false);
+  });
 });
 
 function event(faction: Faction | -1, id: number, s: number, z: number): SimEvent {

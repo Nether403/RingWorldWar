@@ -914,7 +914,9 @@ export class AiOpponent {
     const knownHostile = target && (
       (target.kind === 'spinalNode' && target.faction !== this.faction) ||
       (target.faction === other(this.faction) && (
-        world.isEntityVisible(this.faction, target.id) || isScenarioKnownEnemyBastion(target, this.faction)
+        world.isEntityVisible(this.faction, target.id) ||
+        world.hasStrategicContact(this.faction, target.id) ||
+        isScenarioKnownEnemyBastion(target, this.faction)
       ))
     );
     const arrived = target !== undefined && line.some((unit) =>
@@ -985,6 +987,7 @@ export class AiOpponent {
         (s.faction === enemy || (s.kind === 'spinalNode' && s.faction !== this.faction)) &&
         (
           world.isEntityVisible(this.faction, s.id) ||
+          world.hasStrategicContact(this.faction, s.id) ||
           (
             world.time >= BASTION_ASSAULT_TIME &&
             line.length >= this.cfg.army &&
@@ -995,16 +998,21 @@ export class AiOpponent {
     );
 
     for (const c of candidates) {
+      const contact = world.strategicContactFor(this.faction, c.id);
+      const exact = world.isEntityVisible(this.faction, c.id);
       const d = Math.abs(deltaS(home.s, c.s));
       // Closer is better, but not linearly -- crossing the map is fine if the
       // prize is right.
       let score = 100 - (d / RING_CIRCUMFERENCE) * 160;
 
-      if (c.kind === 'spinalNode') score += this.activeGoal === 'harass' ? 52 : 40;
-      if (c.kind === 'spinalNode') score += spinalMainForceBonus(world, c, this.faction);
-      if (c.kind === 'extractor') score += this.activeGoal === 'harass' ? 44 : 25;
-      if (c.kind === 'mechFoundry') score += 35;
-      if (c.kind === 'bastion') {
+      if (contact?.category === 'major-construction') score += 30;
+      if (exact && c.kind === 'extractor') score += this.activeGoal === 'harass' ? 44 : 25;
+      if (exact && c.kind === 'mechFoundry') score += 35;
+      if (contact?.category === 'active-node' || (exact && c.kind === 'spinalNode')) {
+        score += this.activeGoal === 'harass' ? 52 : 40;
+        score += spinalMainForceBonus(world, c, this.faction);
+      }
+      if (contact?.category === 'bastion' || (exact && c.kind === 'bastion')) {
         score += (this.activeGoal === 'allIn' ? 52 : 10) * this.cfg.aggression;
         // Map-control skirmishing must eventually turn into an attempt at the
         // actual win condition. From fifteen minutes onward, a ready line force
