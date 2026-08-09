@@ -1,0 +1,11 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "core-match",
+  "command": "npm run validate:core-match",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "64c88fe44a5e56a3d2e58bb8487ebe370a490c7b50fb71f5030672256305cad2",
+  "passedTestIds": ["core-match-cohorts"],
+  "summary": "The protected veteran-mirror core-match qualification passed in 540.95 seconds without changing accepted simulation, AI, physics, or outcome semantics."
+}

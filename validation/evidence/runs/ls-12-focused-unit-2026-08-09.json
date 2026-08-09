@@ -1,0 +1,18 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-unit",
+  "command": "npx vitest run tests/render/districtPlan.test.ts tests/render/battlefieldDressing.test.ts tests/render/disposal.test.ts tests/render/settings.test.ts",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "64c88fe44a5e56a3d2e58bb8487ebe370a490c7b50fb71f5030672256305cad2",
+  "passedTestIds": [
+    "district-plan-contract",
+    "deterministic-bounded-scatter",
+    "ring-terrain-placement",
+    "terrain-authority-isolation",
+    "quality-priority-budget",
+    "district-resource-disposal"
+  ],
+  "summary": "Four focused Vitest files passed 22 strict plan, deterministic scatter, seam and terrain placement, authority isolation, quality budget, and disposal tests on the final LS-12 source snapshot."
+}

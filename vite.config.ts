@@ -154,6 +154,17 @@ export const CLAIM_EVIDENCE_POLICY = Object.freeze({
     ]),
     checkIds: Object.freeze(['gravity-range-mode']),
   }),
+  'LS-12': Object.freeze({
+    acceptedState: 'complete',
+    receiptPath: 'validation/evidence/launch-scope/LS-12.json',
+    sourcePaths: Object.freeze([
+      'validation/evidence/ls-12-layered-district-scatter-2026-08-09.json',
+      'validation/evidence/reviews/ls-12-criterion-review-2026-08-09.json',
+      'docs/launch-scope/ls-12-layered-district-scatter.md',
+      'docs/launch-scope-execution-policy.md',
+    ]),
+    checkIds: Object.freeze(['layered-district-scatter-foundation']),
+  }),
   'G-01': Object.freeze({
     acceptedState: 'passed',
     receiptPath: 'validation/evidence/launch-scope/G-01.json',
@@ -393,6 +404,77 @@ export const LS11_CHECK_POLICY = Object.freeze({
   'input-observation': Object.freeze({ runIds: Object.freeze(['focused-browser'] as LS11RunId[]), testIds: Object.freeze(['gravity-range-production', 'gravity-range-keyboard', 'whole-ring-strategic-view-regression']) }),
   'presentation-accessibility': Object.freeze({ runIds: Object.freeze(['focused-browser'] as LS11RunId[]), testIds: Object.freeze(['gravity-range-production', 'gravity-range-responsive', 'gravity-range-keyboard']) }),
   'lifecycle-regression': Object.freeze({ runIds: Object.freeze(['focused-browser', 'full-check', 'core-match'] as LS11RunId[]), testIds: Object.freeze(['gravity-range-keyboard', 'gravity-range-lifecycle', 'whole-ring-strategic-view-regression', 'full-check', 'core-match-cohorts']) }),
+} as const);
+
+export const LS12_ACCEPTANCE_IDS = Object.freeze([
+  'authored-layer-contract',
+  'deterministic-scatter',
+  'ring-terrain-placement',
+  'presentation-authority',
+  'quality-readability',
+  'lifecycle-regression',
+  'presentation-acceptance',
+] as const);
+
+export const LS12_REQUIRED_SOURCE_PATHS = Object.freeze([
+  'src/render/districtPlan.ts',
+  'src/render/battlefieldDressing.ts',
+  'src/render/renderer.ts',
+  'src/main.ts',
+  'tests/render/districtPlan.test.ts',
+  'tests/render/battlefieldDressing.test.ts',
+  'tests/render/disposal.test.ts',
+  'tests/render/settings.test.ts',
+  'e2e/layered-district-scatter.spec.ts',
+  'playwright.ls12.config.ts',
+] as const);
+
+export const LS12_RUN_POLICY = Object.freeze({
+  'focused-unit': Object.freeze({
+    command: 'npx vitest run tests/render/districtPlan.test.ts tests/render/battlefieldDressing.test.ts tests/render/disposal.test.ts tests/render/settings.test.ts',
+    artifactPath: 'validation/evidence/runs/ls-12-focused-unit-2026-08-09.json',
+  }),
+  'focused-browser': Object.freeze({
+    command: 'npm run test:e2e:ls12',
+    artifactPath: 'validation/evidence/runs/ls-12-focused-browser-2026-08-09.json',
+  }),
+  'full-check': Object.freeze({
+    command: 'npm run check',
+    artifactPath: 'validation/evidence/runs/ls-12-full-check-2026-08-09.json',
+  }),
+  'core-match': Object.freeze({
+    command: 'npm run validate:core-match',
+    artifactPath: 'validation/evidence/runs/ls-12-core-match-2026-08-09.json',
+  }),
+} as const);
+
+type LS12RunId = keyof typeof LS12_RUN_POLICY;
+
+export const LS12_RUN_TEST_IDS = Object.freeze({
+  'focused-unit': Object.freeze([
+    'district-plan-contract',
+    'deterministic-bounded-scatter',
+    'ring-terrain-placement',
+    'terrain-authority-isolation',
+    'quality-priority-budget',
+    'district-resource-disposal',
+  ]),
+  'focused-browser': Object.freeze([
+    'production-low-district-foundation',
+    'production-quality-resource-authority',
+  ]),
+  'full-check': Object.freeze(['full-check']),
+  'core-match': Object.freeze(['core-match-cohorts']),
+} as const);
+
+export const LS12_CHECK_POLICY = Object.freeze({
+  'authored-layer-contract': Object.freeze({ runIds: Object.freeze(['focused-unit'] as LS12RunId[]), testIds: Object.freeze(['district-plan-contract']) }),
+  'deterministic-scatter': Object.freeze({ runIds: Object.freeze(['focused-unit'] as LS12RunId[]), testIds: Object.freeze(['deterministic-bounded-scatter']) }),
+  'ring-terrain-placement': Object.freeze({ runIds: Object.freeze(['focused-unit'] as LS12RunId[]), testIds: Object.freeze(['ring-terrain-placement']) }),
+  'presentation-authority': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser', 'core-match'] as LS12RunId[]), testIds: Object.freeze(['terrain-authority-isolation', 'production-quality-resource-authority', 'core-match-cohorts']) }),
+  'quality-readability': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS12RunId[]), testIds: Object.freeze(['quality-priority-budget', 'production-low-district-foundation']) }),
+  'lifecycle-regression': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser', 'full-check', 'core-match'] as LS12RunId[]), testIds: Object.freeze(['district-resource-disposal', 'production-quality-resource-authority', 'full-check', 'core-match-cohorts']) }),
+  'presentation-acceptance': Object.freeze({ runIds: Object.freeze(['focused-browser'] as LS12RunId[]), testIds: Object.freeze(['production-low-district-foundation']) }),
 } as const);
 
 export const LS09_RUN_POLICY = Object.freeze({
@@ -659,7 +741,7 @@ function isSafeImplementationPath(path: string): boolean {
   return !path.includes('\\')
     && !path.startsWith('/')
     && !segments.includes('..')
-    && /^(?:src|tests|e2e)\/[A-Za-z0-9._/-]+$/.test(path);
+    && (/^(?:src|tests|e2e)\/[A-Za-z0-9._/-]+$/.test(path) || path === 'playwright.ls12.config.ts');
 }
 
 function requireSha256(value: unknown, label: string): string {
@@ -954,6 +1036,164 @@ export function ls11SourceSnapshotSha256(sourceRefsValue: unknown): string {
     sha256: requireSha256(source.sha256, `LS-11 source snapshot[${index}].sha256`),
   }));
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function ls12SourceSnapshotSha256(sourceRefsValue: unknown): string {
+  const sourceRefs = asArray(sourceRefsValue).map((source, index) =>
+    requireRecord(source, `LS-12 source snapshot[${index}]`));
+  const canonical = sourceRefs.map((source, index) => ({
+    path: requireNonEmptyString(source.path, `LS-12 source snapshot[${index}].path`),
+    sha256: requireSha256(source.sha256, `LS-12 source snapshot[${index}].sha256`),
+  }));
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function validateLS12EvidenceShape(
+  machineValue: unknown,
+  reviewValue: unknown,
+  runArtifactValues: Record<string, unknown>,
+  expectedHashes?: { contractSha256: string; policySha256: string },
+): void {
+  const machine = requireRecord(machineValue, 'LS-12 machine evidence');
+  requireExactKeys(machine, ['schema', 'version', 'sliceId', 'contractSha256', 'sourceRefs', 'runs', 'checks'], 'LS-12 machine evidence');
+  if (machine.schema !== 'rww.ls-12-verification' || machine.version !== 1 || machine.sliceId !== 'LS-12') {
+    throw new Error('LS-12 machine evidence has an invalid identity');
+  }
+  const contractSha256 = requireSha256(machine.contractSha256, 'LS-12 machine contractSha256');
+  if (expectedHashes && contractSha256 !== expectedHashes.contractSha256) {
+    throw new Error('LS-12 machine evidence does not bind the current contract');
+  }
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-12 machine sourceRefs[${index}]`));
+  const sourcePaths = sourceRefs.map((source, index) => {
+    requireExactKeys(source, ['path', 'sha256'], `LS-12 machine sourceRefs[${index}]`);
+    const path = requireNonEmptyString(source.path, `LS-12 machine sourceRefs[${index}].path`);
+    if (!isSafeImplementationPath(path)) throw new Error(`Unsafe LS-12 implementation source path: ${path}`);
+    requireSha256(source.sha256, `LS-12 machine sourceRefs[${index}].sha256`);
+    return path;
+  });
+  if (JSON.stringify(sourcePaths) !== JSON.stringify(LS12_REQUIRED_SOURCE_PATHS)) {
+    throw new Error('LS-12 machine evidence does not bind the exact implementation sources');
+  }
+  const sourceSnapshotSha256 = ls12SourceSnapshotSha256(sourceRefs);
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-12 machine runs[${index}]`));
+  const runIds = runs.map((run, index) => {
+    requireExactKeys(run, ['id', 'command', 'result', 'exitCode', 'artifact'], `LS-12 machine runs[${index}]`);
+    return requireNonEmptyString(run.id, `LS-12 machine runs[${index}].id`);
+  });
+  if (JSON.stringify(runIds) !== JSON.stringify(Object.keys(LS12_RUN_POLICY))) {
+    throw new Error('LS-12 machine runs do not match the exact verification policy');
+  }
+  const passedTestIdsByRun = new Map<string, Set<string>>();
+  for (const [index, run] of runs.entries()) {
+    const id = runIds[index] as LS12RunId;
+    const policy = LS12_RUN_POLICY[id];
+    if (run.command !== policy.command || run.result !== 'passed' || run.exitCode !== 0) {
+      throw new Error(`LS-12 verification run ${id} did not pass its exact command`);
+    }
+    const artifact = requireRecord(run.artifact, `LS-12 machine runs[${index}].artifact`);
+    requireExactKeys(artifact, ['path', 'sha256'], `LS-12 machine runs[${index}].artifact`);
+    if (artifact.path !== policy.artifactPath) throw new Error(`LS-12 verification run ${id} has the wrong artifact path`);
+    requireSha256(artifact.sha256, `LS-12 machine runs[${index}].artifact.sha256`);
+    const runArtifact = requireRecord(runArtifactValues[id], `LS-12 run artifact ${id}`);
+    requireExactKeys(
+      runArtifact,
+      ['schema', 'version', 'id', 'command', 'result', 'exitCode', 'sourceSnapshotSha256', 'passedTestIds', 'summary'],
+      `LS-12 run artifact ${id}`,
+    );
+    if (runArtifact.schema !== 'rww.command-verification' || runArtifact.version !== 1 || runArtifact.id !== id
+      || runArtifact.command !== policy.command || runArtifact.result !== 'passed' || runArtifact.exitCode !== 0) {
+      throw new Error(`LS-12 run artifact ${id} does not prove the exact passing command`);
+    }
+    if (requireSha256(runArtifact.sourceSnapshotSha256, `LS-12 run artifact ${id}.sourceSnapshotSha256`) !== sourceSnapshotSha256) {
+      throw new Error(`LS-12 run artifact ${id} does not bind the implementation source snapshot`);
+    }
+    if (requireNonEmptyString(runArtifact.summary, `LS-12 run artifact ${id}.summary`).length < 20) {
+      throw new Error(`LS-12 run artifact ${id} lacks a substantive summary`);
+    }
+    const passedTestIds = requireStringArray(runArtifact.passedTestIds, `LS-12 run artifact ${id}.passedTestIds`);
+    if (JSON.stringify(passedTestIds) !== JSON.stringify(LS12_RUN_TEST_IDS[id])) {
+      throw new Error(`LS-12 run artifact ${id} does not contain the exact predeclared test IDs`);
+    }
+    passedTestIdsByRun.set(id, new Set(passedTestIds));
+  }
+  const checks = asArray(machine.checks).map((check, index) => requireRecord(check, `LS-12 machine checks[${index}]`));
+  const checkIds = checks.map((check, index) => {
+    requireExactKeys(check, ['id', 'result', 'runIds', 'testIds'], `LS-12 machine checks[${index}]`);
+    if (check.result !== 'passed') throw new Error(`LS-12 machine check ${String(check.id)} did not pass`);
+    return requireNonEmptyString(check.id, `LS-12 machine checks[${index}].id`);
+  });
+  if (JSON.stringify(checkIds) !== JSON.stringify(LS12_ACCEPTANCE_IDS)) {
+    throw new Error('LS-12 machine checks do not cover the exact acceptance matrix');
+  }
+  for (const [index, check] of checks.entries()) {
+    const id = checkIds[index] as keyof typeof LS12_CHECK_POLICY;
+    const policy = LS12_CHECK_POLICY[id];
+    const checkRunIds = requireStringArray(check.runIds, `LS-12 machine checks[${index}].runIds`);
+    const testIds = requireStringArray(check.testIds, `LS-12 machine checks[${index}].testIds`);
+    if (JSON.stringify(checkRunIds) !== JSON.stringify(policy.runIds)
+      || JSON.stringify(testIds) !== JSON.stringify(policy.testIds)) {
+      throw new Error(`LS-12 machine check ${id} does not match its exact run and test policy`);
+    }
+    for (const testId of testIds) {
+      if (!checkRunIds.some((runId) => passedTestIdsByRun.get(runId)?.has(testId))) {
+        throw new Error(`LS-12 machine check ${id} cannot prove test ID ${testId}`);
+      }
+    }
+  }
+  const review = requireRecord(reviewValue, 'LS-12 criterion review');
+  requireExactKeys(
+    review,
+    [
+      'schema', 'version', 'reviewId', 'claimId', 'contractSha256', 'policySha256', 'reviewRound',
+      'reviewType', 'independentContext', 'reviewer', 'scores', 'dependencyReady', 'blockers',
+      'requiredQualityFindings', 'humanValidation', 'polish',
+    ],
+    'LS-12 criterion review',
+  );
+  if (review.schema !== 'rww.criterion-review' || review.version !== 1 || review.claimId !== 'LS-12'
+    || review.reviewType !== 'platform-presentation-accessibility' || review.independentContext !== true) {
+    throw new Error('LS-12 criterion review has an invalid identity or review type');
+  }
+  requireNonEmptyString(review.reviewId, 'LS-12 criterion review reviewId');
+  if (!Number.isInteger(review.reviewRound) || Number(review.reviewRound) < 1 || Number(review.reviewRound) > 2) {
+    throw new Error('LS-12 criterion review exceeds the bounded review policy');
+  }
+  const reviewer = requireRecord(review.reviewer, 'LS-12 criterion review reviewer');
+  requireExactKeys(reviewer, ['role', 'taskId', 'model', 'completedAt', 'sourceSnapshotSha256'], 'LS-12 criterion review reviewer');
+  if (reviewer.role !== 'independent-critic' || !/^ses_[A-Za-z0-9]+$/.test(requireNonEmptyString(reviewer.taskId, 'LS-12 reviewer taskId'))
+    || !isoDateString(requireNonEmptyString(reviewer.completedAt, 'LS-12 reviewer completedAt'))
+    || requireSha256(reviewer.sourceSnapshotSha256, 'LS-12 reviewer sourceSnapshotSha256') !== sourceSnapshotSha256) {
+    throw new Error('LS-12 criterion review has invalid independent provenance');
+  }
+  requireNonEmptyString(reviewer.model, 'LS-12 reviewer model');
+  if (expectedHashes && (
+    requireSha256(review.contractSha256, 'LS-12 review contractSha256') !== expectedHashes.contractSha256
+    || requireSha256(review.policySha256, 'LS-12 review policySha256') !== expectedHashes.policySha256
+  )) throw new Error('LS-12 criterion review does not bind the current contract and execution policy');
+  const scores = requireRecord(review.scores, 'LS-12 criterion review scores');
+  requireExactKeys(scores, [...LS12_ACCEPTANCE_IDS], 'LS-12 criterion review scores');
+  for (const id of LS12_ACCEPTANCE_IDS) {
+    const score = requireRecord(scores[id], `LS-12 criterion review scores.${id}`);
+    requireExactKeys(score, ['score', 'checkId', 'rationale'], `LS-12 criterion review scores.${id}`);
+    if (score.checkId !== id || !Number.isInteger(score.score) || Number(score.score) < 3 || Number(score.score) > 4
+      || requireNonEmptyString(score.rationale, `LS-12 criterion review scores.${id}.rationale`).length < 20) {
+      throw new Error(`LS-12 criterion ${id} is below ship-ready or lacks rationale`);
+    }
+  }
+  if (review.dependencyReady !== true
+    || requireStringArray(review.blockers, 'LS-12 review blockers').length !== 0
+    || requireStringArray(review.requiredQualityFindings, 'LS-12 review requiredQualityFindings').length !== 0
+    || requireStringArray(review.humanValidation, 'LS-12 review humanValidation').length !== 0) {
+    throw new Error('LS-12 criterion review is not dependency-ready');
+  }
+  for (const [index, finding] of asArray(review.polish).entries()) {
+    const record = requireRecord(finding, `LS-12 criterion review polish[${index}]`);
+    requireExactKeys(record, ['id', 'summary', 'reopenTrigger'], `LS-12 criterion review polish[${index}]`);
+    requireNonEmptyString(record.id, `LS-12 criterion review polish[${index}].id`);
+    requireNonEmptyString(record.summary, `LS-12 criterion review polish[${index}].summary`);
+    requireNonEmptyString(record.reopenTrigger, `LS-12 criterion review polish[${index}].reopenTrigger`);
+  }
 }
 
 export function validateLS11EvidenceShape(
@@ -1493,6 +1733,47 @@ async function validateLS11CurrentSources(machineValue: unknown): Promise<void> 
   }));
 }
 
+async function validateLS12CurrentSources(machineValue: unknown): Promise<void> {
+  const machine = requireRecord(machineValue, 'LS-12 machine evidence');
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-12 machine sourceRefs[${index}]`));
+  await Promise.all(sourceRefs.map(async (source, index) => {
+    const path = requireNonEmptyString(source.path, `LS-12 machine sourceRefs[${index}].path`);
+    const expected = requireSha256(source.sha256, `LS-12 machine sourceRefs[${index}].sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+    } catch {
+      throw new Error(`LS-12 implementation source is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-12 implementation source SHA-256 mismatch: ${path}`);
+  }));
+}
+
+async function loadLS12RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
+  const machine = requireRecord(machineValue, 'LS-12 machine evidence');
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-12 machine runs[${index}]`));
+  const result: Record<string, unknown> = {};
+  for (const [index, run] of runs.entries()) {
+    const id = requireNonEmptyString(run.id, `LS-12 machine runs[${index}].id`);
+    const artifact = requireRecord(run.artifact, `LS-12 machine runs[${index}].artifact`);
+    const path = requireNonEmptyString(artifact.path, `LS-12 machine runs[${index}].artifact.path`);
+    if (!isSafeRepositoryPath(path) || !path.startsWith('validation/evidence/runs/')) {
+      throw new Error(`Unsafe LS-12 run artifact path: ${path}`);
+    }
+    const expected = requireSha256(artifact.sha256, `LS-12 machine runs[${index}].artifact.sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+      result[id] = await readJson(resolve(root, path));
+    } catch {
+      throw new Error(`LS-12 run artifact is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-12 run artifact SHA-256 mismatch: ${path}`);
+  }
+  return result;
+}
+
 async function loadLS11RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
   const machine = requireRecord(machineValue, 'LS-11 machine evidence');
   const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-11 machine runs[${index}]`));
@@ -1761,6 +2042,20 @@ export async function validateClaimEvidenceReceipt(
       policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
     });
     await validateLS11CurrentSources(machine);
+  }
+  if (claimId === 'LS-12') {
+    const digestByPath = new Map(sourceRefs.map((source, index) => [
+      sourcePaths[index]!,
+      requireSha256(source.sha256, `${claimId}.sourceRefs[${index}].sha256`),
+    ]));
+    const machine = await readJson(resolve(root, policy.sourcePaths[0]));
+    const review = await readJson(resolve(root, policy.sourcePaths[1]));
+    const runArtifacts = await loadLS12RunArtifacts(machine);
+    validateLS12EvidenceShape(machine, review, runArtifacts, {
+      contractSha256: digestByPath.get('docs/launch-scope/ls-12-layered-district-scatter.md')!,
+      policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
+    });
+    await validateLS12CurrentSources(machine);
   }
   return receipt;
 }

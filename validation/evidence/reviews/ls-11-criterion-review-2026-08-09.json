@@ -13,7 +13,7 @@
     "taskId": "ses_018a3d330ffetkTsCFoU5K2PCw",
     "model": "azure/gpt-5.6-sol",
     "completedAt": "2026-08-09T17:13:55.371Z",
-    "sourceSnapshotSha256": "5e9b8aa3e51b9dfd70797596f68293051a222a427014ed696e3a823cbb1667cb"
+    "sourceSnapshotSha256": "ecedeae1341878bcc47177f6fa49a358f663b635aa2d32835023d70b7664555b"
   },
   "scores": {
     "production-launch": { "score": 3, "checkId": "production-launch", "rationale": "The keyboard-accessible title action and direct route launch the same deterministic production scenario without requiring the development scenario driver." },

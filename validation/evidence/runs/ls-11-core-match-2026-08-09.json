@@ -5,7 +5,7 @@
   "command": "npm run validate:core-match",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "5e9b8aa3e51b9dfd70797596f68293051a222a427014ed696e3a823cbb1667cb",
+  "sourceSnapshotSha256": "ecedeae1341878bcc47177f6fa49a358f663b635aa2d32835023d70b7664555b",
   "passedTestIds": ["core-match-cohorts"],
   "summary": "The protected veteran-mirror core-match qualification passed on the final LS-11 source snapshot without changing accepted gameplay semantics."
 }

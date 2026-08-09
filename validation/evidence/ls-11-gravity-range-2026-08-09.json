@@ -12,7 +12,7 @@
     { "path": "src/sim/data.ts", "sha256": "9a7ddb0325368dbb0de7233e65976066c6fe92d0ad08b19d6a524d840472bf7f" },
     { "path": "src/sim/world.ts", "sha256": "4bc5d0c71ac8bfc06ec4b07c481d4e9bed3d38a588da42fda64a7b5f037f460f" },
     { "path": "src/game.ts", "sha256": "b62fa820fac645a19587c16c618035abab7a2ca225605c0f3365d12bd554cc22" },
-    { "path": "src/main.ts", "sha256": "1669e961cb87c2b88a98b6c8cd53601786b109cc7e26a66bb4d7cc0f278070a4" },
+    { "path": "src/main.ts", "sha256": "d7da5d6e3364bbb21e90905d94a32965edccf80d02140e8b1ea89c8fcc7f10f2" },
     { "path": "src/render/cameraController.ts", "sha256": "79658b3121942d7cfc454483d1cba2b1fa6d6e874349c3ecb51af453f94b3037" },
     { "path": "src/ui/gravityRangePanel.ts", "sha256": "18f84bc576a0b713ff807de16fa042ea3f7cd9e4c05a1104cd81ff8b31997683" },
     { "path": "src/ui/hud.ts", "sha256": "22279124c6ef1a8456f54ec80fcc65381932680806d283fb2111771dc11fb358" },
@@ -33,28 +33,28 @@
       "command": "npx vitest run tests/arcade/gravityRange.test.ts tests/sim/ballistics.test.ts tests/sim/artillery.test.ts tests/scenario/runtimeScenario.test.ts",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-11-focused-unit-2026-08-09.json", "sha256": "add788a470a91735be38c002695e0173800953977d639d5ebaa6738136a5779e" }
+      "artifact": { "path": "validation/evidence/runs/ls-11-focused-unit-2026-08-09.json", "sha256": "25984d8d639f7a75baeb8e65a35ce92edc263219e313275b4fe9339d6b6eb9c7" }
     },
     {
       "id": "focused-browser",
       "command": "npx playwright test e2e/gravity-range.spec.ts e2e/whole-ring-strategic-view.spec.ts e2e/title-screen.spec.ts --project=chromium-regression",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-11-focused-browser-2026-08-09.json", "sha256": "9cbd2f5637977ddac69267ecb4702528ba15f6e75653be723ea0baf3727998c5" }
+      "artifact": { "path": "validation/evidence/runs/ls-11-focused-browser-2026-08-09.json", "sha256": "ff6872d4af1c8ba7ca00a422cf959530ec87f24dd550640bd3873f99c82c0899" }
     },
     {
       "id": "full-check",
       "command": "npm run check",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-11-full-check-2026-08-09.json", "sha256": "3a756561906b3b3c507e3da8ed3a3226eab26926bafb334c09513fe8154a4971" }
+      "artifact": { "path": "validation/evidence/runs/ls-11-full-check-2026-08-09.json", "sha256": "29fbe96c016fe46ae382a23d12a714e1758be866298416c0ba169be05c35ffc4" }
     },
     {
       "id": "core-match",
       "command": "npm run validate:core-match",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-11-core-match-2026-08-09.json", "sha256": "645686dc9ab1c1855631d008b6ec978b1252cf7201c7ba8a83b83666f10822b0" }
+      "artifact": { "path": "validation/evidence/runs/ls-11-core-match-2026-08-09.json", "sha256": "83fc18ee3c8de8c9dace9423b1694c13647cf2d433bf4dfb355c2bc6c1f9870c" }
     }
   ],
   "checks": [

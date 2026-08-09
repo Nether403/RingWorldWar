@@ -1,0 +1,32 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-12",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-09T19:24:48.779Z",
+  "sourceRefs": [
+    {
+      "path": "validation/evidence/ls-12-layered-district-scatter-2026-08-09.json",
+      "sha256": "41577d15c503b0984710ab8f29d53b9285fbfd7cbeb70530f1e4fa389634021a"
+    },
+    {
+      "path": "validation/evidence/reviews/ls-12-criterion-review-2026-08-09.json",
+      "sha256": "541f4310cac05e26dbb1216347cb813fae73f94df61d0df4e629281924012680"
+    },
+    {
+      "path": "docs/launch-scope/ls-12-layered-district-scatter.md",
+      "sha256": "8e3fce00f076962f3f004b7593390ae68a15d033a019a5d4aa9c00e91403a318"
+    },
+    {
+      "path": "docs/launch-scope-execution-policy.md",
+      "sha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c"
+    }
+  ],
+  "checks": [
+    {
+      "id": "layered-district-scatter-foundation",
+      "result": "passed",
+      "summary": "All seven LS-12 criteria pass one source-bound snapshot: strict authored layers, deterministic bounded scatter, seam-safe terrain planting, presentation-only authority, Low-priority readability, production resource stability, full check, core match, and independent review."
+    }
+  ]
+}

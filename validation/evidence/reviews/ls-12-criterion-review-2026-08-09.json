@@ -1,0 +1,38 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-12-remediation-round-1-review-2026-08-09",
+  "claimId": "LS-12",
+  "contractSha256": "8e3fce00f076962f3f004b7593390ae68a15d033a019a5d4aa9c00e91403a318",
+  "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
+  "reviewRound": 2,
+  "reviewType": "platform-presentation-accessibility",
+  "independentContext": true,
+  "reviewer": {
+    "role": "independent-critic",
+    "taskId": "ses_018588ecaffeHyfaJUSM15YJzT",
+    "model": "azure/gpt-5.6-sol",
+    "completedAt": "2026-08-09T19:24:48.779Z",
+    "sourceSnapshotSha256": "64c88fe44a5e56a3d2e58bb8487ebe370a490c7b50fb71f5030672256305cad2"
+  },
+  "scores": {
+    "authored-layer-contract": { "score": 4, "checkId": "authored-layer-contract", "rationale": "Strict bounded plans declare unique districts, exclusions, and explicit anchor, cluster, row, and scatter patterns across all three neutral foundation scales." },
+    "deterministic-scatter": { "score": 4, "checkId": "deterministic-scatter", "rationale": "Isolated seeded streams, stable authored iteration, fixed draw buckets, and hard generation and visibility ceilings make the resulting scatter deterministic and bounded." },
+    "ring-terrain-placement": { "score": 4, "checkId": "ring-terrain-placement", "rationale": "Canonical wrapping, exclusion checks, slope ceilings, and authoritative height projection pass direct matrix and terrain-byte preservation tests." },
+    "presentation-authority": { "score": 4, "checkId": "presentation-authority", "rationale": "The renderer-owned system reads terrain only, remains outside saves and simulation, and preserves the exact world hash across production quality cycling." },
+    "quality-readability": { "score": 3, "checkId": "quality-readability", "rationale": "Low retains grouped landmark and tactical infrastructure within 72 instances while preserving the Bastion, units, terrain corridor, command feedback, and HUD." },
+    "lifecycle-regression": { "score": 3, "checkId": "lifecycle-regression", "rationale": "Owned resources dispose exactly once, warmed production resources plateau, full check passes 487 tests and build, and protected core match passes." },
+    "presentation-acceptance": { "score": 3, "checkId": "presentation-acceptance", "rationale": "Independent 1280x720 Low review scores layering, tactical readability, and support at three after authored spatial-composition remediation." }
+  },
+  "dependencyReady": true,
+  "blockers": [],
+  "requiredQualityFindings": [],
+  "humanValidation": [],
+  "polish": [
+    {
+      "id": "LS-12-P01",
+      "summary": "Replace neutral primitive silhouettes with the four reusable environmental palettes during LS-13.",
+      "reopenTrigger": "Do not reopen LS-12 unless the foundation cannot express or bound an LS-13 palette."
+    }
+  ]
+}

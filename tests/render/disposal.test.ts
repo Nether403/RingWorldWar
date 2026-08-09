@@ -5,6 +5,7 @@ import { EntityRenderer } from '@render/entityRenderer';
 import { Environment } from '@render/environment';
 import { Markers } from '@render/markers';
 import { RingMesh } from '@render/ringMesh';
+import { BattlefieldDressing } from '@render/battlefieldDressing';
 
 describe('render resource disposal', () => {
   it('releases every unique EntityRenderer geometry and material', () => {
@@ -57,6 +58,21 @@ describe('render resource disposal', () => {
     for (const spy of environmentDispose) expect(spy).toHaveBeenCalledOnce();
     expect(markers.object.children).toHaveLength(0);
     expect(environment.group.children).toHaveLength(0);
+  });
+
+  it('releases every fixed district scatter bucket and owned resource', () => {
+    const dressing = new BattlefieldDressing(83);
+    const resources = resourcesIn(dressing.object);
+    const dispose = resources.map((resource) => vi.spyOn(resource, 'dispose'));
+    const instanceDispose = dressing.object.children
+      .filter((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh)
+      .map((mesh) => vi.spyOn(mesh, 'dispose'));
+
+    dressing.dispose();
+
+    for (const spy of dispose) expect(spy).toHaveBeenCalledOnce();
+    for (const spy of instanceDispose) expect(spy).toHaveBeenCalledOnce();
+    expect(dressing.object.children).toHaveLength(0);
   });
 });
 

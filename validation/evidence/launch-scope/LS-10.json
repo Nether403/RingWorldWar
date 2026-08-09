@@ -7,11 +7,11 @@
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-10-whole-ring-strategic-view-2026-08-09.json",
-      "sha256": "6b0b808059729c30ccd0b6094504c2108b728dace04065861c45539c435fb8bc"
+      "sha256": "0120e46de42ff654633c2a0bcb5e63a791958ea1677e7650aa15be98d1a5059f"
     },
     {
       "path": "validation/evidence/reviews/ls-10-criterion-review-2026-08-09.json",
-      "sha256": "42da4740b65a2ba0266db4f5242796dddefee18690faf3f27fe949cf6533cc2b"
+      "sha256": "f68ff0c93510ce33a5ab26adf55297f5b08cf2773675805ee5f38d5a2547b022"
     },
     {
       "path": "docs/launch-scope/ls-10-whole-ring-strategic-view.md",

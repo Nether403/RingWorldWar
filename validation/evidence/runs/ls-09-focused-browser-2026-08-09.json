@@ -5,7 +5,7 @@
   "command": "npx playwright test e2e/shadow-intelligence.spec.ts --project=chromium-regression",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "74e71e671e948cfd3a5680465d433dacc8c165c144c5a8dca6c8552ee69b7154",
+  "sourceSnapshotSha256": "6473ea5bd67a54f0e7e98c2370b0dc6bd38e825c1d854a56472b8b56d8a363fe",
   "passedTestIds": ["shadow-intelligence-hud", "global-shadow-launch-production"],
   "summary": "Chromium passed target-resolution shadow timing, category ARIA, strategic-signal, authority, layout, and global night-launch production checks."
 }

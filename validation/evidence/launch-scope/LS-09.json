@@ -7,11 +7,11 @@
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-09-shadow-intelligence-2026-08-09.json",
-      "sha256": "a89e8b3cbcdab7d9369f7ebeb5ea2e3e66bbdae30614e4cb2dd6a3257a0a380d"
+      "sha256": "338fcfb23d1724f1a01990556402ba89881d2a8b4d1ea1e20c3524266ef4d40f"
     },
     {
       "path": "validation/evidence/reviews/ls-09-criterion-review-2026-08-09.json",
-      "sha256": "65720ef592351fe3e7c9f3a0771370bcc16d14dce9edac474fb44e083bde290e"
+      "sha256": "0aa8cd4cc1b8cdaa73007b94d0cbe516adf47833d276312378f74825051c7088"
     },
     {
       "path": "docs/launch-scope/ls-09-shadow-timing-overhead-intelligence.md",

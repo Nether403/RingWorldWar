@@ -13,7 +13,7 @@
     "taskId": "ses_0188b187effeZBoyU4R2zI82Tp",
     "model": "azure/gpt-5.6-sol",
     "completedAt": "2026-08-09T17:03:10.142Z",
-    "sourceSnapshotSha256": "74e71e671e948cfd3a5680465d433dacc8c165c144c5a8dca6c8552ee69b7154"
+    "sourceSnapshotSha256": "6473ea5bd67a54f0e7e98c2370b0dc6bd38e825c1d854a56472b8b56d8a363fe"
   },
   "scores": {
     "shadow-authority": { "score": 4, "checkId": "shadow-authority", "rationale": "One core model owns factor, state, cycle, seam, timing, and direction-aware epsilon semantics at all four exact boundaries." },

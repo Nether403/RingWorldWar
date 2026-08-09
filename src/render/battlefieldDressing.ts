@@ -1,30 +1,68 @@
 import * as THREE from 'three';
-import { RING_CIRCUMFERENCE, RING_HALF_WIDTH } from '@core/constants';
-import { deltaS } from '@core/ringMath';
-import { Rng } from '@core/rng';
+import { deltaS, wrapS } from '@core/ringMath';
+import { hashSeed, Rng } from '@core/rng';
 import type { Terrain } from '@gen/terrain';
 import type { RenderAnchor } from './anchor';
 import { disposeObject } from './disposeObject';
+import {
+  FOUNDATION_DISTRICT_PLAN,
+  MAX_DISTRICT_SCATTER_ITEMS,
+  parseDistrictPlan,
+  type DistrictDefinition,
+  type DistrictPlan,
+  type DistrictPattern,
+  type DistrictScale,
+  type DistrictShape,
+} from './districtPlan';
 
-const DRESSING_COUNT = 320;
 const MAX_VISIBLE = 256;
+const PLACEMENT_ATTEMPTS = 12;
 
-interface DressingItem {
-  s: number;
-  z: number;
-  yaw: number;
-  width: number;
-  height: number;
-  depth: number;
-  pipe: boolean;
+export interface GeneratedDressingItem {
+  readonly districtId: string;
+  readonly layerId: string;
+  readonly scale: DistrictScale;
+  readonly shape: DistrictShape;
+  readonly s: number;
+  readonly z: number;
+  readonly yaw: number;
+  readonly width: number;
+  readonly height: number;
+  readonly depth: number;
+  readonly maxSlope: number;
 }
 
-/** Seeded, non-interactive ruins. They never enter collision, LOS, or navigation. */
+interface Candidate {
+  readonly item: GeneratedDressingItem;
+  distanceSq: number;
+}
+
+interface ScaleCounts {
+  overhead: number;
+  tactical: number;
+  micro: number;
+}
+
+export interface BattlefieldDressingDiagnostics {
+  districtIds: string[];
+  generatedTotal: number;
+  generatedByScale: ScaleCounts;
+  visibleTotal: number;
+  visibleByScale: ScaleCounts;
+  drawBuckets: number;
+}
+
+/** Authored, seeded district scatter. It never enters collision, LOS, navigation, or saves. */
 export class BattlefieldDressing {
   readonly object = new THREE.Group();
-  private readonly slabs: THREE.InstancedMesh;
-  private readonly pipes: THREE.InstancedMesh;
-  private readonly items: DressingItem[] = [];
+  private readonly buckets: Record<DistrictShape, THREE.InstancedMesh>;
+  private readonly items: GeneratedDressingItem[] = [];
+  private readonly candidates: Candidate[] = [];
+  private readonly eligible: Candidate[] = [];
+  private readonly visible: GeneratedDressingItem[] = [];
+  private readonly plan: DistrictPlan;
+  private readonly generatedCounts = emptyScaleCounts();
+  private visibleCounts = emptyScaleCounts();
   private lastAnchorVersion = -1;
   private readonly position = new THREE.Vector3();
   private readonly orientation = new THREE.Quaternion();
@@ -37,99 +75,216 @@ export class BattlefieldDressing {
   private drawDistance = 2_400;
   private instanceCap = 192;
 
-  constructor(seed: number) {
-    this.object.name = 'battlefield-dressing';
-    const slabMaterial = new THREE.MeshStandardMaterial({
-      color: 0x625b50,
-      roughness: 0.88,
-      metalness: 0.28,
-    });
-    const pipeMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4c5558,
-      roughness: 0.72,
-      metalness: 0.62,
-    });
-    this.slabs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), slabMaterial, MAX_VISIBLE);
-    this.pipes = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 7), pipeMaterial, MAX_VISIBLE);
-    for (const mesh of [this.slabs, this.pipes]) {
-      mesh.count = 0;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.frustumCulled = false;
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      this.object.add(mesh);
-    }
-
-    const rng = new Rng(seed ^ 0x51a7d3);
-    for (let index = 0; index < DRESSING_COUNT; index++) {
-      const pipe = rng.chance(0.28);
-      this.items.push({
-        s: rng.range(0, RING_CIRCUMFERENCE),
-        z: rng.range(-RING_HALF_WIDTH * 0.92, RING_HALF_WIDTH * 0.92),
-        yaw: rng.range(0, Math.PI),
-        width: pipe ? rng.range(0.7, 1.8) : rng.range(5, 18),
-        height: pipe ? rng.range(5, 22) : rng.range(1.2, 7),
-        depth: pipe ? rng.range(0.7, 1.8) : rng.range(2, 9),
-        pipe,
-      });
-    }
+  constructor(seed: number, plan: DistrictPlan = FOUNDATION_DISTRICT_PLAN) {
+    this.plan = parseDistrictPlan(plan);
+    this.object.name = 'layered-district-scatter';
+    this.buckets = {
+      tower: this.createBucket('district-overhead-landmarks', new THREE.BoxGeometry(1, 1, 1), 0x8a7c60, 0.34),
+      slab: this.createBucket('district-tactical-shells', new THREE.BoxGeometry(1, 1, 1), 0x756c5c, 0.28),
+      pipe: this.createBucket('district-tactical-trunks', new THREE.CylinderGeometry(1, 1, 1, 7), 0x667275, 0.62),
+      debris: this.createBucket('district-bounded-detail', new THREE.BoxGeometry(1, 1, 1), 0x5f5d56, 0.4),
+    };
+    this.generate(seed);
   }
 
   setQuality(drawDistance: number, instanceCap: number, shadows: boolean): void {
     this.drawDistance = Math.max(200, drawDistance);
-    this.instanceCap = Math.max(0, Math.min(MAX_VISIBLE * 2, Math.floor(instanceCap)));
-    this.slabs.castShadow = shadows;
-    this.pipes.castShadow = shadows;
+    this.instanceCap = Math.max(0, Math.min(MAX_VISIBLE, Math.floor(instanceCap)));
+    for (const mesh of Object.values(this.buckets)) mesh.castShadow = shadows;
     this.lastAnchorVersion = -1;
   }
 
   update(anchor: RenderAnchor, terrain: Terrain): void {
     if (anchor.version === this.lastAnchorVersion) return;
     this.lastAnchorVersion = anchor.version;
-    this.slabs.count = 0;
-    this.pipes.count = 0;
+    for (const mesh of Object.values(this.buckets)) mesh.count = 0;
+    this.visible.length = 0;
+    this.visibleCounts = emptyScaleCounts();
+    this.eligible.length = 0;
 
-    const candidates = this.items
-      .map((item) => {
-        const ds = deltaS(anchor.s, item.s);
-        const dz = item.z - anchor.z;
-        return { item, distanceSq: ds * ds + dz * dz, ds, dz };
-      })
-      .filter((candidate) => candidate.distanceSq <= this.drawDistance * this.drawDistance)
-      .sort((a, b) => a.distanceSq - b.distanceSq);
-    let placed = 0;
-    for (const { item } of candidates) {
-      if (placed >= this.instanceCap) break;
-      const mesh = item.pipe ? this.pipes : this.slabs;
-      if (mesh.count >= MAX_VISIBLE) continue;
-      const ground = terrain.heightAt(item.s, item.z);
-      anchor.toVector(item.s, ground, item.z, this.position);
-      anchor.orientation(item.s, 0, this.orientation);
-      this.basis.compose(this.position, this.orientation, ONE);
-      this.localOrientation.setFromAxisAngle(UP, item.yaw);
-      let centerY = item.height * 0.5;
-      if (item.pipe) {
-        const tiltAngle = Math.PI * 0.5 + Math.sin(item.yaw * 3.1) * 0.12;
-        this.tilt.setFromAxisAngle(AXIAL, tiltAngle);
-        this.localOrientation.multiply(this.tilt);
-        centerY = item.width * 1.05 + Math.abs(Math.cos(tiltAngle)) * item.height * 0.5;
-      }
-      this.scale.set(item.width, item.height, item.depth);
-      this.local.compose(LOCAL_CENTER.set(0, centerY, 0), this.localOrientation, this.scale);
-      this.result.multiplyMatrices(this.basis, this.local);
-      mesh.setMatrixAt(mesh.count++, this.result);
-      placed++;
+    const maximumDistanceSq = this.drawDistance * this.drawDistance;
+    for (const candidate of this.candidates) {
+      const ds = deltaS(anchor.s, candidate.item.s);
+      const dz = candidate.item.z - anchor.z;
+      candidate.distanceSq = ds * ds + dz * dz;
+      if (candidate.distanceSq <= maximumDistanceSq) this.eligible.push(candidate);
     }
-    this.slabs.instanceMatrix.needsUpdate = true;
-    this.pipes.instanceMatrix.needsUpdate = true;
+    this.eligible.sort((a, b) => scaleRank(a.item.scale) - scaleRank(b.item.scale)
+      || a.distanceSq - b.distanceSq
+      || a.item.layerId.localeCompare(b.item.layerId));
+
+    for (const { item } of this.eligible) {
+      if (this.visible.length >= this.instanceCap) break;
+      if (terrain.slopeAt(item.s, item.z) > item.maxSlope) continue;
+      const mesh = this.buckets[item.shape];
+      if (mesh.count >= MAX_VISIBLE) continue;
+      this.place(mesh, item, anchor, terrain);
+      this.visible.push(item);
+      this.visibleCounts[item.scale]++;
+    }
+    for (const mesh of Object.values(this.buckets)) mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  diagnostics(): BattlefieldDressingDiagnostics {
+    return {
+      districtIds: this.plan.districts.map((district) => district.id),
+      generatedTotal: this.items.length,
+      generatedByScale: { ...this.generatedCounts },
+      visibleTotal: this.visible.length,
+      visibleByScale: { ...this.visibleCounts },
+      drawBuckets: Object.keys(this.buckets).length,
+    };
+  }
+
+  generatedItems(): readonly GeneratedDressingItem[] {
+    return this.items;
+  }
+
+  visibleItems(): readonly GeneratedDressingItem[] {
+    return this.visible;
   }
 
   dispose(): void {
     disposeObject(this.object);
+    this.eligible.length = 0;
+    this.visible.length = 0;
   }
+
+  private createBucket(
+    name: string,
+    geometry: THREE.BufferGeometry,
+    color: THREE.ColorRepresentation,
+    metalness: number,
+  ): THREE.InstancedMesh {
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      emissive: 0x111311,
+      emissiveIntensity: 0.18,
+      roughness: 0.82,
+      metalness,
+    });
+    const mesh = new THREE.InstancedMesh(geometry, material, MAX_VISIBLE);
+    mesh.name = name;
+    mesh.count = 0;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.object.add(mesh);
+    return mesh;
+  }
+
+  private generate(seed: number): void {
+    for (const district of this.plan.districts) {
+      for (const layer of district.layers) {
+        const rng = new Rng(seed ^ hashSeed(`${district.id}:${layer.id}`) ^ 0x51a7d3);
+        for (let index = 0; index < layer.count && this.items.length < MAX_DISTRICT_SCATTER_ITEMS; index++) {
+          const point = samplePoint(rng, district, layer.pattern, index);
+          if (!point) continue;
+          const item: GeneratedDressingItem = {
+            districtId: district.id,
+            layerId: layer.id,
+            scale: layer.scale,
+            shape: layer.shape,
+            s: point.s,
+            z: point.z,
+            yaw: yawForPattern(rng, layer.pattern, index),
+            width: rng.range(layer.width[0], layer.width[1]),
+            height: rng.range(layer.height[0], layer.height[1]),
+            depth: rng.range(layer.depth[0], layer.depth[1]),
+            maxSlope: layer.maxSlope,
+          };
+          this.items.push(item);
+          this.candidates.push({ item, distanceSq: 0 });
+          this.generatedCounts[item.scale]++;
+        }
+      }
+    }
+  }
+
+  private place(mesh: THREE.InstancedMesh, item: GeneratedDressingItem, anchor: RenderAnchor, terrain: Terrain): void {
+    const ground = terrain.heightAt(item.s, item.z);
+    anchor.toVector(item.s, ground, item.z, this.position);
+    anchor.orientation(item.s, 0, this.orientation);
+    this.basis.compose(this.position, this.orientation, ONE);
+    this.localOrientation.setFromAxisAngle(UP, item.yaw);
+    let centerY = item.height * 0.5;
+    if (item.shape === 'pipe') {
+      const tiltAngle = Math.PI * 0.5 + Math.sin(item.yaw * 3.1) * 0.12;
+      this.tilt.setFromAxisAngle(AXIAL, tiltAngle);
+      this.localOrientation.multiply(this.tilt);
+      centerY = item.width * 1.05 + Math.abs(Math.cos(tiltAngle)) * item.height * 0.5;
+    }
+    this.scale.set(item.width, item.height, item.depth);
+    this.local.compose(LOCAL_CENTER.set(0, centerY, 0), this.localOrientation, this.scale);
+    this.result.multiplyMatrices(this.basis, this.local);
+    mesh.setMatrixAt(mesh.count++, this.result);
+  }
+}
+
+function samplePoint(
+  rng: Rng,
+  district: DistrictDefinition,
+  pattern: DistrictPattern,
+  index: number,
+): { s: number; z: number } | null {
+  for (let attempt = 0; attempt < PLACEMENT_ATTEMPTS; attempt++) {
+    const normalized = patternedPoint(rng, pattern, index + attempt);
+    const s = wrapS(district.centerS + normalized.s * district.halfLength);
+    const z = district.zMin + (normalized.z + 1) * 0.5 * (district.zMax - district.zMin);
+    if (!district.exclusions.some((exclusion) =>
+      Math.abs(deltaS(exclusion.centerS, s)) <= exclusion.halfLength
+      && z >= exclusion.zMin
+      && z <= exclusion.zMax,
+    )) return { s, z };
+  }
+  return null;
+}
+
+function patternedPoint(rng: Rng, pattern: DistrictPattern, index: number): { s: number; z: number } {
+  if (pattern === 'anchors') {
+    const anchor = DISTRICT_ANCHORS[index % DISTRICT_ANCHORS.length]!;
+    return { s: anchor.s + rng.signed() * 0.025, z: anchor.z + rng.signed() * 0.025 };
+  }
+  if (pattern === 'clusters') {
+    const anchor = DISTRICT_ANCHORS[index % DISTRICT_ANCHORS.length]!;
+    return { s: anchor.s + rng.signed() * 0.11, z: anchor.z + rng.signed() * 0.11 };
+  }
+  if (pattern === 'rows') {
+    const row = index % 2 === 0 ? -0.42 : 0.42;
+    const column = Math.floor(index / 2) % 9;
+    return { s: 0.2 + column * 0.085 + rng.signed() * 0.012, z: row + rng.signed() * 0.012 };
+  }
+  return { s: rng.signed(), z: rng.signed() };
+}
+
+function yawForPattern(rng: Rng, pattern: DistrictPattern, index: number): number {
+  if (pattern === 'rows') return index % 2 === 0 ? 0 : Math.PI * 0.5;
+  if (pattern === 'clusters') return (index % 4) * Math.PI * 0.5 + rng.signed() * 0.08;
+  return rng.range(0, Math.PI);
+}
+
+function emptyScaleCounts(): ScaleCounts {
+  return { overhead: 0, tactical: 0, micro: 0 };
+}
+
+function scaleRank(scale: DistrictScale): number {
+  if (scale === 'overhead') return 0;
+  if (scale === 'tactical') return 1;
+  return 2;
 }
 
 const ONE = new THREE.Vector3(1, 1, 1);
 const UP = new THREE.Vector3(0, 1, 0);
 const AXIAL = new THREE.Vector3(0, 0, 1);
 const LOCAL_CENTER = new THREE.Vector3();
+const DISTRICT_ANCHORS = [
+  { s: 0.22, z: -0.48 },
+  { s: 0.22, z: 0.48 },
+  { s: 0.42, z: -0.3 },
+  { s: 0.42, z: 0.3 },
+  { s: 0.62, z: -0.48 },
+  { s: 0.62, z: 0.48 },
+  { s: 0.82, z: -0.3 },
+  { s: 0.82, z: 0.3 },
+] as const;

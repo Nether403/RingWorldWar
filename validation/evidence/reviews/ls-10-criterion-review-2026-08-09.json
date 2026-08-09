@@ -13,7 +13,7 @@
     "taskId": "ses_0188b187effeZBoyU4R2zI82Tp",
     "model": "azure/gpt-5.6-sol",
     "completedAt": "2026-08-09T17:03:10.142Z",
-    "sourceSnapshotSha256": "377a67fe888b0804af831a84addcd92cf47169cfee9600376b67056c2f6888ff"
+    "sourceSnapshotSha256": "63d96e2c68c23d0ce569215c8c38e4f4e74f2f4a5d02a568ebe9c99be0f70ee6"
   },
   "scores": {
     "dedicated-view": { "score": 3, "checkId": "dedicated-view", "rationale": "A dedicated side-on camera owner preserves logical tactical focus, yaw, zoom, projection, layers, resize behavior, and transactional rollback." },

@@ -194,6 +194,7 @@ async function startSession(
 ): Promise<void> {
   const container = document.getElementById('app')!;
   const scenarioDriverEnabled = import.meta.env.DEV && params.get('scenarioDriver') === '1';
+  const ls12QualificationEnabled = params.get('qualification') === 'ls12';
   const requestedSeed = Number(params.get('seed') ?? '20260731') || 20260731;
   const seed = runtimeScenario?.worldSeed ?? requestedSeed;
   const playerFaction = runtimeScenario?.playerFaction ?? (titleAction.kind === 'continue'
@@ -676,6 +677,41 @@ async function startSession(
     (window as unknown as { RWWDiagnostics: unknown }).RWWDiagnostics = Object.freeze(probe());
     cleanup.defer(() => {
       delete (window as unknown as { RWWDiagnostics?: unknown }).RWWDiagnostics;
+    });
+  }
+  if (ls12QualificationEnabled) {
+    const snapshot = () => ({
+      ownerName: dressing.object.name,
+      bucketNames: dressing.object.children.map((child) => child.name),
+      bucketCounts: dressing.object.children.map((child) =>
+        child instanceof THREE.InstancedMesh ? child.count : 0),
+      diagnostics: dressing.diagnostics(),
+      quality: renderer.quality,
+      drawCalls: renderer.drawCalls,
+      triangles: renderer.triangles,
+      contextLost: renderer.gl.getContext().isContextLost(),
+      canvas: { width: renderer.gl.domElement.width, height: renderer.gl.domElement.height },
+      resources: {
+        geometries: renderer.gl.info.memory.geometries,
+        textures: renderer.gl.info.memory.textures,
+        programs: renderer.gl.info.programs?.length ?? 0,
+      },
+      worldHash: game.world.stateHash(),
+    });
+    const qualification = Object.freeze({
+      snapshot,
+      setQuality: (quality: QualityLevel) => {
+        if (!Object.hasOwn(QUALITY, quality)) throw new Error(`Unsupported qualification quality: ${quality}`);
+        renderer.setQuality(quality);
+        dressing.update(anchor, game.terrain);
+        renderer.render(1 / 60);
+        return snapshot();
+      },
+    });
+    (window as unknown as { RWWQualification: unknown }).RWWQualification = qualification;
+    cleanup.defer(() => {
+      const target = window as unknown as { RWWQualification?: unknown };
+      if (target.RWWQualification === qualification) delete target.RWWQualification;
     });
   }
 

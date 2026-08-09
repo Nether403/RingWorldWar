@@ -26,6 +26,13 @@ import ls11FocusedUnit from '../../validation/evidence/runs/ls-11-focused-unit-2
 import ls11FocusedBrowser from '../../validation/evidence/runs/ls-11-focused-browser-2026-08-09.json';
 import ls11FullCheck from '../../validation/evidence/runs/ls-11-full-check-2026-08-09.json';
 import ls11CoreMatch from '../../validation/evidence/runs/ls-11-core-match-2026-08-09.json';
+import ls12Receipt from '../../validation/evidence/launch-scope/LS-12.json';
+import ls12Machine from '../../validation/evidence/ls-12-layered-district-scatter-2026-08-09.json';
+import ls12Review from '../../validation/evidence/reviews/ls-12-criterion-review-2026-08-09.json';
+import ls12FocusedUnit from '../../validation/evidence/runs/ls-12-focused-unit-2026-08-09.json';
+import ls12FocusedBrowser from '../../validation/evidence/runs/ls-12-focused-browser-2026-08-09.json';
+import ls12FullCheck from '../../validation/evidence/runs/ls-12-full-check-2026-08-09.json';
+import ls12CoreMatch from '../../validation/evidence/runs/ls-12-core-match-2026-08-09.json';
 import {
   CLAIM_EVIDENCE_POLICY,
   LS07_ACCEPTANCE_IDS,
@@ -44,6 +51,9 @@ import {
   LS11_REQUIRED_SOURCE_PATHS,
   LS11_RUN_POLICY,
   LS11_RUN_TEST_IDS,
+  LS12_ACCEPTANCE_IDS,
+  LS12_REQUIRED_SOURCE_PATHS,
+  LS12_RUN_POLICY,
   ls07SourceSnapshotSha256,
   ls11SourceSnapshotSha256,
   validateClaimEvidenceReceipt,
@@ -52,6 +62,7 @@ import {
   validateLS09EvidenceShape,
   validateLS10EvidenceShape,
   validateLS11EvidenceShape,
+  validateLS12EvidenceShape,
   validateLaunchProgressManifest,
 } from '../../vite.config.ts';
 
@@ -235,6 +246,30 @@ describe('launch progress manifest integrity', () => {
     await expect(validateClaimEvidenceReceipt(copyManifest().slices[10], ls11Receipt)).resolves.toBeDefined();
   });
 
+  it('binds LS-12 completion to exact district sources, production runs, review, and receipt', async () => {
+    expect(CLAIM_EVIDENCE_POLICY['LS-12']).toEqual({
+      acceptedState: 'complete',
+      receiptPath: 'validation/evidence/launch-scope/LS-12.json',
+      sourcePaths: [
+        'validation/evidence/ls-12-layered-district-scatter-2026-08-09.json',
+        'validation/evidence/reviews/ls-12-criterion-review-2026-08-09.json',
+        'docs/launch-scope/ls-12-layered-district-scatter.md',
+        'docs/launch-scope-execution-policy.md',
+      ],
+      checkIds: ['layered-district-scatter-foundation'],
+    });
+    expect(ls12Machine.sourceRefs.map((source) => source.path)).toEqual(LS12_REQUIRED_SOURCE_PATHS);
+    expect(ls12Machine.checks.map((check) => check.id)).toEqual(LS12_ACCEPTANCE_IDS);
+    expect(ls12Machine.runs.map((run) => run.id)).toEqual(Object.keys(LS12_RUN_POLICY));
+    expect(() => validateLS12EvidenceShape(ls12Machine, ls12Review, {
+      'focused-unit': ls12FocusedUnit,
+      'focused-browser': ls12FocusedBrowser,
+      'full-check': ls12FullCheck,
+      'core-match': ls12CoreMatch,
+    })).not.toThrow();
+    await expect(validateClaimEvidenceReceipt(copyManifest().slices[11], ls12Receipt)).resolves.toBeDefined();
+  });
+
   it('keeps the directional-overlay canvas restoration regression in LS-07 presentation evidence', () => {
     expect(LS07_CHECK_POLICY.presentation.testIds).toContain('directional-overlay-canvas-state');
     expect(LS07_RUN_TEST_IDS['focused-browser']).toContain('directional-overlay-canvas-state');
@@ -287,7 +322,7 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(copyManifest())).resolves.toMatchObject({
       schema: 'rww.launch-scope-progress',
       version: 2,
-      activeSlice: 'LS-12',
+      activeSlice: 'LS-13',
       reviewPolicy: { maxRemediationRounds: 2, maxVisualRemediationRounds: 1 },
     });
   });
@@ -322,8 +357,8 @@ describe('launch progress manifest integrity', () => {
 
   it('rejects an activeSlice whose slice is not the sole active entry', async () => {
     const candidate = copyManifest();
-    candidate.slices[11].state = 'queued';
-    candidate.slices[11].qualification = 'not-run';
+    candidate.slices[12].state = 'queued';
+    candidate.slices[12].qualification = 'not-run';
 
     await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/exactly one active slice/i);
   });
@@ -365,7 +400,7 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(completePolish)).resolves.toBeDefined();
 
     const activePending = copyManifest();
-    activePending.slices[11].qualification = 'pending';
+    activePending.slices[12].qualification = 'pending';
     await expect(validateLaunchProgressManifest(activePending)).resolves.toBeDefined();
 
     for (const qualification of ['not-run', 'pending']) {
@@ -379,25 +414,25 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(completePending)).rejects.toThrow(/LS-01.*disposition.*complete/i);
 
     const activeNotRun = copyManifest();
-    activeNotRun.slices[11].qualification = 'not-run';
-    await expect(validateLaunchProgressManifest(activeNotRun)).rejects.toThrow(/LS-12.*qualification.*active/i);
-
-    for (const disposition of ['clean', 'polish-backlog']) {
-      const candidate = copyManifest();
-      candidate.slices[11].disposition = disposition;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-12.*disposition.*active/i);
-    }
-
-    for (const qualification of ['pending', 'automation-passed']) {
-      const candidate = copyManifest();
-      candidate.slices[12].qualification = qualification;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-13.*qualification.*queued/i);
-    }
+    activeNotRun.slices[12].qualification = 'not-run';
+    await expect(validateLaunchProgressManifest(activeNotRun)).rejects.toThrow(/LS-13.*qualification.*active/i);
 
     for (const disposition of ['clean', 'polish-backlog']) {
       const candidate = copyManifest();
       candidate.slices[12].disposition = disposition;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-13.*disposition.*queued/i);
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-13.*disposition.*active/i);
+    }
+
+    for (const qualification of ['pending', 'automation-passed']) {
+      const candidate = copyManifest();
+      candidate.slices[13].qualification = qualification;
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-14.*qualification.*queued/i);
+    }
+
+    for (const disposition of ['clean', 'polish-backlog']) {
+      const candidate = copyManifest();
+      candidate.slices[13].disposition = disposition;
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-14.*disposition.*queued/i);
     }
   }, 15_000);
 

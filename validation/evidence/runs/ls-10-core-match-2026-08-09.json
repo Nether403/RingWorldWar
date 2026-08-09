@@ -5,7 +5,7 @@
   "command": "npm run validate:core-match",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "377a67fe888b0804af831a84addcd92cf47169cfee9600376b67056c2f6888ff",
+  "sourceSnapshotSha256": "63d96e2c68c23d0ce569215c8c38e4f4e74f2f4a5d02a568ebe9c99be0f70ee6",
   "passedTestIds": ["core-match-cohorts"],
   "summary": "The deterministic veteran-mirror core-match cohort passed every configured gameplay gate on the final LS-10 source snapshot."
 }
