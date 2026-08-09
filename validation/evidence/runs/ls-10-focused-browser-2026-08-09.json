@@ -1,0 +1,17 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-browser",
+  "command": "npx playwright test e2e/whole-ring-strategic-view.spec.ts e2e/camera-controller.spec.ts e2e/camera-transaction.spec.ts e2e/shadow-intelligence.spec.ts e2e/spinal-alignment.spec.ts --project=chromium-regression",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "43070ec843d34e44ca479c982ba7ead39e2516d416586647309ed88ed3f26c20",
+  "passedTestIds": [
+    "whole-ring-strategic-view",
+    "direct-camera-regression",
+    "camera-transaction-regression",
+    "shadow-intelligence-regression",
+    "spinal-alignment-regression"
+  ],
+  "summary": "Ten focused Chromium tests passed whole-ring presentation, live simulation, command isolation, camera transactions, shadow intelligence, and Spinal Alignment regressions."
+}

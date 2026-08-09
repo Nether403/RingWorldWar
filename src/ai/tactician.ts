@@ -12,7 +12,7 @@ import {
   type BTStatus,
 } from './behaviorTree';
 import { issueAttack, issueMove, type AiPoint } from './commands';
-import type { Difficulty, StrategicGoal } from './opponent';
+import type { Difficulty, StrategicGoal } from './contracts';
 
 const MAX_SQUAD_SIZE = 4;
 // Retreat only when a unit is genuinely at risk of being lost. The previous

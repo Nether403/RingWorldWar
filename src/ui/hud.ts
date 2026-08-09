@@ -35,6 +35,7 @@ import {
 import type { AbilityId } from '@sim/abilities';
 import type { DirectionalReachProfile } from '@sim/ballistics';
 import type { BallisticFireResult, SimEvent, StrategicContact, Structure, Unit, World } from '@sim/world';
+import type { CameraMode } from '@render/cameraController';
 import type { MissionHudModel } from '../tutorial/mission';
 import type { MissionDebriefModel } from '../tutorial/mission';
 import type { NarrativeHudModel } from '../tutorial/narrative';
@@ -145,6 +146,27 @@ const CSS = `
 .rww-mode { position:absolute; top:52px; left:50%; transform:translateX(-50%); min-width:260px;
   padding:5px 14px; text-align:center; color:#9fd8ff; border-top:1px solid rgba(159,216,255,.32);
   font-size:9px; letter-spacing:.22em; text-transform:uppercase; opacity:.86; }
+.rww-view-toggle { position:absolute; top:max(10px,env(safe-area-inset-top)); right:112px; pointer-events:auto;
+  min-height:34px; padding:6px 10px; color:#f0b26e; background:rgba(7,11,16,.82);
+  border:1px solid rgba(240,160,82,.38); font:600 9px/1 inherit; letter-spacing:.16em;
+  text-transform:uppercase; cursor:pointer; }
+.rww-view-toggle:hover,.rww-view-toggle:focus-visible { border-color:#f0b26e; outline:2px solid rgba(240,160,82,.42); outline-offset:2px; }
+.rww-strategic-panel { position:absolute; left:50%; bottom:max(18px,env(safe-area-inset-bottom));
+  transform:translateX(-50%); width:min(620px,calc(100vw - 32px)); box-sizing:border-box;
+  padding:14px 18px 13px; pointer-events:auto; text-align:center; border-top:1px solid rgba(159,216,255,.35); }
+.rww-strategic-panel[hidden] { display:none; }
+.rww-strategic-panel h2 { margin:0 0 7px; color:#9fd8ff; font-size:14px; letter-spacing:.2em; text-transform:uppercase; }
+.rww-strategic-orientation { display:flex; justify-content:space-between; gap:12px; color:#f0b26e;
+  font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
+.rww-strategic-summary { margin:8px 0 0; font-size:11px; line-height:1.45; letter-spacing:.08em; }
+.rww-strategic-state { margin:5px 0 0; color:#aebdca; font-size:9px; letter-spacing:.14em; text-transform:uppercase; }
+.rww-strategic-legend { margin:7px 0 0; display:flex; flex-wrap:wrap; justify-content:center; gap:5px 14px;
+  color:#dbe3ec; font-size:9px; letter-spacing:.1em; text-transform:uppercase; }
+.rww-strategic-panel button { margin-top:10px; min-height:38px; padding:7px 14px; color:#f0b26e;
+  background:rgba(10,15,21,.92); border:1px solid rgba(240,160,82,.5); font:600 9px/1 inherit;
+  letter-spacing:.14em; text-transform:uppercase; cursor:pointer; }
+.rww-root.whole-ring .rww-bottom,.rww-root.whole-ring .rww-map,.rww-root.whole-ring .rww-mission,
+.rww-root.whole-ring .rww-event-rail { display:none; }
 .rww-command-ack { position:absolute; left:50%; top:108px; transform:translateX(-50%);
   padding:5px 12px; color:#f0b26e; background:rgba(6,10,15,.78); border-bottom:1px solid #f0821e;
   font-size:9px; letter-spacing:.18em; text-transform:uppercase; opacity:0; transition:opacity .14s; }
@@ -222,6 +244,7 @@ const CSS = `
     width:min(420px,calc(100vw - 12px)); overflow:hidden; }
   .rww-bottom { max-height:calc(100vh - 158px); overflow-y:auto; }
   .rww-help-toggle { top:54px; right:6px; }
+  .rww-view-toggle { top:54px; right:108px; }
   .rww-help-grid { grid-template-columns:1fr; }
   .rww-mission { top: 228px; left: 6px; width: min(340px, calc(100vw - 12px));
     max-height: calc(100vh - 234px); }
@@ -229,6 +252,7 @@ const CSS = `
 @media (max-height:480px) {
   .rww-mode { display:none; }
   .rww-help-toggle { top:48px; right:6px; }
+  .rww-view-toggle { top:48px; right:102px; }
   .rww-alert { top:82px; max-width:calc(100vw - 12px); padding:5px 8px; white-space:nowrap;
     overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; }
   .rww-command-ack { top:112px; }
@@ -266,6 +290,10 @@ export function shadowTimingCopy(timing: ShadowTiming): string {
 }
 
 export function strategicContactSummary(contacts: readonly StrategicContact[]): string {
+  return strategicCategorySummary(contacts.map((contact) => contact.category));
+}
+
+function strategicCategorySummary(categories: readonly StrategicContact['category'][]): string {
   const labels: Record<StrategicContact['category'], string> = {
     bastion: 'Bastion',
     'launch-site': 'launch site',
@@ -275,7 +303,7 @@ export function strategicContactSummary(contacts: readonly StrategicContact[]): 
   const order: StrategicContact['category'][] = ['bastion', 'launch-site', 'active-node', 'major-construction'];
   return order
     .map((category) => {
-      const count = contacts.filter((contact) => contact.category === category).length;
+      const count = categories.filter((entry) => entry === category).length;
       return count === 0 ? '' : `${count} ${labels[category]}${count === 1 ? '' : 's'}`;
     })
     .filter(Boolean)
@@ -337,6 +365,11 @@ export class Hud {
   private previousModalFocus: HTMLElement | null = null;
   private helpEl: HTMLDivElement;
   private helpToggleEl: HTMLButtonElement;
+  private viewToggleEl: HTMLButtonElement;
+  private strategicPanelEl: HTMLElement;
+  private strategicSummaryEl: HTMLParagraphElement;
+  private strategicStateEl: HTMLParagraphElement;
+  private strategicLegendEl: HTMLDivElement;
 
   onMinimapPointer: ((s: number, z: number) => void) | null = null;
   onMinimapPrimary: ((s: number, z: number) => void) | null = null;
@@ -353,6 +386,7 @@ export class Hud {
   onBuildRequest: ((kind: StructureKind | null) => void) | null = null;
   onNarrativeAcknowledge: (() => void) | null = null;
   onBlockingOverlayChange: ((blocked: boolean) => void) | null = null;
+  onWholeRingToggle: (() => void) | null = null;
 
   get blocksGameplayInput(): boolean {
     return this.blockingOverlay;
@@ -484,6 +518,43 @@ export class Hud {
     this.modeEl = el('div', 'rww-mode');
     this.modeEl.textContent = 'Tactical command';
     this.root.appendChild(this.modeEl);
+
+    this.viewToggleEl = button('rww-view-toggle');
+    this.viewToggleEl.textContent = 'M Whole Ring';
+    this.viewToggleEl.setAttribute('aria-pressed', 'false');
+    this.viewToggleEl.setAttribute('aria-controls', 'rww-strategic-view');
+    this.viewToggleEl.onclick = (): void => this.onWholeRingToggle?.();
+    this.root.appendChild(this.viewToggleEl);
+
+    this.strategicPanelEl = el('section', 'rww-strategic-panel rww-panel');
+    this.strategicPanelEl.id = 'rww-strategic-view';
+    this.strategicPanelEl.hidden = true;
+    this.strategicPanelEl.setAttribute('aria-label', 'Whole-ring strategic view status');
+    this.strategicPanelEl.setAttribute('aria-live', 'polite');
+    const strategicTitle = document.createElement('h2');
+    strategicTitle.textContent = 'Whole-Ring / Strategic Side View';
+    const orientation = el('div', 'rww-strategic-orientation');
+    orientation.innerHTML = '<span>◀ Antispinward · long shot</span><span>Edges join</span><span>Spinward · short shot ▶</span>';
+    this.strategicSummaryEl = document.createElement('p');
+    this.strategicSummaryEl.className = 'rww-strategic-summary';
+    this.strategicStateEl = document.createElement('p');
+    this.strategicStateEl.className = 'rww-strategic-state';
+    this.strategicLegendEl = el('div', 'rww-strategic-legend');
+    this.strategicLegendEl.innerHTML =
+      '<span>Solid = friendly</span><span>Outline = hostile</span>' +
+      '<span>● Bastion</span><span>▲ launch site</span><span>■ active Node</span><span>◇ construction</span>';
+    const returnButton = button('rww-strategic-return');
+    returnButton.textContent = 'Return to tactical · M / Esc';
+    returnButton.onclick = (): void => this.onWholeRingToggle?.();
+    this.strategicPanelEl.append(
+      strategicTitle,
+      orientation,
+      this.strategicSummaryEl,
+      this.strategicLegendEl,
+      this.strategicStateEl,
+      returnButton,
+    );
+    this.root.appendChild(this.strategicPanelEl);
     this.commandAckEl = el('div', 'rww-command-ack');
     this.commandAckEl.setAttribute('role', 'status');
     this.commandAckEl.setAttribute('aria-live', 'polite');
@@ -513,6 +584,7 @@ export class Hud {
       '<span><b>Move / attack</b><kbd>Right click</kbd></span>' +
       '<span><b>Ability</b><kbd>X</kbd></span>' +
       '<span><b>Pilot mech</b><kbd>V</kbd></span>' +
+      '<span><b>Whole-ring view</b><kbd>M</kbd></span>' +
       '<span><b>Control groups</b><kbd>Alt/Ctrl + 1–9</kbd></span>' +
       '<span><b>Minimap focus</b><kbd>Arrows / Enter</kbd></span>' +
       '<span><b>Minimap orders</b><kbd>M / A</kbd></span>' +
@@ -613,11 +685,11 @@ export class Hud {
     mission: MissionHudModel | null = null,
     debrief: MissionDebriefModel | null = null,
     narrative: NarrativeHudModel | null = null,
-    directControl = false,
+    cameraMode: CameraMode = 'tactical',
   ): void {
     this.cameraS = cameraS;
     this.cameraZ = cameraZ;
-    this.directControlMode = directControl;
+    this.directControlMode = cameraMode !== 'tactical';
     if (this.alertTimer > 0) {
       this.alertTimer -= dt;
       if (this.alertTimer <= 0) this.alertEl.style.opacity = '0';
@@ -635,7 +707,16 @@ export class Hud {
       this.recentEvents = this.recentEvents.filter((item) => item.ttl > 0);
       this.renderEventRail();
     }
-    this.modeEl.textContent = directControl
+    const wholeRing = cameraMode === 'whole-ring';
+    this.root.classList.toggle('whole-ring', wholeRing);
+    this.strategicPanelEl.hidden = !wholeRing;
+    this.eventRailEl.hidden = wholeRing;
+    this.eventRailEl.setAttribute('aria-hidden', String(wholeRing));
+    this.viewToggleEl.setAttribute('aria-pressed', String(wholeRing));
+    this.viewToggleEl.textContent = wholeRing ? 'M Tactical View' : 'M Whole Ring';
+    this.modeEl.textContent = wholeRing
+      ? 'Whole-ring strategic view'
+      : cameraMode === 'direct'
       ? 'Direct control'
       : artilleryTargeting
         ? 'Artillery targeting — click terrain or minimap'
@@ -645,11 +726,39 @@ export class Hud {
     this.mapWrap.classList.toggle('targeting', artilleryTargeting);
 
     this.drawResources(world, player);
+    if (wholeRing) this.drawStrategicStatus(world, player, cameraS);
     this.drawSelection(world, player, selection, artilleryWeapon);
     this.drawMinimap(world, player, selection, cameraS, cameraZ, artilleryTargeting, artilleryResult, artilleryWeapon);
     this.drawMission(mission);
     this.drawNarrative(narrative);
     this.drawEnd(world, player, narrative ? null : debrief);
+  }
+
+  private drawStrategicStatus(world: World, player: Faction, focusS: number): void {
+    const contacts = world.strategicContacts(player);
+    const summary = strategicContactSummary(contacts);
+    const friendlyCategories: StrategicContact['category'][] = [];
+    for (const structure of world.structures) {
+      if (!structure.alive || structure.faction !== player) continue;
+      const definition = STRUCTURES[structure.kind];
+      if (structure.progress < 1 && definition.majorConstruction) friendlyCategories.push('major-construction');
+      else if (structure.progress >= 1 && definition.overheadIntel) friendlyCategories.push(definition.overheadIntel);
+      else if (structure.progress >= 1 && structure.kind === 'spinalNode') friendlyCategories.push('active-node');
+    }
+    const friendlySummary = strategicCategorySummary(friendlyCategories);
+    const timing = shadowTimingCopy(world.shadowTimingAt(focusS));
+    const hostileCopy = contacts.length === 0
+      ? `No strategic contacts. Tactical focus: ${timing}.`
+      : `${contacts.length} strategic contacts: ${summary}. Tactical focus: ${timing}.`;
+    const friendlyCopy = friendlyCategories.length === 0
+      ? 'No friendly strategic landmarks.'
+      : `${friendlyCategories.length} friendly strategic landmarks: ${friendlySummary}.`;
+    this.strategicSummaryEl.textContent = `${hostileCopy} ${friendlyCopy}`;
+    this.strategicStateEl.textContent = 'Simulation live · reduced intelligence only · axial position collapsed';
+    this.strategicPanelEl.dataset.strategicContactCount = String(contacts.length);
+    this.strategicPanelEl.dataset.strategicContactCategories = [...new Set(contacts.map((contact) => contact.category))]
+      .sort()
+      .join(',');
   }
 
   private drawNarrative(narrative: NarrativeHudModel | null): void {
@@ -1601,6 +1710,7 @@ export class Hud {
     this.onMissionDebriefAction = null;
     this.onNarrativeAcknowledge = null;
     this.onBlockingOverlayChange = null;
+    this.onWholeRingToggle = null;
   }
 }
 

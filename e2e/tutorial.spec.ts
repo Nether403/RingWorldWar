@@ -1,7 +1,9 @@
 import { expect, test, type Page } from 'playwright/test';
 import { readFileSync } from 'node:fs';
+// @ts-expect-error The CLI helpers are intentionally plain Node ESM.
+import { parseScenario } from '../tools/rww/scenario.mjs';
 
-const scenario = JSON.parse(readFileSync('validation/scenarios/first-contact.json', 'utf8'));
+const scenario = parseScenario(JSON.parse(readFileSync('validation/scenarios/first-contact.json', 'utf8')));
 
 async function useScenarioViewport(page: Page): Promise<void> {
   await page.setViewportSize({ width: scenario.viewport.width, height: scenario.viewport.height });

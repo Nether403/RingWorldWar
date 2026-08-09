@@ -1,0 +1,38 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-10-remediation-review-2026-08-09",
+  "claimId": "LS-10",
+  "contractSha256": "0c2eb47ea03f592d8c818e2ce6340c4d6e29d2211ebcdadc7f46e6462a49cbe1",
+  "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
+  "reviewRound": 2,
+  "reviewType": "platform-presentation-accessibility",
+  "independentContext": true,
+  "reviewer": {
+    "role": "independent-critic",
+    "taskId": "ses_019c5d29effeP7sebIoChzfuJP",
+    "model": "azure/gpt-5.6-sol",
+    "completedAt": "2026-08-09T13:24:00.000Z",
+    "sourceSnapshotSha256": "43070ec843d34e44ca479c982ba7ead39e2516d416586647309ed88ed3f26c20"
+  },
+  "scores": {
+    "dedicated-view": { "score": 3, "checkId": "dedicated-view", "rationale": "A dedicated side-on camera owner preserves logical tactical focus, yaw, zoom, projection, layers, resize behavior, and transactional rollback." },
+    "simplified-annulus": { "score": 4, "checkId": "simplified-annulus", "rationale": "The strategic scene uses fixed geometry, bounded instance pools, twelve or fewer renderables, and excludes the entire tactical render layer." },
+    "shadow-authority": { "score": 4, "checkId": "shadow-authority", "rationale": "Annulus sectors sample the shared World daylight authority, preserve the five-panel cycle, and close correctly at the ring seam." },
+    "strategic-authority": { "score": 4, "checkId": "strategic-authority", "rationale": "Hostile marks use only reduced strategic contacts, tactical event ingestion is suppressed, and hidden ordinary or Alignment detail stays absent." },
+    "input-isolation": { "score": 4, "checkId": "input-isolation", "rationale": "All tactical commands and camera capabilities are inactive while selection and tactical camera state remain preserved for return." },
+    "presentation-accessibility": { "score": 4, "checkId": "presentation-accessibility", "rationale": "Visible and accessible copy names topology, direction, live state, contact categories, friendly solid and hostile outline semantics, and exit controls." },
+    "lifecycle-regression": { "score": 3, "checkId": "lifecycle-regression", "rationale": "Both views prewarm and recover, resources dispose, quality and resize remain correct, and camera, shadow, Alignment, and core-match regressions pass." }
+  },
+  "dependencyReady": true,
+  "blockers": [],
+  "requiredQualityFindings": [],
+  "humanValidation": [],
+  "polish": [
+    {
+      "id": "LS-10-P01",
+      "summary": "The strategic category classifier is repeated across world, annulus, and HUD presentation paths.",
+      "reopenTrigger": "Reopen only if a later slice changes strategic categories or the three bounded classifiers drift in behavior."
+    }
+  ]
+}

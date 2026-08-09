@@ -66,6 +66,7 @@ const KEYBINDINGS: ReadonlyArray<readonly [string, string]> = [
   ['Minimap focus / primary', 'Arrows / Enter'],
   ['Minimap move / attack-move', 'M / A'],
   ['Pilot selected mech', 'V'],
+  ['Whole-ring strategic view', 'M'],
   ['Toggle selected ability', 'X'],
   ['Control groups', 'Ctrl or Alt + 1-9'],
   ['Select combat units', 'Ctrl + G'],

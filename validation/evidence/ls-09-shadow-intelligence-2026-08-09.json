@@ -7,14 +7,14 @@
     { "path": "src/core/shadow.ts", "sha256": "4c3a50d412c7e509aeaf26012bc2ad1bede6879462ad9eb783aec4ca118b568f" },
     { "path": "src/sim/data.ts", "sha256": "9a7ddb0325368dbb0de7233e65976066c6fe92d0ad08b19d6a524d840472bf7f" },
     { "path": "src/sim/world.ts", "sha256": "4bc5d0c71ac8bfc06ec4b07c481d4e9bed3d38a588da42fda64a7b5f037f460f" },
-    { "path": "src/game.ts", "sha256": "f358b2003ac9a56028b55456deccef3cea10f37bc4f34853635bd9eda8feb9d6" },
-    { "path": "src/main.ts", "sha256": "a719a3606d634af03818a37f39806c5e9db7c28da1f7c6e8c537b9d315eb5881" },
+    { "path": "src/game.ts", "sha256": "e0522dc54db2faee927d6c51b30cc8193e387350d5b5bd03ed1e0322cf509b66" },
+    { "path": "src/main.ts", "sha256": "3a15c8d836121e1154219c47fc7007ef3e912ef24bf5feeef130a1e3c3cf44b0" },
     { "path": "src/render/environment.ts", "sha256": "83240ad07568c64e6a71f854f8f13d74dac629bbbb1cb1bd338befb7408b089d" },
     { "path": "src/render/effects.ts", "sha256": "0295a176b972de443f305437d4006ad0ef6fa1f92c347e2e70070ca46f3520ca" },
     { "path": "src/render/presentationEvents.ts", "sha256": "9b10dd3601a775f81e99c62f16f1576dbe47b4ef09096c40082b927fc8552014" },
     { "path": "src/audio/audioEngine.ts", "sha256": "739f949fd5c0a5f44b15d861950909df6e6503689034c541781c7fca21495445" },
     { "path": "src/ai/opponent.ts", "sha256": "71f4d08b6aacdab6deb941b4e364aa76cdc0a66a51c6cde573daf6755e298e16" },
-    { "path": "src/ui/hud.ts", "sha256": "d26eb00b21d08a03624a11309d5b9ad8405b1a0020bbe90a42252bdd488e7385" },
+    { "path": "src/ui/hud.ts", "sha256": "6f0fe0a02b69f5805d12eb71eedaef961949f2e13011e27f6856a16a3e5f232e" },
     { "path": "tests/core/shadow.test.ts", "sha256": "c8769a56ccf95c0c3d2d88a2c7aedbf48ce70934ae59d745cf0af6f938d9c799" },
     { "path": "tests/sim/shadowIntelligence.test.ts", "sha256": "58280a5225f4471e17289be2de83310a2b7a08c8f53f7a34603e8b479227862d" },
     { "path": "tests/sim/vision.test.ts", "sha256": "de264638e2163d6fa2ddb57931650cbbc039172ee56c73ee6e70b4fb76c96fe0" },
@@ -31,28 +31,28 @@
       "command": "npx vitest run tests/core/shadow.test.ts tests/sim/shadowIntelligence.test.ts tests/sim/vision.test.ts tests/render/environment.test.ts tests/render/presentationEvents.test.ts tests/audio/audioEngine.test.ts tests/ai/strategist.test.ts tests/ui/hud.test.ts",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-09-focused-unit-2026-08-09.json", "sha256": "353495c7e0d14df63af6aa414fcc2511ab9bba5b5ef5facaec36d2de4e4e874e" }
+      "artifact": { "path": "validation/evidence/runs/ls-09-focused-unit-2026-08-09.json", "sha256": "929c6c3ce6c95ca8d2666a393f117e2e6cca0225ca4d03f5ab63c1af42722e91" }
     },
     {
       "id": "focused-browser",
       "command": "npx playwright test e2e/shadow-intelligence.spec.ts --project=chromium-regression",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-09-focused-browser-2026-08-09.json", "sha256": "06115d3ad4469a21ab1a470bffe54baab05a153b2927ffe602c95406aa1aa4e2" }
+      "artifact": { "path": "validation/evidence/runs/ls-09-focused-browser-2026-08-09.json", "sha256": "fcf00e85300b903d97c3d7cfa2dba9784a0e89af7f70497f8aa319ea1a042d3a" }
     },
     {
       "id": "full-check",
       "command": "npm run check",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-09-full-check-2026-08-09.json", "sha256": "7a055df639bd939a9a9f76c3c5355e3b7e4a7bef0dc4f7fc514d0861ad051f27" }
+      "artifact": { "path": "validation/evidence/runs/ls-09-full-check-2026-08-09.json", "sha256": "0f64acb1546bb2dc4f5fb44c194beb166362de37413cea4d4e5005da23b280e1" }
     },
     {
       "id": "core-match",
       "command": "npm run validate:core-match",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-09-core-match-2026-08-09.json", "sha256": "f058b0cd579786cbb06b07208ddc62d2d7d86a190166729008f2f1040bac721d" }
+      "artifact": { "path": "validation/evidence/runs/ls-09-core-match-2026-08-09.json", "sha256": "8905826146f52cb721db78367244b89c8abbfce976721e6eb0286b7edebc3aab" }
     }
   ],
   "checks": [

@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // @ts-expect-error The CLI helpers are intentionally plain Node ESM.
@@ -33,6 +36,39 @@ const scenario = {
 };
 
 describe('browser scenario schema', () => {
+  it('strictly parses every tracked browser scenario artifact', () => {
+    const directory = 'validation/scenarios';
+    const files = readdirSync(directory).filter((file) => file.endsWith('.json')).sort();
+
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      const source = readFileSync(join(directory, file), 'utf8');
+      expect(parseScenario(JSON.parse(source)).id, file).toBeTruthy();
+    }
+  });
+
+  it('binds current Break the Line evidence to the validated scenario bytes', () => {
+    const scenarioPath = 'validation/scenarios/break-the-line.json';
+    const bytes = readFileSync(scenarioPath);
+    const parsed = parseScenario(JSON.parse(bytes.toString('utf8')));
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const evidencePaths = [
+      'validation/evidence/break-the-line-completion.json',
+      'validation/evidence/break-the-line-visual.json',
+      'validation/evidence/break-the-line-t480s-5s.json',
+    ];
+
+    for (const evidencePath of evidencePaths) {
+      const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
+      expect(evidence.scenario, evidencePath).toMatchObject({
+        id: parsed.id,
+        revision: parsed.revision,
+        path: scenarioPath,
+        sha256,
+      });
+    }
+  });
+
   it('parses a complete versioned scenario without retaining mutable input', () => {
     const parsed = parseScenario(scenario);
     expect(parsed).toEqual({

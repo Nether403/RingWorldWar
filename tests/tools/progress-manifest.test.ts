@@ -12,6 +12,13 @@ import ls09FocusedUnit from '../../validation/evidence/runs/ls-09-focused-unit-2
 import ls09FocusedBrowser from '../../validation/evidence/runs/ls-09-focused-browser-2026-08-09.json';
 import ls09FullCheck from '../../validation/evidence/runs/ls-09-full-check-2026-08-09.json';
 import ls09CoreMatch from '../../validation/evidence/runs/ls-09-core-match-2026-08-09.json';
+import ls10Receipt from '../../validation/evidence/launch-scope/LS-10.json';
+import ls10Machine from '../../validation/evidence/ls-10-whole-ring-strategic-view-2026-08-09.json';
+import ls10Review from '../../validation/evidence/reviews/ls-10-criterion-review-2026-08-09.json';
+import ls10FocusedUnit from '../../validation/evidence/runs/ls-10-focused-unit-2026-08-09.json';
+import ls10FocusedBrowser from '../../validation/evidence/runs/ls-10-focused-browser-2026-08-09.json';
+import ls10FullCheck from '../../validation/evidence/runs/ls-10-full-check-2026-08-09.json';
+import ls10CoreMatch from '../../validation/evidence/runs/ls-10-core-match-2026-08-09.json';
 import {
   CLAIM_EVIDENCE_POLICY,
   LS07_ACCEPTANCE_IDS,
@@ -22,11 +29,15 @@ import {
   LS09_ACCEPTANCE_IDS,
   LS09_REQUIRED_SOURCE_PATHS,
   LS09_RUN_POLICY,
+  LS10_ACCEPTANCE_IDS,
+  LS10_REQUIRED_SOURCE_PATHS,
+  LS10_RUN_POLICY,
   ls07SourceSnapshotSha256,
   validateClaimEvidenceReceipt,
   validateLS08CriterionReview,
   validateLS07EvidenceShape,
   validateLS09EvidenceShape,
+  validateLS10EvidenceShape,
   validateLaunchProgressManifest,
 } from '../../vite.config.ts';
 
@@ -127,6 +138,30 @@ describe('launch progress manifest integrity', () => {
     })).toThrow(/implementation source snapshot/i);
   });
 
+  it('binds LS-10 completion to the exact whole-ring sources, runs, and independent review', async () => {
+    expect(CLAIM_EVIDENCE_POLICY['LS-10']).toEqual({
+      acceptedState: 'complete',
+      receiptPath: 'validation/evidence/launch-scope/LS-10.json',
+      sourcePaths: [
+        'validation/evidence/ls-10-whole-ring-strategic-view-2026-08-09.json',
+        'validation/evidence/reviews/ls-10-criterion-review-2026-08-09.json',
+        'docs/launch-scope/ls-10-whole-ring-strategic-view.md',
+        'docs/launch-scope-execution-policy.md',
+      ],
+      checkIds: ['whole-ring-strategic-view'],
+    });
+    expect(ls10Machine.sourceRefs.map((source) => source.path)).toEqual(LS10_REQUIRED_SOURCE_PATHS);
+    expect(ls10Machine.checks.map((check) => check.id)).toEqual(LS10_ACCEPTANCE_IDS);
+    expect(ls10Machine.runs.map((run) => run.id)).toEqual(Object.keys(LS10_RUN_POLICY));
+    expect(() => validateLS10EvidenceShape(ls10Machine, ls10Review, {
+      'focused-unit': ls10FocusedUnit,
+      'focused-browser': ls10FocusedBrowser,
+      'full-check': ls10FullCheck,
+      'core-match': ls10CoreMatch,
+    })).not.toThrow();
+    await expect(validateClaimEvidenceReceipt(copyManifest().slices[9], ls10Receipt)).resolves.toBeDefined();
+  });
+
   it('keeps the directional-overlay canvas restoration regression in LS-07 presentation evidence', () => {
     expect(LS07_CHECK_POLICY.presentation.testIds).toContain('directional-overlay-canvas-state');
     expect(LS07_RUN_TEST_IDS['focused-browser']).toContain('directional-overlay-canvas-state');
@@ -179,7 +214,7 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(copyManifest())).resolves.toMatchObject({
       schema: 'rww.launch-scope-progress',
       version: 2,
-      activeSlice: 'LS-10',
+      activeSlice: 'LS-11',
       reviewPolicy: { maxRemediationRounds: 2, maxVisualRemediationRounds: 1 },
     });
   });
@@ -214,8 +249,8 @@ describe('launch progress manifest integrity', () => {
 
   it('rejects an activeSlice whose slice is not the sole active entry', async () => {
     const candidate = copyManifest();
-    candidate.slices[9].state = 'queued';
-    candidate.slices[9].qualification = 'not-run';
+    candidate.slices[10].state = 'queued';
+    candidate.slices[10].qualification = 'not-run';
 
     await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/exactly one active slice/i);
   });
@@ -257,7 +292,7 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(completePolish)).resolves.toBeDefined();
 
     const activePending = copyManifest();
-    activePending.slices[9].qualification = 'pending';
+    activePending.slices[10].qualification = 'pending';
     await expect(validateLaunchProgressManifest(activePending)).resolves.toBeDefined();
 
     for (const qualification of ['not-run', 'pending']) {
@@ -271,25 +306,25 @@ describe('launch progress manifest integrity', () => {
     await expect(validateLaunchProgressManifest(completePending)).rejects.toThrow(/LS-01.*disposition.*complete/i);
 
     const activeNotRun = copyManifest();
-    activeNotRun.slices[9].qualification = 'not-run';
-    await expect(validateLaunchProgressManifest(activeNotRun)).rejects.toThrow(/LS-10.*qualification.*active/i);
-
-    for (const disposition of ['clean', 'polish-backlog']) {
-      const candidate = copyManifest();
-      candidate.slices[9].disposition = disposition;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-10.*disposition.*active/i);
-    }
-
-    for (const qualification of ['pending', 'automation-passed']) {
-      const candidate = copyManifest();
-      candidate.slices[10].qualification = qualification;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-11.*qualification.*queued/i);
-    }
+    activeNotRun.slices[10].qualification = 'not-run';
+    await expect(validateLaunchProgressManifest(activeNotRun)).rejects.toThrow(/LS-11.*qualification.*active/i);
 
     for (const disposition of ['clean', 'polish-backlog']) {
       const candidate = copyManifest();
       candidate.slices[10].disposition = disposition;
-      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-11.*disposition.*queued/i);
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-11.*disposition.*active/i);
+    }
+
+    for (const qualification of ['pending', 'automation-passed']) {
+      const candidate = copyManifest();
+      candidate.slices[11].qualification = qualification;
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-12.*qualification.*queued/i);
+    }
+
+    for (const disposition of ['clean', 'polish-backlog']) {
+      const candidate = copyManifest();
+      candidate.slices[11].disposition = disposition;
+      await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-12.*disposition.*queued/i);
     }
   }, 15_000);
 

@@ -5,7 +5,7 @@
   "command": "npm run validate:core-match",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "4886fa5ce752671ea367dcd408adbb15999412617ea77a7f98e69a569345cea6",
+  "sourceSnapshotSha256": "ce7a667dc8a7a2f95943d64b42bd142ac5f7fa3ee4ac9ffe09d5244d62711513",
   "passedTestIds": ["core-match-cohorts"],
-  "summary": "The veteran-mirror deterministic core-match cohort passed in 472.48 seconds on the final LS-09 source snapshot."
+  "summary": "The veteran-mirror deterministic core-match cohort passed every configured gate after LS-10 integration."
 }

@@ -1,4 +1,4 @@
-import type { Difficulty } from './opponent';
+import type { Difficulty } from './contracts';
 
 export type BTStatus = 'running' | 'success' | 'failure';
 

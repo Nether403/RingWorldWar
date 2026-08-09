@@ -7,11 +7,11 @@
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-07-paired-nodes-2026-08-07.json",
-      "sha256": "bc583e3f9d60a9ddd2b35f811b4264f45bbc533c38ece5761bbc3775430dc76d"
+      "sha256": "0e7d3eb23b013aded073b84b3ee6bc2b1b27debae7e6e3be2788df62d93b2f4d"
     },
     {
       "path": "validation/evidence/reviews/ls-07-criterion-review-2026-08-07.json",
-      "sha256": "f3eb166a77478faf93342c221c1460b4920051a11ad5c611f2a17b2bc244c8af"
+      "sha256": "0a6aaeefa25428806295edbba6cb56549f42d79bd4a52f35ac632e76a644a684"
     },
     {
       "path": "docs/launch-scope/ls-07-paired-spinal-nodes.md",
@@ -26,7 +26,7 @@
     {
       "id": "paired-spinal-node-alignment",
       "result": "passed",
-      "summary": "All nine LS-07 categories pass on the refreshed source snapshot; LS-09 strategic contacts preserve exact hidden-mate and hostile-Alignment boundaries, deterministic pair AI, persistence, presentation, and scope."
+      "summary": "All nine LS-07 categories pass on the refreshed source snapshot; the whole-ring view preserves exact hidden-mate and hostile-Alignment boundaries, deterministic pair AI, persistence, presentation, and scope."
     }
   ]
 }

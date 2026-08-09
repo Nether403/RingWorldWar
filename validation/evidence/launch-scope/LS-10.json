@@ -1,0 +1,32 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-10",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-09T13:30:00.000Z",
+  "sourceRefs": [
+    {
+      "path": "validation/evidence/ls-10-whole-ring-strategic-view-2026-08-09.json",
+      "sha256": "c8a66de6aa4a33208ffc118e235dfd088bf4154f446eb6efcd489b5674f011e4"
+    },
+    {
+      "path": "validation/evidence/reviews/ls-10-criterion-review-2026-08-09.json",
+      "sha256": "609b98c5eede0faafdf2b7dfba8bfb8aaa94552c8ba382ceb9706e2a0ace03ff"
+    },
+    {
+      "path": "docs/launch-scope/ls-10-whole-ring-strategic-view.md",
+      "sha256": "0c2eb47ea03f592d8c818e2ce6340c4d6e29d2211ebcdadc7f46e6462a49cbe1"
+    },
+    {
+      "path": "docs/launch-scope-execution-policy.md",
+      "sha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c"
+    }
+  ],
+  "checks": [
+    {
+      "id": "whole-ring-strategic-view",
+      "result": "passed",
+      "summary": "All seven LS-10 criteria pass one source-bound snapshot: dedicated camera ownership, bounded annulus, canonical shadows, reduced strategic authority, command isolation, accessible non-color presentation, lifecycle, regressions, and core match."
+    }
+  ]
+}

@@ -1,11 +1,15 @@
 import { expect, test } from 'playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+// @ts-expect-error The CLI helpers are intentionally plain Node ESM.
+import { collectGit } from '../tools/rww/process.mjs';
+// @ts-expect-error The CLI helpers are intentionally plain Node ESM.
+import { parseScenario } from '../tools/rww/scenario.mjs';
 
-const scenarioSource = readFileSync('validation/scenarios/break-the-line.json', 'utf8');
-const scenario = JSON.parse(scenarioSource);
-const scenarioSha256 = createHash('sha256').update(scenarioSource).digest('hex');
+const scenarioPath = 'validation/scenarios/break-the-line.json';
+const scenarioBytes = readFileSync(scenarioPath);
+const scenario = parseScenario(JSON.parse(scenarioBytes.toString('utf8')));
+const scenarioSha256 = createHash('sha256').update(scenarioBytes).digest('hex');
 
 test('Break the Line starts with an established deterministic battlefield', async ({ page }) => {
   const errors: string[] = [];
@@ -270,13 +274,20 @@ test('Break the Line is completable through normal orders, capture, combat, and 
     schema: 'rww.break-line-completion',
     version: 1,
     test: testInfo.title,
-    sourceBaseSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
-    scenario: { id: scenario.id, revision: scenario.revision, sha256: scenarioSha256 },
+    scenario: {
+      schema: scenario.schema,
+      version: scenario.version,
+      id: scenario.id,
+      revision: scenario.revision,
+      path: scenarioPath,
+      sha256: scenarioSha256,
+    },
     status: result.hud.status,
     durationTicks,
     durationSeconds: durationTicks / 30,
     completedObjectiveTicks: result.snapshot.completedObjectiveTicks,
     milestoneTicks: result.snapshot.milestones.breakLine.milestoneTicks,
+    code: await collectGit(process.cwd()),
   };
   writeFileSync(testInfo.outputPath('break-line-completion.json'), JSON.stringify(evidence, null, 2));
   await testInfo.attach('break-line-completion', {

@@ -24,7 +24,7 @@ import { World, type BallisticFireResult, type SimEvent, type Unit } from '@sim/
 import type { TrajectorySample } from '@sim/ballistics';
 import { RenderAnchor } from '@render/anchor';
 import { CameraRig } from '@render/cameraRig';
-import { CameraController } from '@render/cameraController';
+import { CameraController, type CameraMode } from '@render/cameraController';
 import { EntityRenderer } from '@render/entityRenderer';
 import { Effects } from '@render/effects';
 import { isPresentationEventEligible } from '@render/presentationEvents';
@@ -220,11 +220,11 @@ export class Game {
     const events = this.presentationEvents.splice(0);
     this.effects.consume(events, this.world, this.anchor, this.playerFaction, this.rig.s, this.rig.z, true);
     this.entities.consumePresentation(events, time);
-    this.hud.consumePresentation(events);
+    if (!this.wholeRingViewActive) this.hud.consumePresentation(events);
     this.onPresentationEvents?.(events);
     this.entities.update(this.world, this.anchor, time, this.playerFaction, this.acc / SIM_DT);
     this.effects.update(dt, this.world, this.anchor, this.playerFaction, this.rig.camera);
-    if (this.effects.shake > 0) this.rig.addShake(this.effects.shake);
+    if (this.effects.shake > 0 && !this.wholeRingViewActive) this.rig.addShake(this.effects.shake);
     const directionalArtilleryTargeting = this.artilleryTargeting &&
       !WEAPONS[this.artilleryWeaponId]?.flightMode;
     this.markers.update(
@@ -257,7 +257,7 @@ export class Game {
       this.mission?.hudModel() ?? null,
       this.mission?.debriefModel() ?? null,
       this.mission?.narrativeHudModel() ?? null,
-      this.directControlActive,
+      this.cameraController.mode,
     );
   }
 
@@ -445,8 +445,45 @@ export class Game {
     return this.directUnitId !== 0;
   }
 
+  get wholeRingViewActive(): boolean {
+    return this.cameraController.mode === 'whole-ring';
+  }
+
+  get tacticalCommandActive(): boolean {
+    return this.cameraController.mode === 'tactical' && !this.hud.blocksGameplayInput;
+  }
+
+  get cameraMode(): CameraMode {
+    return this.cameraController.mode;
+  }
+
+  enterWholeRingView(): boolean {
+    if (this.wholeRingViewActive) return true;
+    if (this.directControlActive || this.world.status === 'completed') return false;
+    const transition = this.cameraController.requestMode('whole-ring');
+    if (!transition.ok) return false;
+    this.cancelArtilleryTarget();
+    this.hud.placing = null;
+    this.hud.hideSelectionRectangle();
+    this.hud.alert('Whole-ring view — simulation live, M or Esc returns tactical');
+    return true;
+  }
+
+  exitWholeRingView(): boolean {
+    if (!this.wholeRingViewActive) return true;
+    const transition = this.cameraController.requestMode('tactical');
+    if (!transition.ok) return false;
+    this.hud.alert('Tactical control restored');
+    return true;
+  }
+
+  toggleWholeRingView(): boolean {
+    return this.wholeRingViewActive ? this.exitWholeRingView() : this.enterWholeRingView();
+  }
+
   enterDirectControl(): boolean {
     if (this.world.status === 'completed') return false;
+    if (!this.tacticalCommandActive) return false;
     if (this.selection.size !== 1) return false;
     const id = this.selection.values().next().value as number | undefined;
     const unit = id ? this.world.unitById(id) : undefined;
@@ -526,7 +563,7 @@ export class Game {
   }
 
   beginArtilleryTarget(sourceId: number, weaponId?: string): void {
-    if (this.world.status === 'completed') return;
+    if (this.world.status === 'completed' || !this.tacticalCommandActive) return;
     const unit = this.world.unitById(sourceId);
     const structure = unit ? undefined : this.world.structureById(sourceId);
     const source = unit ?? structure;
@@ -577,7 +614,7 @@ export class Game {
   }
 
   fireArtilleryTarget(s: number, z: number): boolean {
-    if (!this.artillerySourceId) return false;
+    if (!this.artillerySourceId || !this.tacticalCommandActive) return false;
     this.updateCursor(s, z);
     const weaponId = this.artilleryWeaponId;
     const preflight = this.world.preflightBallisticCommand(
@@ -712,6 +749,7 @@ export class Game {
   }
 
   toggleSelectedAbility(): boolean {
+    if (!this.tacticalCommandActive) return false;
     if (this.selection.size !== 1) return false;
     const unitId = this.selection.values().next().value as number | undefined;
     return unitId ? this.toggleAbility(unitId) : false;
@@ -736,6 +774,7 @@ export class Game {
   }
 
   selectAt(s: number, z: number, additive: boolean): void {
+    if (!this.tacticalCommandActive) return;
     const id = this.pickEntity(s, z);
     if (!additive) this.selection.clear();
     if (id) {
@@ -750,6 +789,7 @@ export class Game {
   }
 
   selectBox(s0: number, z0: number, s1: number, z1: number, additive: boolean): void {
+    if (!this.tacticalCommandActive) return;
     if (!additive) this.selection.clear();
     const lo = Math.min(z0, z1);
     const hi = Math.max(z0, z1);
@@ -772,6 +812,7 @@ export class Game {
   }
 
   selectAllCombat(): void {
+    if (!this.tacticalCommandActive) return;
     this.selection.clear();
     for (const u of this.world.units) {
       if (u.alive && u.faction === this.playerFaction && UNITS[u.kind].isMech) this.selection.add(u.id);
@@ -780,6 +821,7 @@ export class Game {
   }
 
   setControlGroup(index: number): void {
+    if (!this.tacticalCommandActive) return;
     const ids = [...this.selection].filter((id) => {
       const unit = this.world.unitById(id);
       const structure = unit ? undefined : this.world.structureById(id);
@@ -790,6 +832,7 @@ export class Game {
   }
 
   recallControlGroup(index: number): void {
+    if (!this.tacticalCommandActive) return;
     const ids = this.controlGroups.get(index);
     if (!ids) return;
     this.cancelArtilleryTarget();
@@ -808,7 +851,7 @@ export class Game {
 
   /** Right-click: move, attack, or assist, depending on what is under it. */
   issueOrder(s: number, z: number, attackMove: boolean): void {
-    if (this.world.status === 'completed' || this.directControlActive || this.hud.blocksGameplayInput) return;
+    if (this.world.status === 'completed' || !this.tacticalCommandActive) return;
     this.cancelArtilleryTarget();
     const targetId = this.pickEntity(s, z);
     const targetUnit = targetId ? this.world.unitById(targetId) : undefined;
@@ -862,7 +905,7 @@ export class Game {
 
   /** Try to place the structure the player is holding. */
   tryBuild(s: number, z: number): boolean {
-    if (this.world.status === 'completed') return false;
+    if (this.world.status === 'completed' || !this.tacticalCommandActive) return false;
     const kind = this.hud.placing;
     if (!kind) return false;
     const site = this.world.tryPlaceStructure(this.playerFaction, kind, s, z);
@@ -911,19 +954,21 @@ export class Game {
   }
 
   canBuildHere(s: number, z: number): boolean {
+    if (!this.tacticalCommandActive) return false;
     const kind = this.hud.placing;
     if (!kind) return false;
     return this.world.canPlace(this.playerFaction, kind, s, z);
   }
 
   setBuild(kind: StructureKind | null): void {
-    if (this.world.status === 'completed' || this.directControlActive) return;
+    if (this.world.status === 'completed' || !this.tacticalCommandActive) return;
     if (kind) this.cancelArtilleryTarget();
     this.hud.placing = kind;
     this.hud.command(kind ? `Build mode — ${STRUCTURES[kind].name}` : 'Build mode cancelled');
   }
 
   cancelInteractions(): void {
+    if (this.wholeRingViewActive) this.exitWholeRingView();
     if (this.directControlActive) this.exitDirectControl();
     this.cancelArtilleryTarget();
     this.hud.placing = null;

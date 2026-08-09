@@ -1,6 +1,9 @@
+import * as THREE from 'three';
 import type { Terrain } from '@gen/terrain';
 import type { RenderAnchor } from './anchor';
 import { CameraRig } from './cameraRig';
+import { STRATEGIC_LAYER } from './strategicAnnulus';
+import { RING_RADIUS } from '@core/constants';
 
 export type CameraMode =
   | 'tactical'
@@ -66,6 +69,13 @@ const DIRECT_CAPABILITIES: CameraCapabilities = Object.freeze({
   directMovement: true,
 });
 
+const WHOLE_RING_CAPABILITIES: CameraCapabilities = Object.freeze({
+  pan: false,
+  zoom: false,
+  rotate: false,
+  directMovement: false,
+});
+
 class RigModeController implements CameraModeController {
   constructor(
     readonly mode: 'tactical' | 'direct',
@@ -74,6 +84,7 @@ class RigModeController implements CameraModeController {
   ) {}
 
   enter(): boolean {
+    this.rig.camera.layers.set(0);
     if (this.mode === 'direct') this.rig.enterDirect();
     return true;
   }
@@ -96,6 +107,82 @@ class RigModeController implements CameraModeController {
   dispose(): void {}
 }
 
+class WholeRingModeController implements CameraModeController {
+  readonly mode = 'whole-ring' as const;
+  readonly capabilities = WHOLE_RING_CAPABILITIES;
+  private width = 2;
+  private height = 2;
+  private savedProjection: {
+    fov: number;
+    near: number;
+    far: number;
+    layerMask: number;
+  } | null = null;
+
+  constructor(private readonly rig: CameraRig) {}
+
+  setTacticalFar(far: number): void {
+    if (this.savedProjection) this.savedProjection.far = far;
+  }
+
+  enter(): boolean {
+    const camera = this.rig.camera;
+    this.savedProjection = {
+      fov: camera.fov,
+      near: camera.near,
+      far: camera.far,
+      layerMask: camera.layers.mask,
+    };
+    camera.layers.set(STRATEGIC_LAYER);
+    this.frameRing();
+    return true;
+  }
+
+  update(_dt: number, _context: CameraUpdateContext): void {
+    this.frameRing();
+  }
+
+  exit(): void {
+    const saved = this.savedProjection;
+    if (!saved) return;
+    const camera = this.rig.camera;
+    camera.fov = saved.fov;
+    camera.near = saved.near;
+    camera.far = saved.far;
+    camera.layers.mask = saved.layerMask;
+    camera.updateProjectionMatrix();
+    this.savedProjection = null;
+  }
+
+  resize(width: number, height: number): void {
+    this.width = Math.max(2, Math.round(width));
+    this.height = Math.max(2, Math.round(height));
+    this.frameRing();
+  }
+
+  dispose(): void {
+    this.savedProjection = null;
+  }
+
+  private frameRing(): void {
+    const camera = this.rig.camera;
+    camera.aspect = this.width / this.height;
+    camera.fov = 50;
+    camera.near = 10;
+    const halfExtent = RING_RADIUS + 340;
+    const verticalTan = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+    const distance = Math.max(
+      halfExtent / verticalTan,
+      halfExtent / (verticalTan * camera.aspect),
+    );
+    camera.far = distance + RING_RADIUS * 2.2;
+    camera.position.set(0, RING_RADIUS, distance);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(0, RING_RADIUS, 0);
+    camera.updateProjectionMatrix();
+  }
+}
+
 export class CameraController implements CameraControlSurface {
   private readonly controllers = new Map<CameraMode, CameraModeController>();
   private active: CameraModeController | null = null;
@@ -106,6 +193,7 @@ export class CameraController implements CameraControlSurface {
     controllers: readonly CameraModeController[] = [
       new RigModeController('tactical', TACTICAL_CAPABILITIES, rig),
       new RigModeController('direct', DIRECT_CAPABILITIES, rig),
+      new WholeRingModeController(rig),
     ],
   ) {
     for (const controller of controllers) {
@@ -177,6 +265,16 @@ export class CameraController implements CameraControlSurface {
 
   rotate(delta: number): void {
     if (this.capabilities.rotate) this.rig.rotate(delta);
+  }
+
+  setTacticalDrawDistance(far: number): void {
+    const safeFar = Math.max(100, far);
+    const wholeRing = this.controllers.get('whole-ring');
+    if (wholeRing instanceof WholeRingModeController) wholeRing.setTacticalFar(safeFar);
+    if (this.mode !== 'whole-ring') {
+      this.rig.camera.far = safeFar;
+      this.rig.camera.updateProjectionMatrix();
+    }
   }
 
   followDirect(s: number, z: number, yaw: number): void {

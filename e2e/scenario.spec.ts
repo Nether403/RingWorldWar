@@ -1,8 +1,10 @@
 import { expect, test, type Page } from 'playwright/test';
 import { readFileSync } from 'node:fs';
+// @ts-expect-error The CLI helpers are intentionally plain Node ESM.
+import { parseScenario } from '../tools/rww/scenario.mjs';
 
-const scenario = JSON.parse(readFileSync('validation/scenarios/signature-lance.json', 'utf8'));
-const directionalScenario = JSON.parse(readFileSync('validation/scenarios/directional-artillery.json', 'utf8'));
+const scenario = parseScenario(JSON.parse(readFileSync('validation/scenarios/signature-lance.json', 'utf8')));
+const directionalScenario = parseScenario(JSON.parse(readFileSync('validation/scenarios/directional-artillery.json', 'utf8')));
 const EXPECTED_PRE_SETUP_HASH = '1f413b87';
 const EXPECTED_APPLIED_HASH = '5c174281';
 

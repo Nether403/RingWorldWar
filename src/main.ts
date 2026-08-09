@@ -16,6 +16,7 @@ import { BASE_EXPOSURE, QUALITY, Renderer, type QualityLevel } from '@render/ren
 import { Settings } from '@render/settings';
 import { RingMesh } from '@render/ringMesh';
 import { BattlefieldDressing } from '@render/battlefieldDressing';
+import { StrategicAnnulus } from '@render/strategicAnnulus';
 import { BUILDABLE, Faction, STRUCTURES } from '@sim/data';
 import { Game, SAVE_SLOT_KEY } from './game';
 import { DebugOverlay } from '@ui/debugOverlay';
@@ -285,10 +286,16 @@ async function startSession(
     game.entities.setLowQuality(renderer.quality === 'low');
     dressing.setQuality(quality.dressingDistance, quality.dressingCap, quality.dressingShadows);
     environment.setLowQuality(renderer.quality === 'low');
+    cameraController.setTacticalDrawDistance(quality.drawDistance);
+    cameraController.update(0, { anchor, terrain: game.terrain });
   };
   renderer.onQualityChange = applyRenderQuality;
   applyRenderQuality();
   for (const o of game.objects) renderer.scene.add(o);
+  const strategicAnnulus = new StrategicAnnulus();
+  cleanup.defer(() => strategicAnnulus.dispose());
+  renderer.scene.add(strategicAnnulus.object);
+  game.hud.onWholeRingToggle = () => game.toggleWholeRingView();
 
   // Aerial perspective. Inside a ring you are always looking through kilometres
   // of air at more world, so haze does most of the depth cueing.
@@ -297,7 +304,20 @@ async function startSession(
   ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
 
   await boot.step(0.94, 'prewarming combat shaders');
-  startup.shaderPrewarmMilliseconds = (await renderer.prewarmActiveQuality()).durationMilliseconds;
+  const prewarmViews = async (asyncCompile = true): Promise<number> => {
+    const restoreMode = cameraController.mode;
+    strategicAnnulus.update(game.world, game.playerFaction, anchor, rig.s);
+    if (!cameraController.requestMode('tactical').ok) throw new Error('Could not prewarm tactical camera');
+    cameraController.update(0, { anchor, terrain: game.terrain });
+    const tactical = await renderer.prewarmActiveQuality(asyncCompile);
+    if (!cameraController.requestMode('whole-ring').ok) throw new Error('Could not prewarm whole-ring camera');
+    cameraController.update(0, { anchor, terrain: game.terrain });
+    const strategic = await renderer.prewarmActiveQuality(asyncCompile);
+    if (!cameraController.requestMode(restoreMode).ok) throw new Error(`Could not restore ${restoreMode} camera`);
+    cameraController.update(0, { anchor, terrain: game.terrain });
+    return tactical.durationMilliseconds + strategic.durationMilliseconds;
+  };
+  startup.shaderPrewarmMilliseconds = await prewarmViews();
 
   const input = new InputController(renderer.gl.domElement, cameraController);
   cleanup.defer(() => input.dispose());
@@ -323,7 +343,7 @@ async function startSession(
     renderer.gl.domElement,
     game,
     rig,
-    () => !menu.isOpen && !game.hud.blocksGameplayInput,
+    () => !menu.isOpen && !game.hud.blocksGameplayInput && !game.wholeRingViewActive,
   );
   cleanup.defer(() => commandWiring?.dispose());
   cleanup.defer(wireKeys(game, renderer, overlay, input, settings, menu));
@@ -359,6 +379,7 @@ async function startSession(
     input.setEnabled(!menu.isOpen && !game.hud.blocksGameplayInput);
     input.update(dt);
     if (advanceSimulation) game.updateDirectControl(input.moveForward, input.moveRight);
+    if (game.wholeRingViewActive) strategicAnnulus.update(game.world, game.playerFaction, anchor, rig.s);
     cameraController.update(dt, { anchor, terrain: game.terrain });
 
     // Re-base the floating origin onto the camera when it drifts far enough.
@@ -467,7 +488,7 @@ async function startSession(
       try {
         applyRenderQuality();
         environment.buildEnvironment(renderer.gl, renderer.scene);
-        await renderer.prewarmActiveQuality(false);
+        await prewarmViews(false);
         if (cleanup.isDisposed || generation !== recoveryGeneration) return;
         clearRecoveryTimer();
         recoveryOverlay?.remove();
@@ -507,6 +528,7 @@ async function startSession(
     environment,
     ringMesh,
     dressing,
+    strategicAnnulus,
     startup: () => ({ ...startup }),
     dispose: () => cleanup.dispose(),
     probe: () => ({
@@ -528,6 +550,7 @@ async function startSession(
       aiEnabled: game.isAiEnabled,
       units: game.world.units.length,
       structures: game.world.structures.length,
+      strategicAnnulus: strategicAnnulus.snapshot,
     }),
   };
   // Browser validation gets a deliberately narrow control surface. It only
@@ -946,10 +969,18 @@ function wireKeys(
         game.hud.toggleControls(false);
       } else if (menu.isOpen) {
         menu.close();
+      } else if (game.wholeRingViewActive) {
+        game.exitWholeRingView();
       } else {
         game.cancelInteractions();
         menu.open();
       }
+      return;
+    }
+    if (e.code === 'KeyM' && !e.ctrlKey && !e.shiftKey && !e.altKey && !menu.isOpen) {
+      input.consume(e.code);
+      e.preventDefault();
+      game.toggleWholeRingView();
       return;
     }
     if (e.code === 'KeyV' && !e.ctrlKey && !e.shiftKey && !game.directControlActive) {

@@ -5,7 +5,7 @@
   "command": "npx playwright test e2e/spinal-alignment.spec.ts --project=chromium-regression",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "65507830239fad72a8532694245471f268e7a411d6fe3f5d3ac2abefa7a4dfbf",
+  "sourceSnapshotSha256": "47e5c1370449d8ef7024e49e962b614f49f0064327829d2bbdb456436bf16075",
   "passedTestIds": [
     "hud-minimap-pair-state",
     "alignment-accessible-events",

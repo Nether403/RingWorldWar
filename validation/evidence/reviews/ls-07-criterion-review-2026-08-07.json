@@ -1,7 +1,7 @@
 {
   "schema": "rww.criterion-review",
   "version": 1,
-  "reviewId": "ls-07-shadow-intelligence-regression-review-2026-08-09",
+  "reviewId": "ls-07-whole-ring-regression-review-2026-08-09",
   "claimId": "LS-07",
   "contractSha256": "ad7bc4d75b8c5bc923f27bec6fefeb4bdc61a02c319766d496503f45beb12826",
   "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
@@ -10,10 +10,10 @@
   "independentContext": true,
   "reviewer": {
     "role": "independent-critic",
-    "taskId": "ses_01a5645dbffe6CUoDZV6uAhEIa",
+    "taskId": "ses_019c5d29effeP7sebIoChzfuJP",
     "model": "azure/gpt-5.6-sol",
-    "completedAt": "2026-08-09T08:38:32.792Z",
-    "sourceSnapshotSha256": "65507830239fad72a8532694245471f268e7a411d6fe3f5d3ac2abefa7a4dfbf"
+    "completedAt": "2026-08-09T13:24:00.000Z",
+    "sourceSnapshotSha256": "47e5c1370449d8ef7024e49e962b614f49f0064327829d2bbdb456436bf16075"
   },
   "scores": {
     "topology": { "score": 4, "checkId": "topology", "rationale": "Canonical pair and member ordering, standard pair identity, scenario resolution, and malformed-topology rejection satisfy the frozen topology contract." },
@@ -22,9 +22,9 @@
     "gameplay-consequence": { "score": 4, "checkId": "gameplay-consequence", "rationale": "Command remains per Node, Dominance is exactly pair-only at two per second, and the existing Bastion and time-cap outcomes remain authoritative." },
     "ai": { "score": 4, "checkId": "ai", "rationale": "Pair priorities and bonuses remain deterministic for both factions; strategic contacts permit movement but never blind target acquisition or conventional fire." },
     "persistence": { "score": 4, "checkId": "persistence", "rationale": "World v2 pair persistence, v1 migration, partial capture, AI orders, Dominance, and deterministic continuation remain supported with no persisted LS-09 contacts." },
-    "presentation": { "score": 3, "checkId": "presentation", "rationale": "Hidden hostile mate and Alignment state remain protected despite generic active-Node contacts; minimap labels, ARIA, narrow layout, and canvas restoration pass." },
-    "regression": { "score": 4, "checkId": "regression", "rationale": "The exact 77-test focused lane, four browser tests, full check, and veteran-mirror core-match cohort pass against one refreshed source snapshot." },
-    "scope": { "score": 4, "checkId": "scope", "rationale": "LS-09 overhead intelligence is an approved successor slice and discloses no pair relation, remote mate detail, hostile Alignment state, or LS-07 gameplay consequence." }
+    "presentation": { "score": 3, "checkId": "presentation", "rationale": "Hidden hostile mate and Alignment state remain protected in tactical and whole-ring presentation; minimap labels, ARIA, narrow layout, and canvas restoration pass." },
+    "regression": { "score": 4, "checkId": "regression", "rationale": "The exact 77-test focused lane, four browser tests, full check, and veteran-mirror core-match cohort pass against the refreshed LS-10 snapshot." },
+    "scope": { "score": 4, "checkId": "scope", "rationale": "The approved whole-ring successor view discloses no pair relation, remote mate detail, hostile Alignment state, or LS-07 gameplay consequence." }
   },
   "dependencyReady": true,
   "blockers": [],

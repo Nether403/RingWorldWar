@@ -32,14 +32,12 @@ import {
 } from '@sim/data';
 import type { Structure, Unit, World } from '@sim/world';
 import { issueAttack, issueAttackMove, issueBuild, issueMove, type AiPoint } from './commands';
+import type { Difficulty, StrategicGoal } from './contracts';
 import { Tactician, type TacticianPersistenceState } from './tactician';
 
+export type { Difficulty, StrategicGoal } from './contracts';
 export { TACTICIAN_REACTION_DELAY, Tactician } from './tactician';
 export type { Squad, TacticianContext } from './tactician';
-
-export type Difficulty = 'recruit' | 'veteran' | 'commander';
-
-export type StrategicGoal = 'expand' | 'tech' | 'harass' | 'defend' | 'allIn';
 
 export interface GoalScore {
   goal: StrategicGoal;

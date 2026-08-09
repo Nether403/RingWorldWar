@@ -1,0 +1,18 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-unit",
+  "command": "npx vitest run tests/render/cameraController.test.ts tests/render/strategicAnnulus.test.ts tests/ui/hud.test.ts",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "43070ec843d34e44ca479c982ba7ead39e2516d416586647309ed88ed3f26c20",
+  "passedTestIds": [
+    "whole-ring-registration",
+    "whole-ring-camera-restoration",
+    "whole-ring-quality-restoration",
+    "whole-ring-projection",
+    "strategic-annulus-authority",
+    "strategic-annulus-disposal"
+  ],
+  "summary": "Three focused Vitest files passed 17 camera, annulus, authority, fixed-budget, disposal, and HUD copy tests on the final LS-10 source snapshot."
+}

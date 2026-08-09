@@ -1,0 +1,60 @@
+{
+  "schema": "rww.ls-10-verification",
+  "version": 1,
+  "sliceId": "LS-10",
+  "contractSha256": "0c2eb47ea03f592d8c818e2ce6340c4d6e29d2211ebcdadc7f46e6462a49cbe1",
+  "sourceRefs": [
+    { "path": "src/render/strategicAnnulus.ts", "sha256": "0fef3a13d85fe97d6edd8c4ce3d0cb9507a6c4cefd4138b085e0e7e13c49d8ef" },
+    { "path": "src/render/cameraController.ts", "sha256": "79658b3121942d7cfc454483d1cba2b1fa6d6e874349c3ecb51af453f94b3037" },
+    { "path": "src/game.ts", "sha256": "e0522dc54db2faee927d6c51b30cc8193e387350d5b5bd03ed1e0322cf509b66" },
+    { "path": "src/main.ts", "sha256": "3a15c8d836121e1154219c47fc7007ef3e912ef24bf5feeef130a1e3c3cf44b0" },
+    { "path": "src/ui/hud.ts", "sha256": "6f0fe0a02b69f5805d12eb71eedaef961949f2e13011e27f6856a16a3e5f232e" },
+    { "path": "src/ui/settingsMenu.ts", "sha256": "1e2bc928e92d2f252c69174ed9644b7d2015a18a2a4d5aefbfae379e80e8d899" },
+    { "path": "tests/render/strategicAnnulus.test.ts", "sha256": "df3386d4dd2bda6db88f754212355aabe238583b0700b022a7619378f0482c52" },
+    { "path": "tests/render/cameraController.test.ts", "sha256": "8c589ea32efe2c3d3085b4d71652a9689e34e74be7e04afff2d872c9e9c05ea2" },
+    { "path": "e2e/whole-ring-strategic-view.spec.ts", "sha256": "67d85e4c8b35118765e501b24915115c0dd898f66d56e3e95b9d98baf3bd2edf" },
+    { "path": "e2e/camera-controller.spec.ts", "sha256": "7a3a68f8fdeb9206380ecb836d42ab4c0c99b137af79e1a2664ff573575dbc97" },
+    { "path": "e2e/camera-transaction.spec.ts", "sha256": "4708f2e8ab3c611f86bfbd6380a386ccee2904fcaeaf64f5e3a5199a09feb037" },
+    { "path": "e2e/shadow-intelligence.spec.ts", "sha256": "30246ba7589ebdf8b30fd580ad698f7ee88df5aba4b57cb30b7b583be73c6d31" },
+    { "path": "e2e/spinal-alignment.spec.ts", "sha256": "4fbc31dfd3b31df6809e3bd2d52f1624c531eed26388437463fec59448631be8" }
+  ],
+  "runs": [
+    {
+      "id": "focused-unit",
+      "command": "npx vitest run tests/render/cameraController.test.ts tests/render/strategicAnnulus.test.ts tests/ui/hud.test.ts",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-10-focused-unit-2026-08-09.json", "sha256": "06b7705f8f5020f1443ec1c203857ce3cab99c94ce9c18a40c41a8b305ce277e" }
+    },
+    {
+      "id": "focused-browser",
+      "command": "npx playwright test e2e/whole-ring-strategic-view.spec.ts e2e/camera-controller.spec.ts e2e/camera-transaction.spec.ts e2e/shadow-intelligence.spec.ts e2e/spinal-alignment.spec.ts --project=chromium-regression",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-10-focused-browser-2026-08-09.json", "sha256": "4337a212e1306c2fe0073e1d59c1c90291f785076e5d38e3a945fcfad05eb52e" }
+    },
+    {
+      "id": "full-check",
+      "command": "npm run check",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-10-full-check-2026-08-09.json", "sha256": "d996b9035155834f77bd436d24a11526f4a77d3653d310da9c041e85564bfed1" }
+    },
+    {
+      "id": "core-match",
+      "command": "npm run validate:core-match",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-10-core-match-2026-08-09.json", "sha256": "b2a64708717eb76a9270a98190a3e96f0530a4d9c403bc03ee96702622ea9ee3" }
+    }
+  ],
+  "checks": [
+    { "id": "dedicated-view", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["whole-ring-registration", "whole-ring-camera-restoration", "whole-ring-quality-restoration", "whole-ring-strategic-view"] },
+    { "id": "simplified-annulus", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["whole-ring-projection", "strategic-annulus-authority", "whole-ring-strategic-view"] },
+    { "id": "shadow-authority", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["strategic-annulus-authority", "shadow-intelligence-regression"] },
+    { "id": "strategic-authority", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["strategic-annulus-authority", "whole-ring-strategic-view", "spinal-alignment-regression"] },
+    { "id": "input-isolation", "result": "passed", "runIds": ["focused-unit", "focused-browser"], "testIds": ["whole-ring-registration", "whole-ring-strategic-view", "camera-transaction-regression"] },
+    { "id": "presentation-accessibility", "result": "passed", "runIds": ["focused-browser"], "testIds": ["whole-ring-strategic-view"] },
+    { "id": "lifecycle-regression", "result": "passed", "runIds": ["focused-unit", "focused-browser", "full-check", "core-match"], "testIds": ["strategic-annulus-disposal", "direct-camera-regression", "full-check", "core-match-cohorts"] }
+  ]
+}

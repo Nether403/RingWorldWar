@@ -132,6 +132,17 @@ export const CLAIM_EVIDENCE_POLICY = Object.freeze({
     ]),
     checkIds: Object.freeze(['shadow-timing-overhead-intelligence']),
   }),
+  'LS-10': Object.freeze({
+    acceptedState: 'complete',
+    receiptPath: 'validation/evidence/launch-scope/LS-10.json',
+    sourcePaths: Object.freeze([
+      'validation/evidence/ls-10-whole-ring-strategic-view-2026-08-09.json',
+      'validation/evidence/reviews/ls-10-criterion-review-2026-08-09.json',
+      'docs/launch-scope/ls-10-whole-ring-strategic-view.md',
+      'docs/launch-scope-execution-policy.md',
+    ]),
+    checkIds: Object.freeze(['whole-ring-strategic-view']),
+  }),
   'G-01': Object.freeze({
     acceptedState: 'passed',
     receiptPath: 'validation/evidence/launch-scope/G-01.json',
@@ -208,6 +219,83 @@ export const LS09_REQUIRED_SOURCE_PATHS = Object.freeze([
   'tests/ui/hud.test.ts',
   'e2e/shadow-intelligence.spec.ts',
 ] as const);
+
+export const LS10_ACCEPTANCE_IDS = Object.freeze([
+  'dedicated-view',
+  'simplified-annulus',
+  'shadow-authority',
+  'strategic-authority',
+  'input-isolation',
+  'presentation-accessibility',
+  'lifecycle-regression',
+] as const);
+
+export const LS10_REQUIRED_SOURCE_PATHS = Object.freeze([
+  'src/render/strategicAnnulus.ts',
+  'src/render/cameraController.ts',
+  'src/game.ts',
+  'src/main.ts',
+  'src/ui/hud.ts',
+  'src/ui/settingsMenu.ts',
+  'tests/render/strategicAnnulus.test.ts',
+  'tests/render/cameraController.test.ts',
+  'e2e/whole-ring-strategic-view.spec.ts',
+  'e2e/camera-controller.spec.ts',
+  'e2e/camera-transaction.spec.ts',
+  'e2e/shadow-intelligence.spec.ts',
+  'e2e/spinal-alignment.spec.ts',
+] as const);
+
+export const LS10_RUN_POLICY = Object.freeze({
+  'focused-unit': Object.freeze({
+    command: 'npx vitest run tests/render/cameraController.test.ts tests/render/strategicAnnulus.test.ts tests/ui/hud.test.ts',
+    artifactPath: 'validation/evidence/runs/ls-10-focused-unit-2026-08-09.json',
+  }),
+  'focused-browser': Object.freeze({
+    command: 'npx playwright test e2e/whole-ring-strategic-view.spec.ts e2e/camera-controller.spec.ts e2e/camera-transaction.spec.ts e2e/shadow-intelligence.spec.ts e2e/spinal-alignment.spec.ts --project=chromium-regression',
+    artifactPath: 'validation/evidence/runs/ls-10-focused-browser-2026-08-09.json',
+  }),
+  'full-check': Object.freeze({
+    command: 'npm run check',
+    artifactPath: 'validation/evidence/runs/ls-10-full-check-2026-08-09.json',
+  }),
+  'core-match': Object.freeze({
+    command: 'npm run validate:core-match',
+    artifactPath: 'validation/evidence/runs/ls-10-core-match-2026-08-09.json',
+  }),
+} as const);
+
+type LS10RunId = keyof typeof LS10_RUN_POLICY;
+
+export const LS10_RUN_TEST_IDS = Object.freeze({
+  'focused-unit': Object.freeze([
+    'whole-ring-registration',
+    'whole-ring-camera-restoration',
+    'whole-ring-quality-restoration',
+    'whole-ring-projection',
+    'strategic-annulus-authority',
+    'strategic-annulus-disposal',
+  ]),
+  'focused-browser': Object.freeze([
+    'whole-ring-strategic-view',
+    'direct-camera-regression',
+    'camera-transaction-regression',
+    'shadow-intelligence-regression',
+    'spinal-alignment-regression',
+  ]),
+  'full-check': Object.freeze(['full-check']),
+  'core-match': Object.freeze(['core-match-cohorts']),
+} as const);
+
+export const LS10_CHECK_POLICY = Object.freeze({
+  'dedicated-view': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS10RunId[]), testIds: Object.freeze(['whole-ring-registration', 'whole-ring-camera-restoration', 'whole-ring-quality-restoration', 'whole-ring-strategic-view']) }),
+  'simplified-annulus': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS10RunId[]), testIds: Object.freeze(['whole-ring-projection', 'strategic-annulus-authority', 'whole-ring-strategic-view']) }),
+  'shadow-authority': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS10RunId[]), testIds: Object.freeze(['strategic-annulus-authority', 'shadow-intelligence-regression']) }),
+  'strategic-authority': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS10RunId[]), testIds: Object.freeze(['strategic-annulus-authority', 'whole-ring-strategic-view', 'spinal-alignment-regression']) }),
+  'input-isolation': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS10RunId[]), testIds: Object.freeze(['whole-ring-registration', 'whole-ring-strategic-view', 'camera-transaction-regression']) }),
+  'presentation-accessibility': Object.freeze({ runIds: Object.freeze(['focused-browser'] as LS10RunId[]), testIds: Object.freeze(['whole-ring-strategic-view']) }),
+  'lifecycle-regression': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser', 'full-check', 'core-match'] as LS10RunId[]), testIds: Object.freeze(['strategic-annulus-disposal', 'direct-camera-regression', 'full-check', 'core-match-cohorts']) }),
+} as const);
 
 export const LS09_RUN_POLICY = Object.freeze({
   'focused-unit': Object.freeze({
@@ -750,6 +838,171 @@ export function ls09SourceSnapshotSha256(sourceRefsValue: unknown): string {
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 
+export function ls10SourceSnapshotSha256(sourceRefsValue: unknown): string {
+  const sourceRefs = asArray(sourceRefsValue).map((source, index) =>
+    requireRecord(source, `LS-10 source snapshot[${index}]`));
+  const canonical = sourceRefs.map((source, index) => ({
+    path: requireNonEmptyString(source.path, `LS-10 source snapshot[${index}].path`),
+    sha256: requireSha256(source.sha256, `LS-10 source snapshot[${index}].sha256`),
+  }));
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function validateLS10EvidenceShape(
+  machineValue: unknown,
+  reviewValue: unknown,
+  runArtifactValues: Record<string, unknown>,
+  expectedHashes?: { contractSha256: string; policySha256: string },
+): void {
+  const machine = requireRecord(machineValue, 'LS-10 machine evidence');
+  requireExactKeys(
+    machine,
+    ['schema', 'version', 'sliceId', 'contractSha256', 'sourceRefs', 'runs', 'checks'],
+    'LS-10 machine evidence',
+  );
+  if (machine.schema !== 'rww.ls-10-verification' || machine.version !== 1 || machine.sliceId !== 'LS-10') {
+    throw new Error('LS-10 machine evidence has an invalid identity');
+  }
+  const contractSha256 = requireSha256(machine.contractSha256, 'LS-10 machine contractSha256');
+  if (expectedHashes && contractSha256 !== expectedHashes.contractSha256) {
+    throw new Error('LS-10 machine evidence does not bind the current contract');
+  }
+
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-10 machine sourceRefs[${index}]`));
+  const sourcePaths = sourceRefs.map((source, index) => {
+    requireExactKeys(source, ['path', 'sha256'], `LS-10 machine sourceRefs[${index}]`);
+    const path = requireNonEmptyString(source.path, `LS-10 machine sourceRefs[${index}].path`);
+    if (!isSafeImplementationPath(path)) throw new Error(`Unsafe LS-10 implementation source path: ${path}`);
+    requireSha256(source.sha256, `LS-10 machine sourceRefs[${index}].sha256`);
+    return path;
+  });
+  if (JSON.stringify(sourcePaths) !== JSON.stringify(LS10_REQUIRED_SOURCE_PATHS)) {
+    throw new Error('LS-10 machine evidence does not bind the exact implementation sources');
+  }
+  const sourceSnapshotSha256 = ls10SourceSnapshotSha256(sourceRefs);
+
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-10 machine runs[${index}]`));
+  const runIds = runs.map((run, index) => {
+    requireExactKeys(run, ['id', 'command', 'result', 'exitCode', 'artifact'], `LS-10 machine runs[${index}]`);
+    return requireNonEmptyString(run.id, `LS-10 machine runs[${index}].id`);
+  });
+  if (JSON.stringify(runIds) !== JSON.stringify(Object.keys(LS10_RUN_POLICY))) {
+    throw new Error('LS-10 machine runs do not match the exact verification policy');
+  }
+  const passedTestIdsByRun = new Map<string, Set<string>>();
+  for (const [index, run] of runs.entries()) {
+    const id = runIds[index] as LS10RunId;
+    const policy = LS10_RUN_POLICY[id];
+    if (run.command !== policy.command || run.result !== 'passed' || run.exitCode !== 0) {
+      throw new Error(`LS-10 verification run ${id} did not pass its exact command`);
+    }
+    const artifact = requireRecord(run.artifact, `LS-10 machine runs[${index}].artifact`);
+    requireExactKeys(artifact, ['path', 'sha256'], `LS-10 machine runs[${index}].artifact`);
+    if (artifact.path !== policy.artifactPath) throw new Error(`LS-10 verification run ${id} has the wrong artifact path`);
+    requireSha256(artifact.sha256, `LS-10 machine runs[${index}].artifact.sha256`);
+    const runArtifact = requireRecord(runArtifactValues[id], `LS-10 run artifact ${id}`);
+    requireExactKeys(
+      runArtifact,
+      ['schema', 'version', 'id', 'command', 'result', 'exitCode', 'sourceSnapshotSha256', 'passedTestIds', 'summary'],
+      `LS-10 run artifact ${id}`,
+    );
+    if (runArtifact.schema !== 'rww.command-verification' || runArtifact.version !== 1 || runArtifact.id !== id
+      || runArtifact.command !== policy.command || runArtifact.result !== 'passed' || runArtifact.exitCode !== 0) {
+      throw new Error(`LS-10 run artifact ${id} does not prove the exact passing command`);
+    }
+    if (requireSha256(runArtifact.sourceSnapshotSha256, `LS-10 run artifact ${id}.sourceSnapshotSha256`) !== sourceSnapshotSha256) {
+      throw new Error(`LS-10 run artifact ${id} does not bind the implementation source snapshot`);
+    }
+    if (requireNonEmptyString(runArtifact.summary, `LS-10 run artifact ${id}.summary`).length < 20) {
+      throw new Error(`LS-10 run artifact ${id} lacks a substantive summary`);
+    }
+    const passedTestIds = requireStringArray(runArtifact.passedTestIds, `LS-10 run artifact ${id}.passedTestIds`);
+    if (JSON.stringify(passedTestIds) !== JSON.stringify(LS10_RUN_TEST_IDS[id])) {
+      throw new Error(`LS-10 run artifact ${id} does not contain the exact predeclared test IDs`);
+    }
+    passedTestIdsByRun.set(id, new Set(passedTestIds));
+  }
+
+  const checks = asArray(machine.checks).map((check, index) => requireRecord(check, `LS-10 machine checks[${index}]`));
+  const checkIds = checks.map((check, index) => {
+    requireExactKeys(check, ['id', 'result', 'runIds', 'testIds'], `LS-10 machine checks[${index}]`);
+    if (check.result !== 'passed') throw new Error(`LS-10 machine check ${String(check.id)} did not pass`);
+    return requireNonEmptyString(check.id, `LS-10 machine checks[${index}].id`);
+  });
+  if (JSON.stringify(checkIds) !== JSON.stringify(LS10_ACCEPTANCE_IDS)) {
+    throw new Error('LS-10 machine checks do not cover the exact acceptance matrix');
+  }
+  for (const [index, check] of checks.entries()) {
+    const id = checkIds[index] as keyof typeof LS10_CHECK_POLICY;
+    const policy = LS10_CHECK_POLICY[id];
+    const checkRunIds = requireStringArray(check.runIds, `LS-10 machine checks[${index}].runIds`);
+    const testIds = requireStringArray(check.testIds, `LS-10 machine checks[${index}].testIds`);
+    if (JSON.stringify(checkRunIds) !== JSON.stringify(policy.runIds)
+      || JSON.stringify(testIds) !== JSON.stringify(policy.testIds)) {
+      throw new Error(`LS-10 machine check ${id} does not match its exact run and test policy`);
+    }
+    for (const testId of testIds) {
+      if (!checkRunIds.some((runId) => passedTestIdsByRun.get(runId)?.has(testId))) {
+        throw new Error(`LS-10 machine check ${id} cannot prove test ID ${testId}`);
+      }
+    }
+  }
+
+  const review = requireRecord(reviewValue, 'LS-10 criterion review');
+  requireExactKeys(
+    review,
+    [
+      'schema', 'version', 'reviewId', 'claimId', 'contractSha256', 'policySha256', 'reviewRound',
+      'reviewType', 'independentContext', 'reviewer', 'scores', 'dependencyReady', 'blockers',
+      'requiredQualityFindings', 'humanValidation', 'polish',
+    ],
+    'LS-10 criterion review',
+  );
+  if (review.schema !== 'rww.criterion-review' || review.version !== 1 || review.claimId !== 'LS-10'
+    || review.reviewType !== 'platform-presentation-accessibility' || review.independentContext !== true) {
+    throw new Error('LS-10 criterion review has an invalid identity or review type');
+  }
+  if (!Number.isInteger(review.reviewRound) || Number(review.reviewRound) < 1 || Number(review.reviewRound) > 2) {
+    throw new Error('LS-10 criterion review exceeds the bounded review policy');
+  }
+  const reviewer = requireRecord(review.reviewer, 'LS-10 criterion review reviewer');
+  requireExactKeys(reviewer, ['role', 'taskId', 'model', 'completedAt', 'sourceSnapshotSha256'], 'LS-10 criterion review reviewer');
+  if (reviewer.role !== 'independent-critic' || !/^ses_[A-Za-z0-9]+$/.test(requireNonEmptyString(reviewer.taskId, 'LS-10 reviewer taskId'))
+    || !isoDateString(requireNonEmptyString(reviewer.completedAt, 'LS-10 reviewer completedAt'))
+    || requireSha256(reviewer.sourceSnapshotSha256, 'LS-10 reviewer sourceSnapshotSha256') !== sourceSnapshotSha256) {
+    throw new Error('LS-10 criterion review has invalid independent provenance');
+  }
+  requireNonEmptyString(reviewer.model, 'LS-10 reviewer model');
+  if (expectedHashes && (
+    requireSha256(review.contractSha256, 'LS-10 review contractSha256') !== expectedHashes.contractSha256
+    || requireSha256(review.policySha256, 'LS-10 review policySha256') !== expectedHashes.policySha256
+  )) throw new Error('LS-10 criterion review does not bind the current contract and execution policy');
+  const scores = requireRecord(review.scores, 'LS-10 criterion review scores');
+  requireExactKeys(scores, [...LS10_ACCEPTANCE_IDS], 'LS-10 criterion review scores');
+  for (const id of LS10_ACCEPTANCE_IDS) {
+    const score = requireRecord(scores[id], `LS-10 criterion review scores.${id}`);
+    requireExactKeys(score, ['score', 'checkId', 'rationale'], `LS-10 criterion review scores.${id}`);
+    if (score.checkId !== id || !Number.isInteger(score.score) || Number(score.score) < 3 || Number(score.score) > 4
+      || requireNonEmptyString(score.rationale, `LS-10 criterion review scores.${id}.rationale`).length < 20) {
+      throw new Error(`LS-10 criterion ${id} is below ship-ready or lacks rationale`);
+    }
+  }
+  if (review.dependencyReady !== true
+    || requireStringArray(review.blockers, 'LS-10 review blockers').length !== 0
+    || requireStringArray(review.requiredQualityFindings, 'LS-10 review requiredQualityFindings').length !== 0
+    || requireStringArray(review.humanValidation, 'LS-10 review humanValidation').length !== 0) {
+    throw new Error('LS-10 criterion review is not dependency-ready');
+  }
+  for (const [index, finding] of asArray(review.polish).entries()) {
+    const record = requireRecord(finding, `LS-10 criterion review polish[${index}]`);
+    requireExactKeys(record, ['id', 'summary', 'reopenTrigger'], `LS-10 criterion review polish[${index}]`);
+    requireNonEmptyString(record.id, `LS-10 criterion review polish[${index}].id`);
+    requireNonEmptyString(record.summary, `LS-10 criterion review polish[${index}].summary`);
+    requireNonEmptyString(record.reopenTrigger, `LS-10 criterion review polish[${index}].reopenTrigger`);
+  }
+}
+
 export function validateLS09EvidenceShape(
   machineValue: unknown,
   reviewValue: unknown,
@@ -940,6 +1193,47 @@ async function validateLS09CurrentSources(machineValue: unknown): Promise<void> 
     }
     if (actual !== expected) throw new Error(`LS-09 implementation source SHA-256 mismatch: ${path}`);
   }));
+}
+
+async function validateLS10CurrentSources(machineValue: unknown): Promise<void> {
+  const machine = requireRecord(machineValue, 'LS-10 machine evidence');
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-10 machine sourceRefs[${index}]`));
+  await Promise.all(sourceRefs.map(async (source, index) => {
+    const path = requireNonEmptyString(source.path, `LS-10 machine sourceRefs[${index}].path`);
+    const expected = requireSha256(source.sha256, `LS-10 machine sourceRefs[${index}].sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+    } catch {
+      throw new Error(`LS-10 implementation source is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-10 implementation source SHA-256 mismatch: ${path}`);
+  }));
+}
+
+async function loadLS10RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
+  const machine = requireRecord(machineValue, 'LS-10 machine evidence');
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-10 machine runs[${index}]`));
+  const result: Record<string, unknown> = {};
+  for (const [index, run] of runs.entries()) {
+    const id = requireNonEmptyString(run.id, `LS-10 machine runs[${index}].id`);
+    const artifact = requireRecord(run.artifact, `LS-10 machine runs[${index}].artifact`);
+    const path = requireNonEmptyString(artifact.path, `LS-10 machine runs[${index}].artifact.path`);
+    if (!isSafeRepositoryPath(path) || !path.startsWith('validation/evidence/runs/')) {
+      throw new Error(`Unsafe LS-10 run artifact path: ${path}`);
+    }
+    const expected = requireSha256(artifact.sha256, `LS-10 machine runs[${index}].artifact.sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+      result[id] = await readJson(resolve(root, path));
+    } catch {
+      throw new Error(`LS-10 run artifact is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-10 run artifact SHA-256 mismatch: ${path}`);
+  }
+  return result;
 }
 
 async function loadLS09RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
@@ -1134,6 +1428,20 @@ export async function validateClaimEvidenceReceipt(
       policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
     });
     await validateLS09CurrentSources(machine);
+  }
+  if (claimId === 'LS-10') {
+    const digestByPath = new Map(sourceRefs.map((source, index) => [
+      sourcePaths[index]!,
+      requireSha256(source.sha256, `${claimId}.sourceRefs[${index}].sha256`),
+    ]));
+    const machine = await readJson(resolve(root, policy.sourcePaths[0]));
+    const review = await readJson(resolve(root, policy.sourcePaths[1]));
+    const runArtifacts = await loadLS10RunArtifacts(machine);
+    validateLS10EvidenceShape(machine, review, runArtifacts, {
+      contractSha256: digestByPath.get('docs/launch-scope/ls-10-whole-ring-strategic-view.md')!,
+      policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
+    });
+    await validateLS10CurrentSources(machine);
   }
   return receipt;
 }

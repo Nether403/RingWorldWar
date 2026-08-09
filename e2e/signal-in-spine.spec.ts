@@ -1,7 +1,9 @@
 import { expect, test } from 'playwright/test';
 import { readFileSync } from 'node:fs';
+// @ts-expect-error The CLI helpers are intentionally plain Node ESM.
+import { parseScenario } from '../tools/rww/scenario.mjs';
 
-const scenario = JSON.parse(readFileSync('validation/scenarios/a-signal-in-the-spine.json', 'utf8'));
+const scenario = parseScenario(JSON.parse(readFileSync('validation/scenarios/a-signal-in-the-spine.json', 'utf8')));
 
 test('A Signal in the Spine pauses for briefing and completes through the story battlefield', async ({ page }) => {
   test.setTimeout(180_000);

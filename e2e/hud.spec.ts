@@ -1,7 +1,9 @@
 import { expect, test } from 'playwright/test';
 import { readFileSync } from 'node:fs';
+// @ts-expect-error The CLI helpers are intentionally plain Node ESM.
+import { parseScenario } from '../tools/rww/scenario.mjs';
 
-const signalScenario = JSON.parse(readFileSync('validation/scenarios/a-signal-in-the-spine.json', 'utf8'));
+const signalScenario = parseScenario(JSON.parse(readFileSync('validation/scenarios/a-signal-in-the-spine.json', 'utf8')));
 
 test('HUD zones remain stable, non-overlapping, and acknowledge commands', async ({ page }) => {
   await page.goto('/?scenarioDriver=1');

@@ -7,11 +7,11 @@
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-09-shadow-intelligence-2026-08-09.json",
-      "sha256": "4684e8f5afd8bbf82ca3fb62627dd7e53a33681ddf49c9a3d04f36f8bc61754e"
+      "sha256": "5d5c7466c334647b4d4281e8845d750f76550160c6d1942fa1c72c19393900ce"
     },
     {
       "path": "validation/evidence/reviews/ls-09-criterion-review-2026-08-09.json",
-      "sha256": "a4c0d186bf06a1f7155e9f84348947bae77893d856cc899129718153644813ee"
+      "sha256": "4efc51072f2331c316990f5ac8fa9aa2b9bc45d5accc0d85e8a60e2b9485c07f"
     },
     {
       "path": "docs/launch-scope/ls-09-shadow-timing-overhead-intelligence.md",
@@ -26,7 +26,7 @@
     {
       "id": "shadow-timing-overhead-intelligence",
       "result": "passed",
-      "summary": "All eight LS-09 categories pass one source-bound snapshot: shared shadow timing, solar and local sensor rules, global night-launch signals, immutable strategic contacts, tactical authority separation, AI routing, accessible HUD presentation, persistence, regressions, and scope."
+      "summary": "All eight LS-09 categories pass the refreshed source-bound snapshot: shared shadow timing, launch signals, immutable strategic contacts, whole-ring authority separation, AI routing, accessible presentation, persistence, regressions, and scope."
     }
   ]
 }

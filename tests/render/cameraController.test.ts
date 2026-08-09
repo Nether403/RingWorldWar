@@ -29,16 +29,57 @@ function lifecycle(mode: CameraModeController['mode'], events: string[], enter =
 }
 
 describe('CameraController', () => {
-  it('names the frozen camera modes while only tactical and direct are registered', () => {
-    const camera = new CameraController(new CameraRig(1));
+  it('registers a read-only whole-ring owner by default', () => {
+    const rig = new CameraRig(1);
+    const camera = new CameraController(rig);
 
-    expect(camera.availableModes).toEqual(['tactical', 'direct']);
-    expect(camera.requestMode('whole-ring')).toEqual({
-      ok: false,
-      mode: 'whole-ring',
-      reason: 'unsupported-camera-mode',
+    expect(camera.availableModes).toEqual(['tactical', 'direct', 'whole-ring']);
+    expect(camera.requestMode('whole-ring')).toEqual({ ok: true, mode: 'whole-ring' });
+    expect(camera.mode).toBe('whole-ring');
+    expect(camera.capabilities).toEqual({
+      pan: false,
+      zoom: false,
+      rotate: false,
+      directMovement: false,
     });
-    expect(camera.mode).toBe('tactical');
+    expect(rig.camera.layers.isEnabled(2)).toBe(true);
+    expect(rig.camera.layers.isEnabled(0)).toBe(false);
+  });
+
+  it('frames the full ring side-on and restores tactical projection without mutating rig focus', () => {
+    const rig = new CameraRig(16 / 9);
+    const camera = new CameraController(rig);
+    rig.setView(730, -120, 0.47, 540);
+    const state = { s: rig.s, z: rig.z, yaw: rig.yaw, distance: rig.distance };
+
+    expect(camera.requestMode('whole-ring').ok).toBe(true);
+    camera.resize(1280, 720);
+    camera.update(0, {} as Parameters<CameraController['update']>[1]);
+
+    expect(rig.camera.position.z).toBeGreaterThan(7_200);
+    expect(rig.camera.position.x).toBeCloseTo(0);
+    expect(rig.camera.position.y).toBeCloseTo(3_600);
+    expect(rig.camera.near).toBe(10);
+    expect(rig.camera.far).toBeGreaterThan(14_000);
+    expect({ s: rig.s, z: rig.z, yaw: rig.yaw, distance: rig.distance }).toEqual(state);
+
+    expect(camera.requestMode('tactical').ok).toBe(true);
+    expect(rig.camera.layers.isEnabled(0)).toBe(true);
+    expect(rig.camera.layers.isEnabled(2)).toBe(false);
+    expect({ s: rig.s, z: rig.z, yaw: rig.yaw, distance: rig.distance }).toEqual(state);
+  });
+
+  it('restores the current tactical draw distance after a quality change in whole-ring mode', () => {
+    const rig = new CameraRig(16 / 9);
+    const camera = new CameraController(rig);
+
+    camera.requestMode('whole-ring');
+    camera.setTacticalDrawDistance(8_000);
+    camera.update(0, {} as Parameters<CameraController['update']>[1]);
+    expect(rig.camera.far).toBeGreaterThan(14_000);
+
+    camera.requestMode('tactical');
+    expect(rig.camera.far).toBe(8_000);
   });
 
   it('is idempotent and exits the old owner before entering the new owner', () => {

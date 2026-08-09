@@ -1,7 +1,7 @@
 {
   "schema": "rww.criterion-review",
   "version": 1,
-  "reviewId": "ls-09-remediation-review-2026-08-09",
+  "reviewId": "ls-09-whole-ring-regression-review-2026-08-09",
   "claimId": "LS-09",
   "contractSha256": "d8778afa89b2ca451178e06e2070ebdd3131cadc540a2394ca452aee2452ada3",
   "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
@@ -10,10 +10,10 @@
   "independentContext": true,
   "reviewer": {
     "role": "independent-critic",
-    "taskId": "ses_01a6c5198ffeU0h9GZoyIlpy1Q",
+    "taskId": "ses_019c5d29effeP7sebIoChzfuJP",
     "model": "azure/gpt-5.6-sol",
-    "completedAt": "2026-08-09T08:38:32.792Z",
-    "sourceSnapshotSha256": "4886fa5ce752671ea367dcd408adbb15999412617ea77a7f98e69a569345cea6"
+    "completedAt": "2026-08-09T13:24:00.000Z",
+    "sourceSnapshotSha256": "ce7a667dc8a7a2f95943d64b42bd142ac5f7fa3ee4ac9ffe09d5244d62711513"
   },
   "scores": {
     "shadow-authority": { "score": 4, "checkId": "shadow-authority", "rationale": "One core model owns factor, state, cycle, seam, timing, and direction-aware epsilon semantics at all four exact boundaries." },
@@ -21,9 +21,9 @@
     "launch-intelligence": { "score": 4, "checkId": "launch-intelligence", "rationale": "Game prevalidates complete event eligibility while Effects and audio preserve global deep-shadow launches; hidden day launches retain existing fog and range." },
     "strategic-contacts": { "score": 4, "checkId": "strategic-contacts", "rationale": "Approved contacts derive solely from live hostile state independently of LOS, exclude ordinary entities, and return readonly frozen collections and entries." },
     "authority-ai": { "score": 4, "checkId": "authority-ai", "rationale": "Strategic contacts never grant tactical visibility, selection, or conventional firing authority; AI routing remains separate from exact combat acquisition." },
-    "presentation-accessibility": { "score": 4, "checkId": "presentation-accessibility", "rationale": "HUD and minimap provide non-color timing, hidden-contact outlines, visible category summaries, category-aware ARIA, and 1280x720 Low browser coverage." },
-    "persistence-regression": { "score": 3, "checkId": "persistence-regression", "rationale": "Save continuation, focused suites, LS-07 regressions, full lint/build/unit checks, and the veteran-mirror core cohort pass on the final snapshot." },
-    "scope": { "score": 4, "checkId": "scope", "rationale": "No strategic camera, remembered fog, transport, campaign, victory, or save-schema expansion was introduced, and all material consumers are source-bound." }
+    "presentation-accessibility": { "score": 4, "checkId": "presentation-accessibility", "rationale": "HUD, minimap, and whole-ring view provide non-color timing, reduced contacts, category summaries, category-aware ARIA, and 1280x720 Low browser coverage." },
+    "persistence-regression": { "score": 3, "checkId": "persistence-regression", "rationale": "Save continuation, focused suites, LS-07 regressions, full lint/build/unit checks, and the veteran-mirror core cohort pass after LS-10 integration." },
+    "scope": { "score": 4, "checkId": "scope", "rationale": "The approved strategic camera consumes LS-09 authority without remembered fog, transport, campaign, victory, save-schema, or tactical-targeting expansion." }
   },
   "dependencyReady": true,
   "blockers": [],
