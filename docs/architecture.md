@@ -88,6 +88,16 @@ Gate 1 uses stable-ordered object arrays. At the current few-hundred-entity targ
 ```
 Systems emit presentation events for transient effects. Renderers read authoritative world state plus previous unit transforms for interpolation; player and AI actions enter through world/game command methods.
 
+#### 3.2.1 World authority seam
+
+`World` remains the concrete simulation aggregate, but its external use has three logical surfaces:
+
+- **Commands:** `Game` owns player and lifecycle commands; AI modules own opponent commands; runtime scenario construction owns bootstrap spawning and topology.
+- **Queries:** UI, render, audio, tutorial, and validation code may inspect visibility, reachability, entities, and strategic contacts without changing authoritative state.
+- **State transfer:** serialization owns persistence export/restore. The active game or headless runner is the single owner that destructively drains simulation events and then fans the returned batch out to missions, render, HUD, audio, and voice.
+
+The repository lint records the reviewed command and state-transfer callers. New callers should use the smallest existing surface and must not add a second event drain. A type-level command/query split is intentionally deferred while entity lookup still returns live mutable simulation objects; adding shallow interfaces would not create a real seam.
+
 ### 3.3 Ballistics — the rotating frame
 In the ring's rotating reference frame, a free-flying projectile experiences two fictitious accelerations:
 ```

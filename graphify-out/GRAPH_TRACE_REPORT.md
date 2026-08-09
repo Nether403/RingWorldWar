@@ -6,193 +6,147 @@
 
 ## Scope
 
-This report traces the five recommended questions from `GRAPH_REPORT.md`, then records the architectural follow-ups the graph supports. It is an evidence report, not an implementation plan: no source files were changed.
+This report records the source-reviewed disposition of the issues originally raised by `GRAPH_REPORT.md` and the remediation now represented in the graph. It distinguishes source defects from graph-extraction limits and from qualification evidence that requires a separate canonical refresh.
 
 ## Graph Quality And Limits
 
-- Corpus: 386 files, approximately 303,939 words.
-- Rendered graph: 2,666 nodes, 6,795 edges, 232 communities.
-- Audio and video content was not transcribed because the optional `faster-whisper` dependency is not installed. The 69 media files therefore contribute file metadata but no spoken-content concepts.
-- The extraction diagnostic found 207 dangling edges, 1 self-loop, 45 directed endpoint collapses, and 48 undirected endpoint collapses. Dangling edges were not rendered.
-- Broad two-hop traversals around `Faction`, `World`, and `Game` exceeded the query budget. Findings below use exact node IDs and shortest paths where possible.
-- An AST edge establishes structural use or a call/reference relationship; it does not by itself prove that a method mutates state. Recommendations that distinguish reads from writes require source review before implementation.
+- Current rendered graph: 2,681 nodes, 6,842 edges, 190 communities.
+- Current `graph.json` contains zero dangling edges and zero self-loops.
+- The graph was refreshed from commit `56a07093` with local AST extraction.
+- Three changed documentation files were skipped during semantic extraction because no supported LLM API key was configured. Their older semantic nodes may remain until a keyed rebuild.
+- Community labels were regenerated from graph hubs rather than an LLM, so several labels are implementation symbols rather than plain-language names.
+- AST import/reference edges establish structural dependency, not state mutation. Source review remains authoritative for command/query classification.
 
 ## Executive Summary
 
-`World`, `Faction`, and `Game` are the three primary runtime bridges. Their high degree is mostly consistent with their roles: `World` is the simulation aggregate, `Faction` is shared domain data, and `Game` is the composition root. The graph nevertheless identifies four focused follow-ups:
+The source review corrected two overstatements in the original graph report and confirmed three bounded improvements:
 
-1. Separate AI policy, tactics, and behavior-tree contracts to break the current import cycle.
-2. Make the scenario artifact used by E2E tests explicit and connect it to the production parser/factory flow.
-3. Audit direct consumers of `World` methods and preserve a narrow command/query boundary as more features are added.
-4. Split the conceptual responsibilities currently grouped around `data.ts` and the broad `Faction` dependency.
+1. The reported AI cycles were source/type cycles, not runtime ESM cycles. Shared types now live in `src/ai/contracts.ts`, and the refreshed report detects no import cycles.
+2. Browser validation scenarios are intentionally distinct from production runtime scenarios. Direct Playwright consumers now call the canonical browser `parseScenario()` before page injection.
+3. Break the Line now hashes the exact bytes it parses, emits complete scenario identity, and records full dirty-worktree provenance.
+4. `World` remains the concrete simulation aggregate. Its reviewed authority owners are now documented and enforced by repository lint rather than by shallow command/query interfaces.
+5. Broad `Faction` projections and a physical `data.ts` decomposition remain deferred because source review found no current defect and the move would require coordinated LS-07/LS-09 requalification.
 
-## Trace 1: World Mutation Boundary
-
-**Question:** Which `World` mutations are performed directly outside `src/sim/world.ts`, and should they become explicit commands?
-
-### Evidence
-
-- `World` is defined at `src/sim/world.ts:L393` and has degree 222.
-- `Game` references `World` at `src/game.ts:L63`.
-- `opponent.ts`, `tactician.ts`, `hud.ts`, `session.ts`, `runner.ts`, `entityRenderer.ts`, `gameSave.ts`, `audioEngine.ts`, tutorials, and tests import or reference `World`.
-- The graph found 268 external call/reference edges incident on `World` methods.
-- Examples that look command-like:
-  - `src/ai/opponent.ts:L844`: `.updateArtilleryRepositioning()` calls `World.activateAbility()`.
-  - `src/ai/opponent.ts:L589`: `AiOpponent.runTactics()` calls `World.fireBallisticAt()`.
-  - `src/ai/opponent.ts:L531`: `.findBuildSpot()` calls `World.canPlace()`.
-  - `src/tutorial/counterfire.ts:L172`: `updateCounterfireMilestones()` calls `World.hasExactSensorContactFrom()`.
-- Examples that look query/read-only:
-  - `src/ui/hud.ts:L1442` and `L1446`: HUD selection code calls ballistic capability/range methods.
-  - `src/sim/serialize.ts:L52`: `createWorldSnapshot()` calls `World.exportPersistenceState()`.
-  - `src/headless/runner.ts:L139`: `runHeadlessMatch()` calls `World.drainEvents()`.
-
-### Finding
-
-The graph supports a mixed model: AI invokes action-bearing `World` methods, while HUD, serialization, headless execution, and presentation consume query/state APIs. This is not automatically a violation. It is a boundary worth protecting because the `World` aggregate is already the highest-degree node in the graph.
-
-### Recommendation
-
-Do not move methods yet. First classify externally used `World` methods into three explicit sets:
-
-- Commands: ability activation, ballistic fire, build/order issuance, and any method that changes simulation state.
-- Queries: reachability, visibility, range, placement, and entity lookup.
-- State transfer: persistence export/restore and event draining.
-
-Then require new external consumers to depend on the smallest applicable surface rather than the whole aggregate. Source review is needed to verify the graph's call/reference classifications before this is enforced.
-
-## Trace 2: AI Dependency Cycle
-
-**Question:** Can `opponent.ts`, `tactician.ts`, and `behaviorTree.ts` depend on shared AI interfaces instead of each other?
+## Trace 1: AI Dependency Direction
 
 ### Evidence
 
-- The graph report identifies a two-file cycle: `src/ai/opponent.ts -> src/ai/tactician.ts -> src/ai/opponent.ts`.
-- It also identifies a three-file cycle: `src/ai/behaviorTree.ts -> src/ai/opponent.ts -> src/ai/tactician.ts -> src/ai/behaviorTree.ts`.
-- `AiOpponent` references `Tactician` directly.
-- `tactician.ts --imports_from--> behaviorTree.ts`.
-- `behaviorTree.ts --imports_from--> opponent.ts`.
-- `AiOpponent` reaches `BTNode` in three hops through `opponent.ts` and `behaviorTree.ts`.
-- `AiOpponent` exposes strategy operations such as `.runTactics()`, `.chooseAttackTarget()`, `.findBuildSpot()`, and `.refreshPushTarget()` from `src/ai/opponent.ts`.
-- `Tactician` owns persistence and tactical updates, including `.exportPersistenceState()`, `.restorePersistenceState()`, and `.update()`.
-- `behaviorTree.ts` owns reusable behavior-tree primitives, including `BTContext`, `BTNode`, `Selector`, `Sequence`, `Cooldown`, and `DifficultyGate`.
+- `Difficulty` and `StrategicGoal` are defined in `src/ai/contracts.ts:1-3`.
+- `behaviorTree.ts` imports `Difficulty` from `contracts.ts` at `src/ai/behaviorTree.ts:1`.
+- `tactician.ts` imports `Difficulty` and `StrategicGoal` from `contracts.ts` at `src/ai/tactician.ts:15`.
+- `opponent.ts` imports and re-exports those public types while retaining the runtime `Tactician` dependency.
+- `tools/lint.mjs:75-83` rejects a future lower-level import from `./opponent`.
+- `GRAPH_REPORT.md:216-217` reports no import cycles.
 
 ### Finding
 
-The files currently combine three different roles: strategic policy, tactical execution/persistence, and reusable behavior-tree mechanics. The import cycle is therefore a credible architectural coupling, not merely a file-layout concern.
+The runtime and source dependency direction is now one-way:
 
-### Recommendation
+```text
+opponent.ts -> tactician.ts -> behaviorTree.ts
+      |              |               |
+      +--------------+---------------+-> contracts.ts
+```
 
-Introduce a dependency direction before extracting implementation:
+The behavior-tree and tactical modules no longer depend on the strategic opponent implementation.
 
-1. Define behavior-tree primitives and an `AiWorldReadModel` in a low-level AI contracts module.
-2. Let `Tactician` depend on behavior-tree primitives plus a narrow command sink.
-3. Let `AiOpponent` assemble strategic policy and pass data/commands into `Tactician`, rather than importing tactical implementation details bidirectionally.
-4. Keep persistence DTOs owned by the tactical layer or a neutral persistence module, never by behavior-tree primitives.
+### Verification
 
-## Trace 3: E2E Scenario Provenance
+- AI behavior, tactics, strategy, artillery, serialization, and core-match tests passed after the move.
+- Typecheck and lint passed.
 
-**Question:** Should E2E scenarios call the same parser/factory used by `runtimeScenario.ts`?
+## Trace 2: Browser Scenario Validation And Provenance
 
 ### Evidence
 
-- `scenarioSource` is defined in `e2e/break-line.spec.ts:L6` and has degree 1. Its only graph edge is containment by `break-line.spec.ts`.
-- There is no graph path from `e2e_break_line_spec_scenariosource` to `parseGameSaveSnapshot()`.
-- `scenarioSha256` is likewise E2E-local at `e2e/break-line.spec.ts:L8`.
-- The production scenario path is cohesive:
-  - `parseRuntimeScenario()` is defined at `src/scenario/runtimeScenario.ts:L103`.
-  - `parseRuntimeScenario() --calls--> validateReferences()` directly.
-  - It also calls `readAi()`, `readBinding()`, `readDeposit()`, `readOpeningView()`, `readPlayer()`, `readSpinalPair()`, `readStructure()`, `readUnit()`, and `faction()`.
-  - `runtimeScenario.ts -> opponent.ts -> World` forms a two-hop production path.
-- `runtimeScenario.test.ts` imports both `parseRuntimeScenario()` and `createRuntimeScenarioWorld()`, creating a two-hop test-mediated connection between parser and factory.
+- The canonical browser parser remains `parseScenario()` at `tools/rww/scenario.mjs:38`.
+- Break the Line reads raw bytes, parses those bytes, and hashes the same bytes at `e2e/break-line.spec.ts:9-12`.
+- Direct scenario consumers in `break-line.spec.ts`, `tutorial.spec.ts`, `counterfire.spec.ts`, `signal-in-spine.spec.ts`, `hud.spec.ts`, and `scenario.spec.ts` now call `parseScenario()`.
+- `tests/tools/scenario.test.ts:39-48` parses every tracked browser scenario artifact.
+- `tests/tools/scenario.test.ts:50-70` binds the current Break the Line bytes to completion, visual, and T480 evidence.
+- Break the Line completion evidence now includes schema, version, id, revision, path, SHA-256, and the repository's full `collectGit()` provenance snapshot.
+- Production runtime coverage remains separate in `e2e/runtime-scenario.spec.ts` through `parseRuntimeScenario()` and `createRuntimeScenarioWorld()`.
 
 ### Finding
 
-The runtime parser is already a clear validation boundary. The E2E source/hash identifiers are currently evidence metadata rather than graph-visible inputs to the parser/factory contract. That prevents the graph from proving that an E2E scenario is parsed and instantiated by the same production code.
+The original recommendation to send browser fixtures through the runtime parser was incorrect. The repaired seam is:
 
-### Recommendation
+```text
+validation/scenarios/*.json
+  -> JSON decoding
+  -> parseScenario()
+  -> applyBrowserScenario()
+```
 
-Use a shared scenario artifact at the E2E boundary. The test should obtain its scenario input through the same parse-and-factory entry point as production, or explicitly assert the artifact/hash passed to that entry point. Retain E2E-only metadata separately if it describes browser setup rather than scenario content.
+Production authored runtime scenarios retain their different schema and production factory path.
 
-## Trace 4: Faction Consumer Contracts
+### Verification
 
-**Question:** Which `Faction` consumers only need a smaller derived contract?
+- All 10 tracked browser scenario JSON artifacts passed strict parsing.
+- Break the Line completion passed and emitted scenario/provenance evidence.
+- Scenario, tutorial, counterfire, signal, HUD, and Break the Line browser paths passed except for two unrelated committed LS-10 assertions documented below.
+
+## Trace 3: World Authority Seam
 
 ### Evidence
 
-- `Faction` is defined at `src/sim/data.ts:L15` and has degree 178.
-- It is imported or referenced by 39 or more files.
-- High-fan-out consumer groups include:
-  - `src/sim/world.ts`: 57 connections.
-  - `src/ui/hud.ts`: 13 connections.
-  - `src/audio/voiceDirector.ts`: 6 connections.
-  - `src/headless/runner.ts`: 6 connections.
-  - `src/headless/coreMatch.ts`: 5 connections.
-  - `src/render/effects.ts` and `src/render/entityRenderer.ts`: 4 connections each.
-  - `src/scenario/runtimeScenario.ts`: 4 connections.
-- Direct shortest paths show `Faction` imported by `audioEngine.ts` and `coreMatch.ts`; `Game` references it at `src/game.ts:L69`.
+- `docs/architecture.md:91-99` classifies external use as commands, queries, and state transfer.
+- `tools/lint.mjs:39-57` defines reviewed owners for lifecycle, bootstrap, gameplay command, event-drain, and persistence methods.
+- `tools/lint.mjs:59-85` normalizes Windows paths, checks authority calls, and prevents the AI dependency from reversing.
+- `tests/tools/lint.test.ts` covers allowed owners, unauthorized command/state-transfer callers, and the AI import direction.
+- `Game` and the headless runner remain the only event-drain owners; scenario construction remains the only external spawning/topology owner.
 
 ### Finding
 
-The graph cannot determine whether each consumer needs the entire enum/type or only a small projection. It does distinguish consumer roles well enough to identify likely candidates for narrowing.
+Source review found no current unauthorized mutation defect. The useful fix was to preserve the existing authority model with executable checks. A type-level `WorldCommands`/`WorldQueries` split would not create a real seam while entity lookups still return mutable objects.
 
-### Recommended Contract Candidates
+### Verification
 
-- UI and rendering: faction presentation data such as palette, iconography, display label, and visual identity.
-- Audio and voice: a faction voice-pack selector or cue namespace.
-- Headless/core-match validation: faction identity and balance/modifier read models.
-- Scenario parsing and saves: validated faction identifier plus serialization conversion.
-- AI and simulation: the full combat/balance modifier model where necessary.
+- Repository lint passes with the new authority checks.
+- World determinism, serialization, headless observer, renderer, and presentation-event tests pass.
 
-The simulation core should remain the owner of authoritative faction statistics. Presentation, audio, and metadata-only consumers should not need the full simulation-facing dependency.
+## Rejected Or Deferred Findings
 
-## Trace 5: data.ts Responsibility Split
+### Faction Projections
 
-**Question:** Which parts of `data.ts` are balance catalogs versus runtime rules versus test fixtures?
+`Faction` is already a two-member identity at `src/sim/data.ts:15-18`. Presentation, audio, headless, scenario, AI, and simulation consumers do not share one oversized faction object. New per-layer projection interfaces would add indirection without reducing meaningful coupling.
 
-### Evidence
+### data.ts Physical Split
 
-- `data.ts` anchors the low-cohesion "Simulation Data and Tests" community: 70 nodes, cohesion 0.042.
-- The graph identifies catalog-like concepts: `ABILITIES`, `WEAPONS`, `UnitDef`, `StructureDef`, `BUILDABLE`, `FactionModifiers`, `FACTION_MODS`, `DamageType`, `ArmorClass`, `WeaponKind`, `UnitKind`, and `StructureKind`.
-- It identifies simulation rule/config concepts: `STARTING_COMMAND`, `COMMAND_PER_NODE`, `DOMINANCE_PER_ALIGNED_PAIR_PER_SEC`, spinal capture constants, firing reveal time, wreck lifetime, and power/damage-related concepts.
-- It identifies runtime consumers including `World`, `RuntimeScenario`, `AiOpponent`, `Game`, `Terrain`, headless runners, and tutorial scenarios.
-- Test and validation code has its own nearby path through `runtimeScenario.test.ts`, balance validation documentation, and scenario helpers; the graph does not establish a dedicated fixture module inside `data.ts`.
+`src/sim/data.ts` does mix content catalogs, faction modifiers, presentation labels/colors, and global/default rules. It does not contain test fixtures. A later qualified refactor may extract faction identity, presentation metadata, and simulation rules, but must coordinate source-bound LS-07/LS-09 evidence rather than manually changing hashes.
 
-### Finding
+### World Interface Extraction
 
-`data.ts` appears to be a mixed domain catalog and simulation configuration dependency. The graph provides stronger evidence for the first two responsibilities than for a dedicated test-fixture responsibility. Tests may be importing production data directly rather than consuming separately named fixtures.
+No broad command/query interface is warranted until a real second adapter, worker authority, multiplayer authority, or independent command producer appears.
 
-### Recommendation
+## Remaining Blockers Outside This Remediation
 
-Split conceptually before splitting files:
+### Qualification Evidence
 
-- Catalogs: unit, structure, ability, weapon, armor, and faction definitions.
-- Rules/config: economy, spinal alignment, visibility, firing, wreck, and timing constants.
-- Test fixtures: only scenario builders, intentionally synthetic definitions, and test defaults.
+The concurrent commit that captured the AI contract move changed `src/ai/opponent.ts`, but LS-07 and LS-09 receipts still contain its previous SHA-256. `tests/tools/progress-manifest.test.ts` therefore fails current-source validation. This requires canonical requalification and independent review; the hashes must not be manually patched.
 
-If source review confirms production data is reused as implicit test fixtures, add explicit fixture builders rather than duplicating balance catalogs.
+### Existing Chromium Assertions
 
-## Prioritized Follow-Ups
+The focused Chromium run passed 23 of 25 tests. Two committed LS-10 assertions remain failing:
 
-1. **Scenario contract traceability:** make E2E scenario content visibly pass through the production parser/factory. This closes the current degree-one scenario evidence gap.
-2. **AI dependency direction:** break the `opponent.ts` / `tactician.ts` / `behaviorTree.ts` cycle with contracts and a one-way dependency structure.
-3. **World API audit:** classify the 268 graph-visible external `World` method edges into commands, queries, and state transfer before adding more consumers.
-4. **Faction projections:** introduce presentation/audio/metadata projections only where source review shows a consumer does not need full simulation-facing faction data.
-5. **Data responsibility map:** name and test catalog, rules, and fixture seams before deciding whether physical file extraction is worth the churn.
+- `e2e/runtime-scenario.spec.ts:78` expects the authored engineer to remain inside the old tactical framing after camera changes.
+- `e2e/scenario.spec.ts:106` expects `SENSOR COVERAGE`, while the current HUD renders `SENSOR · 1 BASTION`.
 
-## Additional Questions The Graph Supports
+These failures are unrelated to scenario parsing and authority linting and should be resolved in the LS-10 change set.
 
-- Which external callers of `World` invoke command-like methods without going through `Game` or a dedicated command service?
-- Which `Faction` imports are only needed to select visual or audio assets?
-- Which E2E scenario fields are browser harness controls versus authored scenario content?
-- Can `TacticianPersistenceState` be serialized without importing strategic policy or behavior-tree mechanics?
-- Which `data.ts` constants vary per scenario or difficulty and therefore belong in runtime configuration rather than global data?
+## Verification Summary
 
-## Source References
+- `npm run lint`: passed.
+- `npm run build`: passed.
+- Unit suite excluding the stale qualification-integrity test: 443 passed, 1 skipped.
+- `npm run validate:core-match`: passed.
+- Focused Chromium regression: 23 passed, 2 unrelated committed LS-10 failures.
+- Rendered graph integrity: 2,681 nodes, 6,842 edges, zero dangling edges, zero self-loops.
+- Import cycles: none detected.
 
-- `src/sim/world.ts:L393` - `World`
-- `src/sim/data.ts:L15` - `Faction`
-- `src/game.ts:L62-L75` - `Game` references to core runtime subsystems
-- `src/scenario/runtimeScenario.ts:L103` - `parseRuntimeScenario()`
-- `src/ai/opponent.ts:L309` - `AiOpponent`
-- `e2e/break-line.spec.ts:L6-L8` - E2E scenario source and hash metadata
-- `graphify-out/GRAPH_REPORT.md` - community cohesion, import-cycle report, and full graph audit
+## Recommended Next Actions
+
+1. Requalify LS-07 and LS-09 through the canonical evidence workflow for the committed `opponent.ts` change.
+2. Reconcile the two LS-10 Chromium assertions with the intended camera and HUD behavior.
+3. Run a keyed Graphify semantic update so the three changed documentation files and community labels are refreshed.
+4. Revisit the bounded `data.ts` split only in a dedicated requalification window.
