@@ -1,0 +1,16 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-unit",
+  "command": "npx vitest run tests/tutorial/mission.test.ts tests/tutorial/gameSave.test.ts tests/campaign/missionRegistry.test.ts tests/campaign/campaignRoute.test.ts tests/campaign/campaignProfile.test.ts",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "d8ccb180e9fa410617064d3ac6c5345199cab6c4f6dfebf7e68304486d0b10d2",
+  "passedTestIds": [
+    "tutorial-arc-objective-authority",
+    "tutorial-arc-persistence",
+    "campaign-registry-contract",
+    "campaign-route-and-profile"
+  ],
+  "summary": "The focused LS-15 lane passed 31 tests across five suites covering First Contact objective authority and failure semantics, the validated save envelope, the twelve-mission registry, campaign route context, and campaign profile lifecycle."
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-browser",
+  "command": "npx playwright test e2e/integrated-tutorial-arc.spec.ts --project=chromium-regression",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "d8ccb180e9fa410617064d3ac6c5345199cab6c4f6dfebf7e68304486d0b10d2",
+  "passedTestIds": [
+    "production-front-door-launch",
+    "production-arc-completion",
+    "production-arc-persistence",
+    "production-standalone-boundary"
+  ],
+  "summary": "The focused LS-15 browser lane passed 4 tests at 1280x720 Low covering campaign-archive front-door launch, deterministic ten-objective completion with campaign progression, save-envelope restoration with reload route continuity, and the standalone arc boundary, all with clean consoles."
+}

@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import manifest from '../../docs/launch-scope-progress.json';
 import g01Receipt from '../../validation/evidence/launch-scope/G-01.json';
 import g05Receipt from '../../validation/evidence/launch-scope/G-05.json';
@@ -48,6 +50,11 @@ import ls14FocusedUnit from '../../validation/evidence/runs/ls-14-focused-unit-2
 import ls14FocusedBrowser from '../../validation/evidence/runs/ls-14-focused-browser-2026-08-10.json';
 import ls14FullCheck from '../../validation/evidence/runs/ls-14-full-check-2026-08-10.json';
 import ls14CoreMatch from '../../validation/evidence/runs/ls-14-core-match-2026-08-10.json';
+import ls15Machine from '../../validation/evidence/ls-15-integrated-tutorial-arc-2026-08-10.json';
+import ls15FocusedUnit from '../../validation/evidence/runs/ls-15-focused-unit-2026-08-10.json';
+import ls15FocusedBrowser from '../../validation/evidence/runs/ls-15-focused-browser-2026-08-10.json';
+import ls15FullCheck from '../../validation/evidence/runs/ls-15-full-check-2026-08-10.json';
+import ls15CoreMatch from '../../validation/evidence/runs/ls-15-core-match-2026-08-10.json';
 import {
   CLAIM_EVIDENCE_POLICY,
   LS07_ACCEPTANCE_IDS,
@@ -75,8 +82,14 @@ import {
   LS14_ACCEPTANCE_IDS,
   LS14_REQUIRED_SOURCE_PATHS,
   LS14_RUN_POLICY,
+  LS15_ACCEPTANCE_IDS,
+  LS15_CHECK_POLICY,
+  LS15_REQUIRED_SOURCE_PATHS,
+  LS15_RUN_POLICY,
+  LS15_RUN_TEST_IDS,
   ls07SourceSnapshotSha256,
   ls11SourceSnapshotSha256,
+  ls15SourceSnapshotSha256,
   validateClaimEvidenceReceipt,
   validateLS08CriterionReview,
   validateLS07EvidenceShape,
@@ -86,6 +99,7 @@ import {
   validateLS12EvidenceShape,
   validateLS13EvidenceShape,
   validateLS14EvidenceShape,
+  validateLS15EvidenceShape,
   validateLaunchProgressManifest,
 } from '../../vite.config.ts';
 
@@ -647,6 +661,118 @@ describe('launch progress manifest integrity', () => {
     candidate.references[0].url = 'javascript:alert(1)';
 
     await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/invalid reference URL/i);
+  });
+});
+
+describe('LS-15 automation evidence integrity', () => {
+  function ls15RunArtifacts(): Record<string, any> {
+    return {
+      'focused-unit': structuredClone(ls15FocusedUnit),
+      'focused-browser': structuredClone(ls15FocusedBrowser),
+      'full-check': structuredClone(ls15FullCheck),
+      'core-match': structuredClone(ls15CoreMatch),
+    };
+  }
+
+  function contractSha256(): string {
+    return createHash('sha256')
+      .update(readFileSync('docs/launch-scope/ls-15-integrated-tutorial-arc.md'))
+      .digest('hex');
+  }
+
+  it('predeclares the exact LS-15 automation lane policy', () => {
+    expect(LS15_ACCEPTANCE_IDS).toEqual([
+      'public-alpha-front-door',
+      'arc-completable',
+      'onboarding-legibility',
+      'persistence-continuity',
+      'authority-boundary',
+      'regression-review',
+    ]);
+    expect(Object.keys(LS15_RUN_POLICY)).toEqual(['focused-unit', 'focused-browser', 'full-check', 'core-match']);
+    expect(LS15_RUN_POLICY['focused-browser'].command)
+      .toBe('npx playwright test e2e/integrated-tutorial-arc.spec.ts --project=chromium-regression');
+    expect(LS15_REQUIRED_SOURCE_PATHS).toContain('e2e/integrated-tutorial-arc.spec.ts');
+    expect(LS15_RUN_TEST_IDS['focused-browser']).toEqual([
+      'production-front-door-launch',
+      'production-arc-completion',
+      'production-arc-persistence',
+      'production-standalone-boundary',
+    ]);
+  });
+
+  it('accepts the tracked LS-15 machine evidence bound to the current contract', () => {
+    expect(() => validateLS15EvidenceShape(
+      structuredClone(ls15Machine),
+      ls15RunArtifacts(),
+      { contractSha256: contractSha256() },
+    )).not.toThrow();
+  });
+
+  it('rejects tampered LS-15 automation evidence', () => {
+    const expected = { contractSha256: contractSha256() };
+
+    const wrongContract = structuredClone(ls15Machine);
+    wrongContract.contractSha256 = 'f'.repeat(64);
+    expect(() => validateLS15EvidenceShape(wrongContract, ls15RunArtifacts(), expected))
+      .toThrow(/does not bind the current contract/i);
+
+    const tamperedSnapshot = structuredClone(ls15Machine);
+    tamperedSnapshot.sourceSnapshotSha256 = 'f'.repeat(64);
+    expect(() => validateLS15EvidenceShape(tamperedSnapshot, ls15RunArtifacts(), expected))
+      .toThrow(/source snapshot/i);
+
+    const missingSource = structuredClone(ls15Machine);
+    missingSource.sourceRefs.pop();
+    expect(() => validateLS15EvidenceShape(missingSource, ls15RunArtifacts(), expected))
+      .toThrow(/exact implementation sources/i);
+
+    const forgedTestIds = ls15RunArtifacts();
+    forgedTestIds['focused-browser'].passedTestIds.push('forged-extra-test');
+    expect(() => validateLS15EvidenceShape(structuredClone(ls15Machine), forgedTestIds, expected))
+      .toThrow(/exact predeclared test IDs/i);
+
+    const wrongCommand = ls15RunArtifacts();
+    wrongCommand['full-check'].command = 'npm run lint';
+    expect(() => validateLS15EvidenceShape(structuredClone(ls15Machine), wrongCommand, expected))
+      .toThrow(/exact passing command/i);
+
+    const failedRun = structuredClone(ls15Machine);
+    failedRun.runs[3].result = 'failed';
+    expect(() => validateLS15EvidenceShape(failedRun, ls15RunArtifacts(), expected))
+      .toThrow(/did not pass its exact command/i);
+
+    const failedCheck = structuredClone(ls15Machine);
+    failedCheck.checks[1].result = 'failed';
+    expect(() => validateLS15EvidenceShape(failedCheck, ls15RunArtifacts(), expected))
+      .toThrow(/did not pass/i);
+
+    const unboundArtifact = ls15RunArtifacts();
+    unboundArtifact['core-match'].sourceSnapshotSha256 = 'e'.repeat(64);
+    expect(() => validateLS15EvidenceShape(structuredClone(ls15Machine), unboundArtifact, expected))
+      .toThrow(/implementation source snapshot/i);
+  });
+
+  it('keeps the tracked LS-15 snapshot consistent with the declared sources', () => {
+    expect(ls15SourceSnapshotSha256((ls15Machine as Record<string, any>).sourceRefs))
+      .toBe((ls15Machine as Record<string, any>).sourceSnapshotSha256);
+    expect((ls15Machine as Record<string, any>).sourceRefs.map((source: any) => source.path))
+      .toEqual([...LS15_REQUIRED_SOURCE_PATHS]);
+    expect((ls15Machine as Record<string, any>).checks.map((check: any) => check.id))
+      .toEqual([...LS15_ACCEPTANCE_IDS]);
+    for (const check of (ls15Machine as Record<string, any>).checks) {
+      expect(check.runIds).toEqual([...LS15_CHECK_POLICY[check.id as keyof typeof LS15_CHECK_POLICY].runIds]);
+    }
+  });
+
+  it('rejects LS-15 completion while the G-02 claim contract remains undeclared', async () => {
+    const candidate = copyManifest();
+    candidate.slices[14].state = 'complete';
+    candidate.slices[14].qualification = 'automation-passed';
+    candidate.slices[14].disposition = 'clean';
+    candidate.slices[14].evidenceRefs = ['validation/evidence/launch-scope/LS-15.json'];
+
+    await expect(validateLaunchProgressManifest(candidate)).rejects.toThrow(/LS-15.*no policy.*claim receipt/i);
   });
 });
 

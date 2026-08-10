@@ -1,0 +1,13 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "core-match",
+  "command": "npm run validate:core-match",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "d8ccb180e9fa410617064d3ac6c5345199cab6c4f6dfebf7e68304486d0b10d2",
+  "passedTestIds": [
+    "core-match-cohorts"
+  ],
+  "summary": "The protected LS-15 core-match lane passed the veteran-mirror deterministic gameplay cohort on the bound source snapshot, confirming the tutorial-arc integration did not alter accepted match semantics."
+}

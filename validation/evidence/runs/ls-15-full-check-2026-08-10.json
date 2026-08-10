@@ -1,0 +1,13 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "full-check",
+  "command": "npm run check",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "d8ccb180e9fa410617064d3ac6c5345199cab6c4f6dfebf7e68304486d0b10d2",
+  "passedTestIds": [
+    "full-check"
+  ],
+  "summary": "The LS-15 full check passed lint, the complete 500-test unit suite with one pre-existing skip, typecheck, and the production build on the bound source snapshot."
+}

@@ -1,0 +1,174 @@
+{
+  "schema": "rww.ls-15-verification",
+  "version": 1,
+  "sliceId": "LS-15",
+  "contractSha256": "716d3b81204630f5eeac65d84cc365114bceec249e95c77217ebb8043819150d",
+  "sourceSnapshotSha256": "d8ccb180e9fa410617064d3ac6c5345199cab6c4f6dfebf7e68304486d0b10d2",
+  "sourceRefs": [
+    {
+      "path": "src/tutorial/mission.ts",
+      "sha256": "da0963ae35c301f9b9418bb06323683ecd98cdb37f77b4bbf4b521ba259ec7df"
+    },
+    {
+      "path": "src/tutorial/narrative.ts",
+      "sha256": "8a20ab6f38873f08f13be6671f34877261034d9576a73aa7de89f3b53509752c"
+    },
+    {
+      "path": "src/campaign/missionRegistry.ts",
+      "sha256": "55ddb105cd3934f14f69705fba80ab379b2e392dc88c02b16f6ac0a2aa40641b"
+    },
+    {
+      "path": "src/campaign/campaignRoute.ts",
+      "sha256": "8c85e7771bf6c96d6f543d534875de2f68d5060f4e66cc13d2ccd0a1966df31f"
+    },
+    {
+      "path": "src/campaign/campaignProfile.ts",
+      "sha256": "aebe8fbe0bb628af5dddd191dac089c00a7a4cbcfe4da6ca4c7aead34dbcab19"
+    },
+    {
+      "path": "src/scenario/firstContact.ts",
+      "sha256": "cddb8789daa1a98ecc820af36400734e26ba3714e61c68d225288ed0a0e9c468"
+    },
+    {
+      "path": "src/scenario/route.ts",
+      "sha256": "5e3369b8fd5ffca31ae612fe4913465fa5f5a73dec4427cdc2b57755eada9b9c"
+    },
+    {
+      "path": "src/main.ts",
+      "sha256": "d7da5d6e3364bbb21e90905d94a32965edccf80d02140e8b1ea89c8fcc7f10f2"
+    },
+    {
+      "path": "src/ui/titleScreen.ts",
+      "sha256": "d112f11967ac3d58b7c9645622919876cf8cf64815be8d920e98839b799ee70d"
+    },
+    {
+      "path": "src/ui/hud.ts",
+      "sha256": "22279124c6ef1a8456f54ec80fcc65381932680806d283fb2111771dc11fb358"
+    },
+    {
+      "path": "tests/tutorial/mission.test.ts",
+      "sha256": "819cd570513b4e9893bc2ce813e91aaf78b9a8ae11baa40f95f7fe5c3c484c4a"
+    },
+    {
+      "path": "tests/tutorial/gameSave.test.ts",
+      "sha256": "35076c48b69a0242080c73061867afadaca047beae82252e223360a62379f38e"
+    },
+    {
+      "path": "tests/campaign/missionRegistry.test.ts",
+      "sha256": "7a547f11bcf1403ae427793bf36bdbce4ef6fe47336ac0c2353c0f69b24fbf72"
+    },
+    {
+      "path": "tests/campaign/campaignRoute.test.ts",
+      "sha256": "d475c553d7cdb2ebaf8cfa07c992043f15f7dc47def8415089613217f0c4c96d"
+    },
+    {
+      "path": "tests/campaign/campaignProfile.test.ts",
+      "sha256": "4e1e378f95644e5156d13fb69c989a19da4b964714adec3ef31a06239b9090e5"
+    },
+    {
+      "path": "e2e/integrated-tutorial-arc.spec.ts",
+      "sha256": "a93b239307b3eeac7c9f88b13c9d1da7141b23ef5742cdd573b7c7dcda8249b1"
+    },
+    {
+      "path": "e2e/tutorial.spec.ts",
+      "sha256": "fe7867f30f7e63d0662f5dc7e04a6bfd233e4ece6c97dff5d30c082ebccacba2"
+    },
+    {
+      "path": "e2e/campaign.spec.ts",
+      "sha256": "f6c6c84953a02865a8de6974c2ca2639dfe61e1ef3f679be8e82bd1f7608f3a2"
+    }
+  ],
+  "runs": [
+    {
+      "id": "focused-unit",
+      "command": "npx vitest run tests/tutorial/mission.test.ts tests/tutorial/gameSave.test.ts tests/campaign/missionRegistry.test.ts tests/campaign/campaignRoute.test.ts tests/campaign/campaignProfile.test.ts",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": {
+        "path": "validation/evidence/runs/ls-15-focused-unit-2026-08-10.json",
+        "sha256": "f6d6746e9011e0c204e2f0b337e400dc837cfe06795e22f3ddc17ca4f3768dc1"
+      }
+    },
+    {
+      "id": "focused-browser",
+      "command": "npx playwright test e2e/integrated-tutorial-arc.spec.ts --project=chromium-regression",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": {
+        "path": "validation/evidence/runs/ls-15-focused-browser-2026-08-10.json",
+        "sha256": "d8994a45d4e724c0fe722a0bc0299d0367be0e42e5f48eb4d550db966cfd50fa"
+      }
+    },
+    {
+      "id": "full-check",
+      "command": "npm run check",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": {
+        "path": "validation/evidence/runs/ls-15-full-check-2026-08-10.json",
+        "sha256": "a71cd3a92f64a8ab3c0e11c8e0564c91ee163f69c1332d3c6ea8bd733ae742a0"
+      }
+    },
+    {
+      "id": "core-match",
+      "command": "npm run validate:core-match",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": {
+        "path": "validation/evidence/runs/ls-15-core-match-2026-08-10.json",
+        "sha256": "9f2c2f4240dafbe40779abbfee53853feeb7536752fdb15194c9f7eae1cfcda6"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "public-alpha-front-door",
+      "result": "passed",
+      "runIds": [
+        "focused-unit",
+        "focused-browser"
+      ]
+    },
+    {
+      "id": "arc-completable",
+      "result": "passed",
+      "runIds": [
+        "focused-unit",
+        "focused-browser"
+      ]
+    },
+    {
+      "id": "onboarding-legibility",
+      "result": "passed",
+      "runIds": [
+        "focused-browser"
+      ]
+    },
+    {
+      "id": "persistence-continuity",
+      "result": "passed",
+      "runIds": [
+        "focused-unit",
+        "focused-browser"
+      ]
+    },
+    {
+      "id": "authority-boundary",
+      "result": "passed",
+      "runIds": [
+        "focused-unit",
+        "focused-browser",
+        "core-match"
+      ]
+    },
+    {
+      "id": "regression-review",
+      "result": "passed",
+      "runIds": [
+        "focused-browser",
+        "full-check",
+        "core-match"
+      ]
+    }
+  ]
+}

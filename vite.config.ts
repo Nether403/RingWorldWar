@@ -645,6 +645,83 @@ export const LS14_CHECK_POLICY = Object.freeze({
   'regression-review': Object.freeze({ runIds: Object.freeze(['focused-browser', 'full-check', 'core-match'] as LS14RunId[]) }),
 } as const);
 
+export const LS15_ACCEPTANCE_IDS = Object.freeze([
+  'public-alpha-front-door',
+  'arc-completable',
+  'onboarding-legibility',
+  'persistence-continuity',
+  'authority-boundary',
+  'regression-review',
+] as const);
+
+export const LS15_REQUIRED_SOURCE_PATHS = Object.freeze([
+  'src/tutorial/mission.ts',
+  'src/tutorial/narrative.ts',
+  'src/campaign/missionRegistry.ts',
+  'src/campaign/campaignRoute.ts',
+  'src/campaign/campaignProfile.ts',
+  'src/scenario/firstContact.ts',
+  'src/scenario/route.ts',
+  'src/main.ts',
+  'src/ui/titleScreen.ts',
+  'src/ui/hud.ts',
+  'tests/tutorial/mission.test.ts',
+  'tests/tutorial/gameSave.test.ts',
+  'tests/campaign/missionRegistry.test.ts',
+  'tests/campaign/campaignRoute.test.ts',
+  'tests/campaign/campaignProfile.test.ts',
+  'e2e/integrated-tutorial-arc.spec.ts',
+  'e2e/tutorial.spec.ts',
+  'e2e/campaign.spec.ts',
+] as const);
+
+export const LS15_RUN_POLICY = Object.freeze({
+  'focused-unit': Object.freeze({
+    command: 'npx vitest run tests/tutorial/mission.test.ts tests/tutorial/gameSave.test.ts tests/campaign/missionRegistry.test.ts tests/campaign/campaignRoute.test.ts tests/campaign/campaignProfile.test.ts',
+    artifactPath: 'validation/evidence/runs/ls-15-focused-unit-2026-08-10.json',
+  }),
+  'focused-browser': Object.freeze({
+    command: 'npx playwright test e2e/integrated-tutorial-arc.spec.ts --project=chromium-regression',
+    artifactPath: 'validation/evidence/runs/ls-15-focused-browser-2026-08-10.json',
+  }),
+  'full-check': Object.freeze({
+    command: 'npm run check',
+    artifactPath: 'validation/evidence/runs/ls-15-full-check-2026-08-10.json',
+  }),
+  'core-match': Object.freeze({
+    command: 'npm run validate:core-match',
+    artifactPath: 'validation/evidence/runs/ls-15-core-match-2026-08-10.json',
+  }),
+} as const);
+
+type LS15RunId = keyof typeof LS15_RUN_POLICY;
+
+export const LS15_RUN_TEST_IDS = Object.freeze({
+  'focused-unit': Object.freeze([
+    'tutorial-arc-objective-authority',
+    'tutorial-arc-persistence',
+    'campaign-registry-contract',
+    'campaign-route-and-profile',
+  ]),
+  'focused-browser': Object.freeze([
+    'production-front-door-launch',
+    'production-arc-completion',
+    'production-arc-persistence',
+    'production-standalone-boundary',
+  ]),
+  'full-check': Object.freeze(['full-check']),
+  'core-match': Object.freeze(['core-match-cohorts']),
+} as const);
+
+export const LS15_CHECK_POLICY = Object.freeze({
+  'public-alpha-front-door': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS15RunId[]) }),
+  'arc-completable': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS15RunId[]) }),
+  'onboarding-legibility': Object.freeze({ runIds: Object.freeze(['focused-browser'] as LS15RunId[]) }),
+  'persistence-continuity': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS15RunId[]) }),
+  'authority-boundary': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser', 'core-match'] as LS15RunId[]) }),
+  'regression-review': Object.freeze({ runIds: Object.freeze(['focused-browser', 'full-check', 'core-match'] as LS15RunId[]) }),
+} as const);
+
 export const LS09_RUN_POLICY = Object.freeze({
   'focused-unit': Object.freeze({
     command: 'npx vitest run tests/core/shadow.test.ts tests/sim/shadowIntelligence.test.ts tests/sim/vision.test.ts tests/render/environment.test.ts tests/render/presentationEvents.test.ts tests/audio/audioEngine.test.ts tests/ai/strategist.test.ts tests/ui/hud.test.ts',
@@ -1234,6 +1311,109 @@ export function ls14SourceSnapshotSha256(sourceRefsValue: unknown): string {
     sha256: requireSha256(source.sha256, `LS-14 source snapshot[${index}].sha256`),
   }));
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function ls15SourceSnapshotSha256(sourceRefsValue: unknown): string {
+  const sourceRefs = asArray(sourceRefsValue).map((source, index) =>
+    requireRecord(source, `LS-15 source snapshot[${index}]`));
+  const canonical = sourceRefs.map((source, index) => ({
+    path: requireNonEmptyString(source.path, `LS-15 source snapshot[${index}].path`),
+    sha256: requireSha256(source.sha256, `LS-15 source snapshot[${index}].sha256`),
+  }));
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function validateLS15EvidenceShape(
+  machineValue: unknown,
+  runArtifactValues: Record<string, unknown>,
+  expectedHashes?: { contractSha256: string },
+): void {
+  const machine = requireRecord(machineValue, 'LS-15 machine evidence');
+  requireExactKeys(machine, [
+    'schema', 'version', 'sliceId', 'contractSha256', 'sourceSnapshotSha256',
+    'sourceRefs', 'runs', 'checks',
+  ], 'LS-15 machine evidence');
+  if (machine.schema !== 'rww.ls-15-verification' || machine.version !== 1 || machine.sliceId !== 'LS-15') {
+    throw new Error('LS-15 machine evidence has an invalid identity');
+  }
+  const contractSha256 = requireSha256(machine.contractSha256, 'LS-15 machine contractSha256');
+  if (expectedHashes && contractSha256 !== expectedHashes.contractSha256) {
+    throw new Error('LS-15 machine evidence does not bind the current contract');
+  }
+
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-15 machine sourceRefs[${index}]`));
+  const sourcePaths = sourceRefs.map((source, index) => {
+    requireExactKeys(source, ['path', 'sha256'], `LS-15 machine sourceRefs[${index}]`);
+    const path = requireNonEmptyString(source.path, `LS-15 machine sourceRefs[${index}].path`);
+    if (!isSafeImplementationPath(path)) throw new Error(`Unsafe LS-15 implementation source path: ${path}`);
+    requireSha256(source.sha256, `LS-15 machine sourceRefs[${index}].sha256`);
+    return path;
+  });
+  if (JSON.stringify(sourcePaths) !== JSON.stringify(LS15_REQUIRED_SOURCE_PATHS)) {
+    throw new Error('LS-15 machine evidence does not bind the exact implementation sources');
+  }
+  const sourceSnapshotSha256 = ls15SourceSnapshotSha256(sourceRefs);
+  if (requireSha256(machine.sourceSnapshotSha256, 'LS-15 machine sourceSnapshotSha256') !== sourceSnapshotSha256) {
+    throw new Error('LS-15 machine evidence source snapshot is invalid');
+  }
+
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-15 machine runs[${index}]`));
+  const runIds = runs.map((run, index) => {
+    requireExactKeys(run, ['id', 'command', 'result', 'exitCode', 'artifact'], `LS-15 machine runs[${index}]`);
+    return requireNonEmptyString(run.id, `LS-15 machine runs[${index}].id`);
+  });
+  if (JSON.stringify(runIds) !== JSON.stringify(Object.keys(LS15_RUN_POLICY))) {
+    throw new Error('LS-15 machine runs do not match the exact verification policy');
+  }
+  for (const [index, run] of runs.entries()) {
+    const id = runIds[index] as LS15RunId;
+    const policy = LS15_RUN_POLICY[id];
+    if (run.command !== policy.command || run.result !== 'passed' || run.exitCode !== 0) {
+      throw new Error(`LS-15 verification run ${id} did not pass its exact command`);
+    }
+    const artifact = requireRecord(run.artifact, `LS-15 machine runs[${index}].artifact`);
+    requireExactKeys(artifact, ['path', 'sha256'], `LS-15 machine runs[${index}].artifact`);
+    if (artifact.path !== policy.artifactPath) throw new Error(`LS-15 verification run ${id} has the wrong artifact path`);
+    requireSha256(artifact.sha256, `LS-15 machine runs[${index}].artifact.sha256`);
+    const runArtifact = requireRecord(runArtifactValues[id], `LS-15 run artifact ${id}`);
+    requireExactKeys(runArtifact, [
+      'schema', 'version', 'id', 'command', 'result', 'exitCode',
+      'sourceSnapshotSha256', 'passedTestIds', 'summary',
+    ], `LS-15 run artifact ${id}`);
+    if (runArtifact.schema !== 'rww.command-verification' || runArtifact.version !== 1
+      || runArtifact.id !== id || runArtifact.command !== policy.command
+      || runArtifact.result !== 'passed' || runArtifact.exitCode !== 0) {
+      throw new Error(`LS-15 run artifact ${id} does not prove the exact passing command`);
+    }
+    if (requireSha256(runArtifact.sourceSnapshotSha256, `LS-15 run artifact ${id}.sourceSnapshotSha256`) !== sourceSnapshotSha256) {
+      throw new Error(`LS-15 run artifact ${id} does not bind the implementation source snapshot`);
+    }
+    if (JSON.stringify(requireStringArray(runArtifact.passedTestIds, `LS-15 run artifact ${id}.passedTestIds`))
+      !== JSON.stringify(LS15_RUN_TEST_IDS[id])) {
+      throw new Error(`LS-15 run artifact ${id} does not contain the exact predeclared test IDs`);
+    }
+    if (requireNonEmptyString(runArtifact.summary, `LS-15 run artifact ${id}.summary`).length < 20) {
+      throw new Error(`LS-15 run artifact ${id} lacks a substantive summary`);
+    }
+  }
+
+  const checks = asArray(machine.checks).map((check, index) => requireRecord(check, `LS-15 machine checks[${index}]`));
+  const checkIds = checks.map((check, index) => {
+    requireExactKeys(check, ['id', 'result', 'runIds'], `LS-15 machine checks[${index}]`);
+    if (check.result !== 'passed') throw new Error(`LS-15 machine check ${String(check.id)} did not pass`);
+    return requireNonEmptyString(check.id, `LS-15 machine checks[${index}].id`);
+  });
+  if (JSON.stringify(checkIds) !== JSON.stringify(LS15_ACCEPTANCE_IDS)) {
+    throw new Error('LS-15 machine checks do not cover the exact acceptance matrix');
+  }
+  for (const [index, check] of checks.entries()) {
+    const id = checkIds[index] as keyof typeof LS15_CHECK_POLICY;
+    const runIdsForCheck = requireStringArray(check.runIds, `LS-15 machine checks[${index}].runIds`);
+    if (JSON.stringify(runIdsForCheck) !== JSON.stringify(LS15_CHECK_POLICY[id].runIds)) {
+      throw new Error(`LS-15 machine check ${id} does not match its exact run policy`);
+    }
+  }
 }
 
 export function validateLS14EvidenceShape(
