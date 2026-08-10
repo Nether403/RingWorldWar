@@ -5,7 +5,7 @@
   "command": "npm run test:e2e:ls13",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "9e37d83ecdae52ee199d3d0d1ae20cd0416171825c96a2447f40bdf832be01c4",
+  "sourceSnapshotSha256": "594d655b51cfa6f711fb01d1ff93e05bfa7b81e03a21d35351cc5e722a66565f",
   "passedTestIds": [
     "production-low-four-palettes",
     "production-palette-quality-authority"

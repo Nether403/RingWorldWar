@@ -5,7 +5,7 @@
   "command": "npm run validate:core-match",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "afadbeec042087f67a1346f2056208d118cc33ae8d92d9c7223ffd68a55ff5cc",
+  "sourceSnapshotSha256": "6ec3f24ca3c86b29db6c3674ca353a35e713031c994acbc90f262a9f408c6709",
   "passedTestIds": ["core-match-cohorts"],
   "summary": "The protected veteran-mirror core-match qualification passed in 829.82 seconds after final LS-13 readability remediation without changing accepted simulation, AI, physics, or outcome semantics."
 }

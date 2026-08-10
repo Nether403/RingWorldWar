@@ -6,7 +6,12 @@ import { BattlefieldDressing } from '../../src/render/battlefieldDressing';
 import { QUALITY } from '../../src/render/renderer';
 import { RING_CIRCUMFERENCE } from '../../src/core/constants';
 import { deltaS } from '../../src/core/ringMath';
-import { DISTRICT_PALETTES, ENVIRONMENT_DISTRICT_PLAN, MAX_DISTRICT_SCATTER_ITEMS } from '../../src/render/districtPlan';
+import {
+  DISTRICT_LIFE_CUES,
+  DISTRICT_PALETTES,
+  ENVIRONMENT_DISTRICT_PLAN,
+  MAX_DISTRICT_SCATTER_ITEMS,
+} from '../../src/render/districtPlan';
 
 describe('BattlefieldDressing', () => {
   it('rebuilds the same presentation-only ruin field for the same seed and anchor', () => {
@@ -62,6 +67,8 @@ describe('BattlefieldDressing', () => {
       palette: item.palette,
       silhouette: item.silhouette,
       color: item.color,
+      lifeCue: item.lifeCue,
+      phase: item.phase,
       s: item.s,
       z: item.z,
       yaw: item.yaw,
@@ -72,13 +79,50 @@ describe('BattlefieldDressing', () => {
     for (const palette of DISTRICT_PALETTES) {
       expect(first.generatedItems().filter((item) => item.palette === palette).length).toBeGreaterThan(0);
     }
+    expect(new Set(first.generatedItems().flatMap((item) => item.lifeCue === null ? [] : [item.lifeCue])))
+      .toEqual(new Set(DISTRICT_LIFE_CUES));
+  });
+
+  it('animates inhabited-ring cues deterministically without changing authored items', () => {
+    const anchor = new RenderAnchor();
+    anchor.set(0, 0);
+    const terrain = flatTerrain();
+    const first = new BattlefieldDressing(442, ENVIRONMENT_DISTRICT_PLAN);
+    const second = new BattlefieldDressing(442, ENVIRONMENT_DISTRICT_PLAN);
+    const authored = first.generatedItems().map((item) => ({ ...item }));
+
+    first.update(anchor, terrain, 0);
+    second.update(anchor, terrain, 0);
+    const initial = signature(first);
+    expect(signature(second)).toEqual(initial);
+
+    first.update(anchor, terrain, 1.25);
+    second.update(anchor, terrain, 1.25);
+    expect(signature(first)).toEqual(signature(second));
+    expect(signature(first).matrices).not.toEqual(initial.matrices);
+    expect(signature(first).colors).not.toEqual(initial.colors);
+    expect(first.generatedItems()).toEqual(authored);
+  });
+
+  it('freezes life-cue motion when motion is disabled', () => {
+    const anchor = new RenderAnchor();
+    anchor.set(0, 0);
+    const dressing = new BattlefieldDressing(443, ENVIRONMENT_DISTRICT_PLAN);
+    dressing.setMotionEnabled(false);
+    dressing.update(anchor, flatTerrain(), 0);
+    const initial = signature(dressing);
+
+    dressing.update(anchor, flatTerrain(), 10);
+
+    expect(signature(dressing)).toEqual(initial);
   });
 
   it('keeps generated scatter inside wrapped districts and outside authored exclusions', () => {
     const dressing = new BattlefieldDressing(45, ENVIRONMENT_DISTRICT_PLAN);
 
     for (const item of dressing.generatedItems()) {
-      const district = ENVIRONMENT_DISTRICT_PLAN.districts.find((candidate) => candidate.id === item.districtId)!;
+      const district = ENVIRONMENT_DISTRICT_PLAN.districts.find((candidate) => candidate.id === item.districtId);
+      if (!district) continue;
       expect(Math.abs(deltaS(district.centerS, item.s))).toBeLessThanOrEqual(district.halfLength);
       expect(item.z).toBeGreaterThanOrEqual(district.zMin);
       expect(item.z).toBeLessThanOrEqual(district.zMax);
@@ -102,6 +146,8 @@ describe('BattlefieldDressing', () => {
     expect(low.visibleByScale.tactical).toBeGreaterThan(0);
     expect(low.visiblePalettes).toEqual(DISTRICT_PALETTES);
     expect(Object.values(low.visibleByPalette).every((count) => count > 0)).toBe(true);
+    expect(low.visibleLifeCues).toEqual(DISTRICT_LIFE_CUES);
+    expect(Object.values(low.visibleByLifeCue).every((count) => count > 0)).toBe(true);
     expect(low.visibleTotal).toBeLessThanOrEqual(QUALITY.low.dressingCap);
 
     dressing.setQuality(QUALITY.ultra.dressingDistance, QUALITY.ultra.dressingCap, true);
@@ -109,6 +155,24 @@ describe('BattlefieldDressing', () => {
     const ultra = dressing.diagnostics();
     expect(ultra.visibleByScale.micro).toBeGreaterThan(low.visibleByScale.micro);
     expect(ultra.visibleTotal).toBeLessThanOrEqual(QUALITY.ultra.dressingCap);
+  });
+
+  it('keeps a habitation or vegetation landmark visible across the full playable ring', () => {
+    const anchor = new RenderAnchor();
+    const dressing = new BattlefieldDressing(461, ENVIRONMENT_DISTRICT_PLAN);
+    dressing.setQuality(QUALITY.low.dressingDistance, QUALITY.low.dressingCap, false);
+    const terrain = flatTerrain();
+
+    for (let s = 0; s < RING_CIRCUMFERENCE; s += 700) {
+      for (const z of [-2_000, -1_000, 0, 1_000, 2_000]) {
+        anchor.set(s, z);
+        dressing.update(anchor, terrain);
+        expect(dressing.visibleItems().some((item) =>
+          item.districtId === 'inhabited-ring-corridor'
+          && (item.lifeCue === 'habitation' || item.lifeCue === 'vegetation'),
+        )).toBe(true);
+      }
+    }
   });
 
   it('applies per-layer slope ceilings and wrapped seam visibility', () => {
@@ -122,7 +186,9 @@ describe('BattlefieldDressing', () => {
     } as unknown as Terrain);
 
     expect(dressing.diagnostics().visibleTotal).toBeGreaterThan(0);
-    expect(dressing.visibleItems().every((item) => Math.abs(deltaS(0, item.s)) >= 80)).toBe(true);
+    expect(dressing.visibleItems()
+      .filter((item) => item.districtId !== 'inhabited-ring-corridor')
+      .every((item) => Math.abs(deltaS(0, item.s)) >= 80)).toBe(true);
   });
 
   it('plants instance centers from authoritative terrain height without mutating terrain data', () => {
@@ -169,17 +235,21 @@ describe('BattlefieldDressing', () => {
   });
 });
 
-function signature(dressing: BattlefieldDressing): { counts: number[]; matrices: number[] } {
+function signature(dressing: BattlefieldDressing): { counts: number[]; matrices: number[]; colors: number[] } {
   const meshes = dressing.object.children.filter((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
   const matrix = new THREE.Matrix4();
+  const color = new THREE.Color();
   const matrices: number[] = [];
+  const colors: number[] = [];
   for (const mesh of meshes) {
     for (let index = 0; index < mesh.count; index++) {
       mesh.getMatrixAt(index, matrix);
       matrices.push(...matrix.elements.map((value) => Number(value.toFixed(5))));
+      mesh.getColorAt(index, color);
+      colors.push(color.getHex());
     }
   }
-  return { counts: meshes.map((mesh) => mesh.count), matrices };
+  return { counts: meshes.map((mesh) => mesh.count), matrices, colors };
 }
 
 function flatTerrain(): Terrain {

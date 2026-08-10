@@ -1,0 +1,32 @@
+{
+  "schema": "rww.launch-scope-evidence",
+  "version": 1,
+  "claimId": "LS-14",
+  "acceptedState": "complete",
+  "issuedAt": "2026-08-10T00:22:17.846Z",
+  "sourceRefs": [
+    {
+      "path": "validation/evidence/ls-14-inhabited-ring-life-2026-08-10.json",
+      "sha256": "28e47f883396c9efba4d0a1906092e9dfec05dc1af1dcbad8c4fda8d8b34a4c1"
+    },
+    {
+      "path": "validation/evidence/reviews/ls-14-criterion-review-2026-08-10.json",
+      "sha256": "f0c0fc6c34bb5489642d8dfe5c8d7f7188e26c33c0e7b4f427f6f510c16fe84c"
+    },
+    {
+      "path": "docs/launch-scope/ls-14-inhabited-ring-life.md",
+      "sha256": "3a324aaf14b351ed7712a27ae50d99f56362eec254eb0a44567dc61ee13664f2"
+    },
+    {
+      "path": "docs/launch-scope-execution-policy.md",
+      "sha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c"
+    }
+  ],
+  "checks": [
+    {
+      "id": "inhabited-ring-life",
+      "result": "passed",
+      "summary": "All seven LS-14 criteria pass: strict semantic cues, full-ring habitation/vegetation coverage, deterministic bounded activity, preserved placement and authority, four-bucket Low readability, live reduced motion, stable resources, full check, protected core match, and independent review."
+    }
+  ]
+}

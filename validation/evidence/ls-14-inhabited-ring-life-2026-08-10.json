@@ -1,0 +1,58 @@
+{
+  "schema": "rww.ls-14-verification",
+  "version": 1,
+  "sliceId": "LS-14",
+  "contractSha256": "3a324aaf14b351ed7712a27ae50d99f56362eec254eb0a44567dc61ee13664f2",
+  "sourceSnapshotSha256": "6494ee1a33da31402f848a547dee78477c986bad3165777cb382ecc2efd1f939",
+  "sourceRefs": [
+    { "path": "src/render/districtPlan.ts", "sha256": "3333466b6967bcf7acfa52e131cbb100a6d8a36e2dd609247068ccedef6f5777" },
+    { "path": "src/render/battlefieldDressing.ts", "sha256": "e4511f1a7e05c090db62c16258a9bdcde1d828e51a15696f7902cf655970bc16" },
+    { "path": "tests/render/districtPlan.test.ts", "sha256": "5c2230e2de1f9b2407bac55100582a114f33f906108919414744babfc3ede1e4" },
+    { "path": "tests/render/battlefieldDressing.test.ts", "sha256": "217569c70196d09f2fbb794ff074cf040bf3aea852a14115322432486b90c196" },
+    { "path": "e2e/inhabited-ring-life.spec.ts", "sha256": "5e0605d3cb92ed3489a425b5aab607a7a3a4a3a503403da3f819112737d60eba" },
+    { "path": "playwright.ls14.config.ts", "sha256": "7e97a48052ca8db5ad41b1ea77f494316aa9d3b4bd3d9d7cc2e5f992c8bdaf20" }
+  ],
+  "visualRefs": [
+    { "path": "validation/evidence/ls-14-low-runtime.jpeg", "sha256": "9baea6a8aed32f2f044e8da32b2eff5608b6290778a47a437e96720cf9da6eac" },
+    { "path": "validation/evidence/ls-14-performance-trace.json.gz", "sha256": "820e5416c796e000a44e25ebdc1a835cfea993c2794522d6dfeb4a04a97a7b7d" }
+  ],
+  "runs": [
+    {
+      "id": "focused-unit",
+      "command": "npx vitest run tests/render/districtPlan.test.ts tests/render/battlefieldDressing.test.ts tests/render/disposal.test.ts tests/render/settings.test.ts",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-14-focused-unit-2026-08-10.json", "sha256": "c846d107fbbea478a3e39a5db11667b12ca3ccf8b5e0b63d4a32ab695bcfcee3" }
+    },
+    {
+      "id": "focused-browser",
+      "command": "npm run test:e2e:ls14",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-14-focused-browser-2026-08-10.json", "sha256": "08cac5e90b5a38daa61f01fb88bf28693ed0198fdf2b58e62c6cc193c7fd9e23" }
+    },
+    {
+      "id": "full-check",
+      "command": "npm run check",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-14-full-check-2026-08-10.json", "sha256": "748a6b526a2f92108f9d489014f951895e0590761f491463cd27b4ed0320627e" }
+    },
+    {
+      "id": "core-match",
+      "command": "npm run validate:core-match",
+      "result": "passed",
+      "exitCode": 0,
+      "artifact": { "path": "validation/evidence/runs/ls-14-core-match-2026-08-10.json", "sha256": "c922eedcd8754f5a50d627529e3b90a1d86d40c99be6319728ae924c1bc50a07" }
+    }
+  ],
+  "checks": [
+    { "id": "strict-cue-grammar", "result": "passed", "runIds": ["focused-unit"] },
+    { "id": "ring-wide-inhabited-coverage", "result": "passed", "runIds": ["focused-unit"] },
+    { "id": "deterministic-bounded-activity", "result": "passed", "runIds": ["focused-unit", "focused-browser"] },
+    { "id": "placement-authority", "result": "passed", "runIds": ["focused-unit", "focused-browser", "core-match"] },
+    { "id": "fixed-topology-low-readability", "result": "passed", "runIds": ["focused-unit", "focused-browser"] },
+    { "id": "accessibility-lifecycle", "result": "passed", "runIds": ["focused-unit", "focused-browser"] },
+    { "id": "regression-review", "result": "passed", "runIds": ["focused-browser", "full-check", "core-match"] }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema": "rww.criterion-review",
+  "version": 1,
+  "reviewId": "ls-14-final-remediation-review-2026-08-10",
+  "claimId": "LS-14",
+  "contractSha256": "3a324aaf14b351ed7712a27ae50d99f56362eec254eb0a44567dc61ee13664f2",
+  "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
+  "reviewRound": 2,
+  "reviewType": "platform-presentation-accessibility",
+  "independentContext": true,
+  "reviewer": {
+    "role": "independent-critic",
+    "taskId": "ses_017290689ffebOdZzzyN2VbhUo",
+    "model": "azure/gpt-5.6-sol",
+    "completedAt": "2026-08-10T00:22:17.846Z",
+    "sourceSnapshotSha256": "6494ee1a33da31402f848a547dee78477c986bad3165777cb382ecc2efd1f939"
+  },
+  "scores": {
+    "strict-cue-grammar": { "score": 4, "checkId": "strict-cue-grammar", "rationale": "Four exact active cues have canonical silhouette ownership, static breach silhouettes remain null, and unknown or mismatched assignments fail closed." },
+    "ring-wide-inhabited-coverage": { "score": 4, "checkId": "ring-wide-inhabited-coverage", "rationale": "The sixteen-by-four corridor grid keeps the complete playable ring and axial band within 1,000 metres of habitation or vegetation, including boundary samples." },
+    "deterministic-bounded-activity": { "score": 4, "checkId": "deterministic-bounded-activity", "rationale": "Seeded cue phases and explicit presentation time reproduce matrices and colors exactly while bounded time changes animate without altering authored items." },
+    "placement-authority": { "score": 4, "checkId": "placement-authority", "rationale": "Activity retains authored positions and dimensions, respects slope and exclusions, reads terrain without mutation, and preserves synchronous production world authority." },
+    "fixed-topology-low-readability": { "score": 3, "checkId": "fixed-topology-low-readability", "rationale": "Tapered landmarks, canopy color, transit trunks, and unlit ambient detail remain readable at 1280x720 Low through four buckets and the accepted instance and triangle envelope." },
+    "accessibility-lifecycle": { "score": 4, "checkId": "accessibility-lifecycle", "rationale": "Live reduced motion freezes actual matrix and color signatures, listener disposal is explicit, and sustained production updates preserve GPU resources and context." },
+    "regression-review": { "score": 3, "checkId": "regression-review", "rationale": "Focused unit and browser lanes, LS-12 and LS-13 production regressions, full repository check, protected core match, and independent review pass." }
+  },
+  "dependencyReady": true,
+  "blockers": [],
+  "requiredQualityFindings": [],
+  "humanValidation": [],
+  "polish": [
+    {
+      "id": "LS-14-P01",
+      "summary": "Further non-color differentiation between transit and ambient micro-detail may be considered during later primitive-art refinement.",
+      "reopenTrigger": "Do not reopen LS-14 unless a cue loses Low readability, deterministic activity, reduced-motion behavior, fixed topology, or ring-wide coverage."
+    }
+  ]
+}

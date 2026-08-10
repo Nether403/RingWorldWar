@@ -1,6 +1,6 @@
 # Current Roadmap And Status
 
-**Status date:** 2026-08-09
+**Status date:** 2026-08-10
 
 This is the authoritative source for current delivery status and near-term sequencing. `tasks/plan.md` and `tasks/todo.md` preserve earlier planning history; unchecked or future-looking items there do not override this document.
 
@@ -10,7 +10,7 @@ The project now targets a solo/AI-assisted PC release with a browser demo. The a
 
 The current implementation milestone is the Ring USP slice. LS-04 delivered the strict runtime scenario definition and deterministic world factory, LS-05 delivered the twelve-mission registry and versioned campaign profile, and LS-06 delivered the transactional camera-controller interface. Their exact receipts are tracked in `validation/evidence/launch-scope/`.
 
-LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-spinal-nodes.md`: explicit operational pairs, reversible local Spinal Alignment, pair-only Dominance, deterministic pair-aware AI, v1/v2 persistence, and visibility-safe HUD/minimap representation passed. LS-08 directional advantage overlay and onboarding is complete under `docs/launch-scope/ls-08-directional-advantage.md`: automation, the developer review, and the initial uncoached human tester passed G-01. LS-09 shadow timing and overhead intelligence, LS-10's dedicated whole-ring strategic side view, LS-11's production Gravity Range, LS-12's layered district/scatter foundation, and LS-13's four reusable environmental palettes are also complete. LS-14 habitation, vegetation, transit, and ambient life is the active inhabited-ring slice.
+LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-spinal-nodes.md`: explicit operational pairs, reversible local Spinal Alignment, pair-only Dominance, deterministic pair-aware AI, v1/v2 persistence, and visibility-safe HUD/minimap representation passed. LS-08 directional advantage overlay and onboarding is complete under `docs/launch-scope/ls-08-directional-advantage.md`: automation, the developer review, and the initial uncoached human tester passed G-01. LS-09 shadow timing and overhead intelligence, LS-10's dedicated whole-ring strategic side view, LS-11's production Gravity Range, LS-12's layered district/scatter foundation, LS-13's four reusable environmental palettes, and LS-14's bounded inhabited-ring life layer are also complete. LS-15 integrated public-alpha tutorial arc is active.
 
 ## Current Status
 
@@ -27,7 +27,7 @@ LS-07 is complete under the bounded contract in `docs/launch-scope/ls-07-paired-
 | LS-11 Gravity Range | Complete, polish backlog | Production title/direct launch, deterministic two-shot directional exercise, canonical impact scoring, keyboard/pointer completion, whole-ring observation, responsive accessibility, full check, core match, and independent review passed |
 | LS-12 layered district/scatter foundation | Complete, polish backlog | Strict authored plans, deterministic three-scale spatial composition, seam-safe terrain planting, fixed buckets, Low budgets, production preview, full check, core match, and independent review passed; palette-specific identity was delivered by LS-13 |
 | LS-13 environmental district palettes | Complete, polish backlog | Four strict reusable palettes, deterministic identity, fixed colored buckets, Low readability, full check, core match, and independent review passed; primitive art refinement remains optional polish |
-| LS-14 habitation, vegetation, transit, and ambient life | Active | The four palette identities are qualified; dynamic inhabited-ring cues remain unqualified |
+| LS-14 habitation, vegetation, transit, and ambient life | Complete, polish backlog | Strict cues, full-ring habitation/vegetation coverage, deterministic bounded activity, live reduced motion, Low presentation, full check, protected core match, and independent review passed; further primitive differentiation remains optional polish |
 | Gate 1 technical playable slice | Passed | Automated and technical receipt in `docs/gate-1.md` |
 | Phase 2 systems implementation | Delivered | AI tiers, weapons, abilities, faction modifiers, save/load, quality settings, and headless orchestration are summarized in `tasks/phase-2-systems-depth/execution-report.md` |
 | Gate 2 gameplay cohorts | Passed | Veteran mirror, Veteran vs Recruit, and Commander vs Veteran cohorts all pass the configured gameplay gates in `docs/core-match-validation-results.md` |

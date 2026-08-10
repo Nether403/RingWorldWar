@@ -7,11 +7,11 @@
   "sourceRefs": [
     {
       "path": "validation/evidence/ls-12-layered-district-scatter-2026-08-09.json",
-      "sha256": "766159ae302f47f19826e0bfe54b7d9fb97909bd16a89ae1a88c726d67cec2aa"
+      "sha256": "b5689b3c7c7506b05bf6fceb29bc255a4d73ae88cac852014cf5a7e40e79f7f0"
     },
     {
       "path": "validation/evidence/reviews/ls-12-criterion-review-2026-08-09.json",
-      "sha256": "1bb9b004992c2bba251ad2b310c254fe68415f99cdb8cf7094d93364d93b860b"
+      "sha256": "bba035b1bcc1d8847e30f8993ffad54e21546c5a69fd45169b44f94f4d1d2549"
     },
     {
       "path": "docs/launch-scope/ls-12-layered-district-scatter.md",

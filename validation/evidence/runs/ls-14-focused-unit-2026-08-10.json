@@ -1,0 +1,18 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-unit",
+  "command": "npx vitest run tests/render/districtPlan.test.ts tests/render/battlefieldDressing.test.ts tests/render/disposal.test.ts tests/render/settings.test.ts",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "6494ee1a33da31402f848a547dee78477c986bad3165777cb382ecc2efd1f939",
+  "passedTestIds": [
+    "strict-life-cue-grammar",
+    "ring-wide-inhabited-coverage",
+    "deterministic-bounded-activity",
+    "placement-authority",
+    "fixed-topology",
+    "reduced-motion-lifecycle"
+  ],
+  "summary": "The focused LS-14 lane passed 32 tests covering strict cue semantics, full-ring coverage, deterministic activity, terrain authority, fixed topology, quality budgets, reduced motion, and disposal."
+}

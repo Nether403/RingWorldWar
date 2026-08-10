@@ -3,6 +3,8 @@ import { RING_CIRCUMFERENCE, RING_HALF_WIDTH } from '@core/constants';
 export type DistrictScale = 'overhead' | 'tactical' | 'micro';
 export type DistrictShape = 'tower' | 'slab' | 'pipe' | 'debris';
 export type DistrictPattern = 'anchors' | 'clusters' | 'rows' | 'scatter';
+export const DISTRICT_LIFE_CUES = ['habitation', 'vegetation', 'transit', 'ambient'] as const;
+export type DistrictLifeCue = typeof DISTRICT_LIFE_CUES[number];
 export const DISTRICT_PALETTES = [
   'arc-city',
   'agricultural',
@@ -22,25 +24,26 @@ export type DistrictSilhouette = typeof PALETTE_SILHOUETTES[DistrictPalette][num
 export interface DistrictSilhouetteStyle {
   readonly shape: DistrictShape;
   readonly color: number;
+  readonly lifeCue: DistrictLifeCue | null;
 }
 
 export const DISTRICT_SILHOUETTE_STYLES: Readonly<Record<DistrictSilhouette, DistrictSilhouetteStyle>> = Object.freeze({
-  'civic-tower': { shape: 'tower', color: 0x7896a2 },
-  'shelter-block': { shape: 'slab', color: 0x817869 },
-  'transit-viaduct': { shape: 'pipe', color: 0x4d8791 },
-  'shelter-light': { shape: 'debris', color: 0xd7a556 },
-  'canopy-spire': { shape: 'tower', color: 0x668358 },
-  'terrace-bank': { shape: 'slab', color: 0x7f8454 },
-  'water-channel': { shape: 'pipe', color: 0x477f8e },
-  'farm-rig': { shape: 'debris', color: 0xa17b42 },
-  'maintenance-pylon': { shape: 'tower', color: 0x707d80 },
-  'gantry-deck': { shape: 'slab', color: 0x726c5f },
-  'power-trunk': { shape: 'pipe', color: 0xb28a3d },
-  'salvage-stack': { shape: 'debris', color: 0x895943 },
-  'seal-wall': { shape: 'tower', color: 0x968b78 },
-  'ruined-block': { shape: 'slab', color: 0x74554e },
-  'exposed-scrith': { shape: 'pipe', color: 0x4d5558 },
-  'abandoned-convoy': { shape: 'debris', color: 0x9a603d },
+  'civic-tower': { shape: 'tower', color: 0x7896a2, lifeCue: 'habitation' },
+  'shelter-block': { shape: 'slab', color: 0x817869, lifeCue: 'habitation' },
+  'transit-viaduct': { shape: 'pipe', color: 0x4d8791, lifeCue: 'transit' },
+  'shelter-light': { shape: 'debris', color: 0xd7a556, lifeCue: 'ambient' },
+  'canopy-spire': { shape: 'tower', color: 0x668358, lifeCue: 'vegetation' },
+  'terrace-bank': { shape: 'slab', color: 0x7f8454, lifeCue: 'vegetation' },
+  'water-channel': { shape: 'pipe', color: 0x477f8e, lifeCue: 'ambient' },
+  'farm-rig': { shape: 'debris', color: 0xa17b42, lifeCue: 'ambient' },
+  'maintenance-pylon': { shape: 'tower', color: 0x707d80, lifeCue: 'habitation' },
+  'gantry-deck': { shape: 'slab', color: 0x726c5f, lifeCue: 'transit' },
+  'power-trunk': { shape: 'pipe', color: 0xb28a3d, lifeCue: 'ambient' },
+  'salvage-stack': { shape: 'debris', color: 0x895943, lifeCue: 'ambient' },
+  'seal-wall': { shape: 'tower', color: 0x968b78, lifeCue: null },
+  'ruined-block': { shape: 'slab', color: 0x74554e, lifeCue: null },
+  'exposed-scrith': { shape: 'pipe', color: 0x4d5558, lifeCue: null },
+  'abandoned-convoy': { shape: 'debris', color: 0x9a603d, lifeCue: null },
 });
 
 export interface DistrictExclusion {
@@ -54,6 +57,7 @@ export interface DistrictLayer {
   id: string;
   scale: DistrictScale;
   silhouette: DistrictSilhouette;
+  lifeCue: DistrictLifeCue | null;
   pattern: DistrictPattern;
   count: number;
   maxSlope: number;
@@ -74,19 +78,33 @@ export interface DistrictDefinition {
 }
 
 export interface DistrictPlan {
-  version: 1;
+  version: 2;
   districts: DistrictDefinition[];
+  ringLifeCells: RingLifeCell[];
+}
+
+export interface RingLifeCell {
+  id: string;
+  palette: DistrictPalette;
+  silhouette: DistrictSilhouette;
+  lifeCue: 'habitation' | 'vegetation';
+  centerS: number;
+  z: number;
+  width: number;
+  height: number;
+  depth: number;
 }
 
 const MAX_DISTRICTS = 16;
 const MAX_LAYERS_PER_DISTRICT = 8;
 const MAX_ITEMS_PER_LAYER = 256;
+const MAX_RING_LIFE_CELLS = 64;
 export const MAX_DISTRICT_SCATTER_ITEMS = 2_048;
 
 export function parseDistrictPlan(value: unknown): DistrictPlan {
   const root = record(value, 'district plan');
-  exactKeys(root, ['version', 'districts'], 'district plan');
-  if (root.version !== 1) throw new Error('District plan version must be 1');
+  exactKeys(root, ['version', 'districts', 'ringLifeCells'], 'district plan');
+  if (root.version !== 2) throw new Error('District plan version must be 2');
   const rawDistricts = array(root.districts, 'district plan districts');
   if (rawDistricts.length < 1 || rawDistricts.length > MAX_DISTRICTS) {
     throw new Error(`District plan must contain 1..${MAX_DISTRICTS} districts`);
@@ -139,13 +157,17 @@ export function parseDistrictPlan(value: unknown): DistrictPlan {
     const layers = rawLayers.map((rawLayer, layerIndex): DistrictLayer => {
       const layerPath = `${path}.layers[${layerIndex}]`;
       const layer = record(rawLayer, layerPath);
-      exactKeys(layer, ['id', 'scale', 'silhouette', 'pattern', 'count', 'maxSlope', 'width', 'height', 'depth'], layerPath);
+      exactKeys(layer, ['id', 'scale', 'silhouette', 'lifeCue', 'pattern', 'count', 'maxSlope', 'width', 'height', 'depth'], layerPath);
       const layerId = identifier(layer.id, `${layerPath}.id`);
       if (layerIds.has(layerId)) throw new Error(`Duplicate layer id in ${id}: ${layerId}`);
       layerIds.add(layerId);
       if (!isScale(layer.scale)) throw new Error(`${layerPath}.scale is invalid`);
       if (!isSilhouetteForPalette(layer.silhouette, palette)) {
         throw new Error(`${layerPath}.silhouette does not belong to ${palette}`);
+      }
+      if (layer.lifeCue !== null && !isLifeCue(layer.lifeCue)) throw new Error(`${layerPath}.lifeCue is invalid`);
+      if (DISTRICT_SILHOUETTE_STYLES[layer.silhouette].lifeCue !== layer.lifeCue) {
+        throw new Error(`${layerPath}.lifeCue does not match ${layer.silhouette}`);
       }
       if (!isPattern(layer.pattern)) throw new Error(`${layerPath}.pattern is invalid`);
       const count = integer(layer.count, `${layerPath}.count`);
@@ -157,6 +179,7 @@ export function parseDistrictPlan(value: unknown): DistrictPlan {
         id: layerId,
         scale: layer.scale,
         silhouette: layer.silhouette,
+        lifeCue: layer.lifeCue,
         pattern: layer.pattern,
         count,
         maxSlope,
@@ -170,33 +193,68 @@ export function parseDistrictPlan(value: unknown): DistrictPlan {
   if (itemCount > MAX_DISTRICT_SCATTER_ITEMS) {
     throw new Error(`District plan count exceeds ${MAX_DISTRICT_SCATTER_ITEMS}`);
   }
-  return { version: 1, districts };
+  const rawRingLifeCells = array(root.ringLifeCells, 'district plan ringLifeCells');
+  if (rawRingLifeCells.length < 1 || rawRingLifeCells.length > MAX_RING_LIFE_CELLS) {
+    throw new Error(`District plan ringLifeCells must contain 1..${MAX_RING_LIFE_CELLS} cells`);
+  }
+  const cellIds = new Set<string>();
+  const ringLifeCells = rawRingLifeCells.map((rawCell, index): RingLifeCell => {
+    const path = `district plan ringLifeCells[${index}]`;
+    const cell = record(rawCell, path);
+    exactKeys(cell, ['id', 'palette', 'silhouette', 'lifeCue', 'centerS', 'z', 'width', 'height', 'depth'], path);
+    const id = identifier(cell.id, `${path}.id`);
+    if (cellIds.has(id)) throw new Error(`Duplicate ring life cell id: ${id}`);
+    cellIds.add(id);
+    if (!isPalette(cell.palette)) throw new Error(`${path}.palette is invalid`);
+    const palette = cell.palette;
+    if (!isSilhouetteForPalette(cell.silhouette, palette)) throw new Error(`${path}.silhouette does not belong to ${palette}`);
+    const style = DISTRICT_SILHOUETTE_STYLES[cell.silhouette];
+    if ((cell.lifeCue !== 'habitation' && cell.lifeCue !== 'vegetation') || style.lifeCue !== cell.lifeCue) {
+      throw new Error(`${path}.lifeCue must match a habitation or vegetation silhouette`);
+    }
+    const centerS = finite(cell.centerS, `${path}.centerS`);
+    if (centerS < 0 || centerS >= RING_CIRCUMFERENCE) throw new Error(`${path}.centerS is outside the ring`);
+    const z = finite(cell.z, `${path}.z`);
+    if (z < -RING_HALF_WIDTH || z > RING_HALF_WIDTH) throw new Error(`${path}.z is outside the ring`);
+    return {
+      id,
+      palette,
+      silhouette: cell.silhouette,
+      lifeCue: cell.lifeCue,
+      centerS,
+      z,
+      width: positive(cell.width, `${path}.width`),
+      height: positive(cell.height, `${path}.height`),
+      depth: positive(cell.depth, `${path}.depth`),
+    };
+  });
+  return { version: 2, districts, ringLifeCells };
 }
 
 const PALETTE_LAYERS: Readonly<Record<DistrictPalette, readonly DistrictLayer[]>> = {
   'arc-city': [
-    layer('occupied-towers', 'overhead', 'civic-tower', 'anchors', 8, 0.2, [14, 24], [34, 58], [12, 22]),
-    layer('shelter-blocks', 'tactical', 'shelter-block', 'clusters', 28, 0.3, [9, 24], [5, 15], [6, 14]),
-    layer('transit-viaducts', 'tactical', 'transit-viaduct', 'rows', 18, 0.26, [1.2, 2.8], [44, 80], [1.2, 2.8]),
-    layer('shelter-lights', 'micro', 'shelter-light', 'scatter', 56, 0.36, [1, 3], [0.8, 2.2], [1, 3]),
+    layer('occupied-towers', 'overhead', 'civic-tower', 'habitation', 'anchors', 8, 0.2, [14, 24], [34, 58], [12, 22]),
+    layer('shelter-blocks', 'tactical', 'shelter-block', 'habitation', 'clusters', 28, 0.3, [9, 24], [5, 15], [6, 14]),
+    layer('transit-viaducts', 'tactical', 'transit-viaduct', 'transit', 'rows', 18, 0.26, [1.2, 2.8], [44, 80], [1.2, 2.8]),
+    layer('shelter-lights', 'micro', 'shelter-light', 'ambient', 'scatter', 56, 0.36, [1, 3], [0.8, 2.2], [1, 3]),
   ],
   agricultural: [
-    layer('canopy-spires', 'overhead', 'canopy-spire', 'clusters', 8, 0.24, [18, 32], [22, 40], [18, 32]),
-    layer('terrace-banks', 'tactical', 'terrace-bank', 'rows', 28, 0.22, [12, 30], [2, 7], [8, 18]),
-    layer('water-channels', 'tactical', 'water-channel', 'rows', 18, 0.18, [1.8, 3.6], [36, 68], [1.8, 3.6]),
-    layer('farm-rigs', 'micro', 'farm-rig', 'clusters', 56, 0.32, [1.5, 5], [0.8, 3], [1.5, 4]),
+    layer('canopy-spires', 'overhead', 'canopy-spire', 'vegetation', 'clusters', 8, 0.24, [18, 32], [22, 40], [18, 32]),
+    layer('terrace-banks', 'tactical', 'terrace-bank', 'vegetation', 'rows', 28, 0.22, [12, 30], [2, 7], [8, 18]),
+    layer('water-channels', 'tactical', 'water-channel', 'ambient', 'rows', 18, 0.18, [1.8, 3.6], [36, 68], [1.8, 3.6]),
+    layer('farm-rigs', 'micro', 'farm-rig', 'ambient', 'clusters', 56, 0.32, [1.5, 5], [0.8, 3], [1.5, 4]),
   ],
   'spinal-industrial': [
-    layer('maintenance-pylons', 'overhead', 'maintenance-pylon', 'anchors', 8, 0.18, [12, 20], [38, 64], [10, 18]),
-    layer('gantry-decks', 'tactical', 'gantry-deck', 'rows', 28, 0.25, [14, 32], [4, 10], [5, 12]),
-    layer('power-trunks', 'tactical', 'power-trunk', 'rows', 18, 0.22, [1.6, 3.2], [50, 88], [1.6, 3.2]),
-    layer('salvage-stacks', 'micro', 'salvage-stack', 'clusters', 56, 0.38, [2, 6], [1, 3.6], [1.5, 5]),
+    layer('maintenance-pylons', 'overhead', 'maintenance-pylon', 'habitation', 'anchors', 8, 0.18, [12, 20], [38, 64], [10, 18]),
+    layer('gantry-decks', 'tactical', 'gantry-deck', 'transit', 'rows', 28, 0.25, [14, 32], [4, 10], [5, 12]),
+    layer('power-trunks', 'tactical', 'power-trunk', 'ambient', 'rows', 18, 0.22, [1.6, 3.2], [50, 88], [1.6, 3.2]),
+    layer('salvage-stacks', 'micro', 'salvage-stack', 'ambient', 'clusters', 56, 0.38, [2, 6], [1, 3.6], [1.5, 5]),
   ],
   'breach-evacuation': [
-    layer('seal-walls', 'overhead', 'seal-wall', 'rows', 8, 0.16, [16, 28], [24, 44], [8, 14]),
-    layer('ruined-blocks', 'tactical', 'ruined-block', 'clusters', 28, 0.34, [10, 26], [3, 12], [6, 16]),
-    layer('exposed-scrith', 'tactical', 'exposed-scrith', 'scatter', 18, 0.3, [1.4, 3], [32, 62], [1.4, 3]),
-    layer('abandoned-convoys', 'micro', 'abandoned-convoy', 'rows', 56, 0.3, [2, 7], [1.2, 3.2], [1.5, 4]),
+    layer('seal-walls', 'overhead', 'seal-wall', null, 'rows', 8, 0.16, [16, 28], [24, 44], [8, 14]),
+    layer('ruined-blocks', 'tactical', 'ruined-block', null, 'clusters', 28, 0.34, [10, 26], [3, 12], [6, 16]),
+    layer('exposed-scrith', 'tactical', 'exposed-scrith', null, 'scatter', 18, 0.3, [1.4, 3], [32, 62], [1.4, 3]),
+    layer('abandoned-convoys', 'micro', 'abandoned-convoy', null, 'rows', 56, 0.3, [2, 7], [1.2, 3.2], [1.5, 4]),
   ],
 };
 
@@ -204,6 +262,7 @@ function layer(
   id: string,
   scale: DistrictScale,
   silhouette: DistrictSilhouette,
+  lifeCue: DistrictLifeCue | null,
   pattern: DistrictPattern,
   count: number,
   maxSlope: number,
@@ -211,7 +270,7 @@ function layer(
   height: [number, number],
   depth: [number, number],
 ): DistrictLayer {
-  return { id, scale, silhouette, pattern, count, maxSlope, width, height, depth };
+  return { id, scale, silhouette, lifeCue, pattern, count, maxSlope, width, height, depth };
 }
 
 function authoredDistrict(id: string, palette: DistrictPalette, centerS: number): DistrictDefinition {
@@ -233,7 +292,7 @@ function authoredDistrict(id: string, palette: DistrictPalette, centerS: number)
 }
 
 export const ENVIRONMENT_DISTRICT_PLAN: DistrictPlan = parseDistrictPlan({
-  version: 1,
+  version: 2,
   districts: [
     authoredDistrict('arc-city-00', 'arc-city', RING_CIRCUMFERENCE - 600),
     authoredDistrict('agricultural-00', 'agricultural', RING_CIRCUMFERENCE - 200),
@@ -244,6 +303,21 @@ export const ENVIRONMENT_DISTRICT_PLAN: DistrictPlan = parseDistrictPlan({
     authoredDistrict('spinal-industrial-01', 'spinal-industrial', RING_CIRCUMFERENCE * 0.5 + 200),
     authoredDistrict('breach-evacuation-01', 'breach-evacuation', RING_CIRCUMFERENCE * 0.5 + 600),
   ],
+  ringLifeCells: Array.from({ length: 16 }, (_, ringIndex) =>
+    [-1_500, -500, 500, 1_500].map((z, axialIndex) => {
+      const vegetation = (ringIndex + axialIndex) % 2 === 1;
+      return {
+        id: `ring-life-${ringIndex.toString().padStart(2, '0')}-${axialIndex}`,
+        palette: vegetation ? 'agricultural' : 'arc-city',
+        silhouette: vegetation ? 'canopy-spire' : 'civic-tower',
+        lifeCue: vegetation ? 'vegetation' : 'habitation',
+        centerS: ringIndex * RING_CIRCUMFERENCE / 16,
+        z,
+        width: vegetation ? 14 : 10,
+        height: vegetation ? 24 : 34,
+        depth: vegetation ? 14 : 10,
+      };
+    })).flat(),
 });
 
 function record(value: unknown, path: string): Record<string, unknown> {
@@ -298,6 +372,10 @@ function range(value: unknown, path: string): [number, number] {
 
 function isScale(value: unknown): value is DistrictScale {
   return value === 'overhead' || value === 'tactical' || value === 'micro';
+}
+
+function isLifeCue(value: unknown): value is DistrictLifeCue {
+  return typeof value === 'string' && DISTRICT_LIFE_CUES.includes(value as DistrictLifeCue);
 }
 
 function isPalette(value: unknown): value is DistrictPalette {

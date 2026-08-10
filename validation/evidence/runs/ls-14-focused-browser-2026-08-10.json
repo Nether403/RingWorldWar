@@ -1,0 +1,16 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "focused-browser",
+  "command": "npm run test:e2e:ls14",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "6494ee1a33da31402f848a547dee78477c986bad3165777cb382ecc2efd1f939",
+  "passedTestIds": [
+    "production-low-life-cues",
+    "production-activity-authority",
+    "production-reduced-motion",
+    "production-sustained-resource-budget"
+  ],
+  "summary": "The built 1280x720 Low application passed all four LS-14 browser tests with four legible cue classes, changing and frozen signatures, stable resources, exact caps, a live context, and a clean console."
+}

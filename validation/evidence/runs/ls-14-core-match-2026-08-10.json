@@ -1,0 +1,11 @@
+{
+  "schema": "rww.command-verification",
+  "version": 1,
+  "id": "core-match",
+  "command": "npm run validate:core-match",
+  "result": "passed",
+  "exitCode": 0,
+  "sourceSnapshotSha256": "6494ee1a33da31402f848a547dee78477c986bad3165777cb382ecc2efd1f939",
+  "passedTestIds": ["core-match-cohorts"],
+  "summary": "The protected veteran-mirror core-match cohort passed all gates on the LS-14 source snapshot in 1,348 seconds without changing accepted simulation semantics."
+}

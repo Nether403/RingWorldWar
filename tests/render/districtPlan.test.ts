@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { RING_CIRCUMFERENCE } from '../../src/core/constants';
+import { deltaS } from '../../src/core/ringMath';
 import {
+  DISTRICT_LIFE_CUES,
   DISTRICT_PALETTES,
   ENVIRONMENT_DISTRICT_PLAN,
   parseDistrictPlan,
@@ -40,6 +42,15 @@ describe('district plan', () => {
     }
   });
 
+  it('assigns every authored layer one bounded inhabited-ring life cue', () => {
+    expect(DISTRICT_LIFE_CUES).toEqual(['habitation', 'vegetation', 'transit', 'ambient']);
+    expect(new Set(ENVIRONMENT_DISTRICT_PLAN.districts.flatMap((district) =>
+      district.layers.flatMap((layer) => layer.lifeCue === null ? [] : [layer.lifeCue]),
+    ))).toEqual(new Set(DISTRICT_LIFE_CUES));
+    const breach = ENVIRONMENT_DISTRICT_PLAN.districts.find((district) => district.palette === 'breach-evacuation')!;
+    expect(breach.layers.every((layer) => layer.lifeCue === null)).toBe(true);
+  });
+
   it('strictly rejects unknown fields, duplicate IDs, and unbounded counts', () => {
     expect(() => parseDistrictPlan({
       ...structuredClone(ENVIRONMENT_DISTRICT_PLAN),
@@ -64,6 +75,28 @@ describe('district plan', () => {
     crossedSilhouette.districts[0]!.layers[0]!.silhouette =
       ENVIRONMENT_DISTRICT_PLAN.districts.find((district) => district.palette === 'agricultural')!.layers[0]!.silhouette;
     expect(() => parseDistrictPlan(crossedSilhouette)).toThrow(/silhouette.*arc-city/i);
+  });
+
+  it('rejects undeclared inhabited-ring life cues', () => {
+    const invalidCue = structuredClone(ENVIRONMENT_DISTRICT_PLAN) as Record<string, any>;
+    invalidCue.districts[0].layers[0].lifeCue = 'wildlife-simulation';
+    expect(() => parseDistrictPlan(invalidCue)).toThrow(/lifeCue/i);
+
+    const mismatchedCue = structuredClone(ENVIRONMENT_DISTRICT_PLAN);
+    mismatchedCue.districts[0]!.layers[0]!.lifeCue = 'transit';
+    expect(() => parseDistrictPlan(mismatchedCue)).toThrow(/lifeCue.*civic-tower/i);
+  });
+
+  it('covers the full ring width with bounded habitation or vegetation cells', () => {
+    expect(ENVIRONMENT_DISTRICT_PLAN.ringLifeCells).toHaveLength(64);
+    for (let s = 0; s < RING_CIRCUMFERENCE; s += 400) {
+      for (const z of [-2_000, -1_000, 0, 1_000, 2_000]) {
+        const nearest = Math.min(...ENVIRONMENT_DISTRICT_PLAN.ringLifeCells.map((cell) =>
+          Math.hypot(deltaS(cell.centerS, s), cell.z - z),
+        ));
+        expect(nearest).toBeLessThan(1_000);
+      }
+    }
   });
 
   it('accepts a district that deliberately crosses the joined ring edge', () => {

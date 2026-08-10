@@ -6,11 +6,13 @@ import type { RenderAnchor } from './anchor';
 import { disposeObject } from './disposeObject';
 import {
   DISTRICT_PALETTES,
+  DISTRICT_LIFE_CUES,
   DISTRICT_SILHOUETTE_STYLES,
   ENVIRONMENT_DISTRICT_PLAN,
   MAX_DISTRICT_SCATTER_ITEMS,
   parseDistrictPlan,
   type DistrictDefinition,
+  type DistrictLifeCue,
   type DistrictPlan,
   type DistrictPattern,
   type DistrictPalette,
@@ -27,6 +29,7 @@ export interface GeneratedDressingItem {
   readonly layerId: string;
   readonly palette: DistrictPalette;
   readonly silhouette: DistrictSilhouette;
+  readonly lifeCue: DistrictLifeCue | null;
   readonly scale: DistrictScale;
   readonly shape: DistrictShape;
   readonly color: number;
@@ -37,6 +40,7 @@ export interface GeneratedDressingItem {
   readonly height: number;
   readonly depth: number;
   readonly maxSlope: number;
+  readonly phase: number;
 }
 
 interface Candidate {
@@ -51,16 +55,24 @@ interface ScaleCounts {
 }
 
 type PaletteCounts = Record<DistrictPalette, number>;
+type LifeCueCounts = Record<DistrictLifeCue, number>;
 
 export interface BattlefieldDressingDiagnostics {
   districtIds: string[];
   generatedTotal: number;
   generatedByScale: ScaleCounts;
   generatedByPalette: PaletteCounts;
+  generatedByLifeCue: LifeCueCounts;
   visibleTotal: number;
   visibleByScale: ScaleCounts;
   visibleByPalette: PaletteCounts;
+  visibleByLifeCue: LifeCueCounts;
   visiblePalettes: DistrictPalette[];
+  visibleLifeCues: DistrictLifeCue[];
+  activityFrame: number;
+  motionEnabled: boolean;
+  matrixSignature: number[];
+  colorSignature: number[];
   drawBuckets: number;
 }
 
@@ -75,9 +87,14 @@ export class BattlefieldDressing {
   private readonly plan: DistrictPlan;
   private readonly generatedCounts = emptyScaleCounts();
   private readonly generatedPaletteCounts = emptyPaletteCounts();
+  private readonly generatedLifeCueCounts = emptyLifeCueCounts();
   private visibleCounts = emptyScaleCounts();
   private visiblePaletteCounts = emptyPaletteCounts();
+  private visibleLifeCueCounts = emptyLifeCueCounts();
   private lastAnchorVersion = -1;
+  private lastActivityFrame = -1;
+  private motionEnabled = true;
+  private motionPreference: MediaQueryList | null = null;
   private readonly position = new THREE.Vector3();
   private readonly orientation = new THREE.Quaternion();
   private readonly localOrientation = new THREE.Quaternion();
@@ -94,11 +111,16 @@ export class BattlefieldDressing {
     this.plan = parseDistrictPlan(plan);
     this.object.name = 'layered-district-scatter';
     this.buckets = {
-      tower: this.createBucket('district-overhead-landmarks', new THREE.BoxGeometry(1, 1, 1), 0.34),
+      tower: this.createBucket('district-overhead-landmarks', new THREE.CylinderGeometry(0.5, 1, 1, 6), 0.34),
       slab: this.createBucket('district-tactical-shells', new THREE.BoxGeometry(1, 1, 1), 0.28),
-      pipe: this.createBucket('district-tactical-trunks', new THREE.CylinderGeometry(1, 1, 1, 7), 0.62),
-      debris: this.createBucket('district-bounded-detail', new THREE.BoxGeometry(1, 1, 1), 0.4),
+      pipe: this.createBucket('district-tactical-trunks', new THREE.CylinderGeometry(1, 1, 1, 7), 0.62, true),
+      debris: this.createBucket('district-bounded-detail', new THREE.OctahedronGeometry(0.7, 0), 0.4, true),
     };
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      this.motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+      this.setMotionEnabled(!this.motionPreference.matches);
+      this.motionPreference.addEventListener('change', this.syncMotionPreference);
+    }
     this.generate(seed);
   }
 
@@ -109,44 +131,71 @@ export class BattlefieldDressing {
     this.lastAnchorVersion = -1;
   }
 
-  update(anchor: RenderAnchor, terrain: Terrain): void {
-    if (anchor.version === this.lastAnchorVersion) return;
+  setMotionEnabled(enabled: boolean): void {
+    if (this.motionEnabled === enabled) return;
+    this.motionEnabled = enabled;
+    this.lastAnchorVersion = -1;
+    this.lastActivityFrame = -1;
+  }
+
+  update(anchor: RenderAnchor, terrain: Terrain, visualTime?: number): void {
+    const resolvedVisualTime = visualTime ?? (typeof window === 'undefined' ? 0 : performance.now() / 1_000);
+    const activityFrame = this.motionEnabled ? Math.floor(Math.max(0, resolvedVisualTime) * 12) : 0;
+    const selectionChanged = anchor.version !== this.lastAnchorVersion;
+    if (!selectionChanged && activityFrame === this.lastActivityFrame) return;
     this.lastAnchorVersion = anchor.version;
-    for (const mesh of Object.values(this.buckets)) mesh.count = 0;
-    this.visible.length = 0;
-    this.visibleCounts = emptyScaleCounts();
-    this.visiblePaletteCounts = emptyPaletteCounts();
-    this.eligible.length = 0;
+    this.lastActivityFrame = activityFrame;
 
-    const maximumDistanceSq = this.drawDistance * this.drawDistance;
-    for (const candidate of this.candidates) {
-      const ds = deltaS(anchor.s, candidate.item.s);
-      const dz = candidate.item.z - anchor.z;
-      candidate.distanceSq = ds * ds + dz * dz;
-      if (candidate.distanceSq <= maximumDistanceSq) this.eligible.push(candidate);
-    }
-    this.eligible.sort((a, b) => scaleRank(a.item.scale) - scaleRank(b.item.scale)
-      || a.distanceSq - b.distanceSq
-      || a.item.layerId.localeCompare(b.item.layerId));
+    if (selectionChanged) {
+      this.visible.length = 0;
+      this.visibleCounts = emptyScaleCounts();
+      this.visiblePaletteCounts = emptyPaletteCounts();
+      this.visibleLifeCueCounts = emptyLifeCueCounts();
+      this.eligible.length = 0;
 
-    const reserved = new Set<GeneratedDressingItem>();
-    for (const palette of DISTRICT_PALETTES) {
-      for (const scale of REQUIRED_LOW_SCALES) {
+      const maximumDistanceSq = this.drawDistance * this.drawDistance;
+      for (const candidate of this.candidates) {
+        const ds = deltaS(anchor.s, candidate.item.s);
+        const dz = candidate.item.z - anchor.z;
+        candidate.distanceSq = ds * ds + dz * dz;
+        if (candidate.distanceSq <= maximumDistanceSq) this.eligible.push(candidate);
+      }
+      this.eligible.sort((a, b) => scaleRank(a.item.scale) - scaleRank(b.item.scale)
+        || a.distanceSq - b.distanceSq
+        || a.item.layerId.localeCompare(b.item.layerId));
+
+      const reserved = new Set<GeneratedDressingItem>();
+      for (const palette of DISTRICT_PALETTES) {
+        for (const scale of REQUIRED_LOW_SCALES) {
+          const representative = this.eligible.find(({ item }) =>
+            item.palette === palette
+            && item.scale === scale
+            && terrain.slopeAt(item.s, item.z) <= item.maxSlope);
+          if (!representative || this.visible.length >= this.instanceCap) continue;
+          this.selectVisible(representative.item);
+          reserved.add(representative.item);
+        }
+      }
+      for (const lifeCue of DISTRICT_LIFE_CUES) {
         const representative = this.eligible.find(({ item }) =>
-          item.palette === palette
-          && item.scale === scale
+          item.lifeCue === lifeCue
+          && !reserved.has(item)
           && terrain.slopeAt(item.s, item.z) <= item.maxSlope);
         if (!representative || this.visible.length >= this.instanceCap) continue;
-        this.addVisible(representative.item, anchor, terrain);
+        this.selectVisible(representative.item);
         reserved.add(representative.item);
+      }
+      for (const { item } of this.eligible) {
+        if (this.visible.length >= this.instanceCap) break;
+        if (reserved.has(item)) continue;
+        if (terrain.slopeAt(item.s, item.z) > item.maxSlope) continue;
+        this.selectVisible(item);
       }
     }
 
-    for (const { item } of this.eligible) {
-      if (this.visible.length >= this.instanceCap) break;
-      if (reserved.has(item)) continue;
-      if (terrain.slopeAt(item.s, item.z) > item.maxSlope) continue;
-      this.addVisible(item, anchor, terrain);
+    for (const mesh of Object.values(this.buckets)) mesh.count = 0;
+    for (const item of this.visible) {
+      this.place(this.buckets[item.shape], item, anchor, terrain, activityFrame / 12);
     }
     for (const mesh of Object.values(this.buckets)) {
       mesh.instanceMatrix.needsUpdate = true;
@@ -155,17 +204,36 @@ export class BattlefieldDressing {
   }
 
   diagnostics(): BattlefieldDressingDiagnostics {
+    const matrix = new THREE.Matrix4();
+    const instanceColor = new THREE.Color();
+    const matrixSignature: number[] = [];
+    const colorSignature: number[] = [];
+    for (const mesh of Object.values(this.buckets)) {
+      for (let index = 0; index < mesh.count; index++) {
+        mesh.getMatrixAt(index, matrix);
+        mesh.getColorAt(index, instanceColor);
+        matrixSignature.push(...matrix.elements.map((value) => Number(value.toFixed(4))));
+        colorSignature.push(instanceColor.getHex());
+      }
+    }
     return {
       districtIds: this.plan.districts.map((district) => district.id),
       generatedTotal: this.items.length,
       generatedByScale: { ...this.generatedCounts },
       generatedByPalette: { ...this.generatedPaletteCounts },
+      generatedByLifeCue: { ...this.generatedLifeCueCounts },
       visibleTotal: this.visible.length,
       visibleByScale: { ...this.visibleCounts },
       visibleByPalette: { ...this.visiblePaletteCounts },
+      visibleByLifeCue: { ...this.visibleLifeCueCounts },
       visiblePalettes: Object.entries(this.visiblePaletteCounts)
         .filter(([, count]) => count > 0)
         .map(([palette]) => palette as DistrictPalette),
+      visibleLifeCues: DISTRICT_LIFE_CUES.filter((lifeCue) => this.visibleLifeCueCounts[lifeCue] > 0),
+      activityFrame: this.lastActivityFrame,
+      motionEnabled: this.motionEnabled,
+      matrixSignature,
+      colorSignature,
       drawBuckets: Object.keys(this.buckets).length,
     };
   }
@@ -179,6 +247,8 @@ export class BattlefieldDressing {
   }
 
   dispose(): void {
+    this.motionPreference?.removeEventListener('change', this.syncMotionPreference);
+    this.motionPreference = null;
     disposeObject(this.object);
     this.eligible.length = 0;
     this.visible.length = 0;
@@ -188,14 +258,17 @@ export class BattlefieldDressing {
     name: string,
     geometry: THREE.BufferGeometry,
     metalness: number,
+    unlit = false,
   ): THREE.InstancedMesh {
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: 0x111311,
-      emissiveIntensity: 0.18,
-      roughness: 0.82,
-      metalness,
-    });
+    const material = unlit
+      ? new THREE.MeshBasicMaterial({ color: 0xffffff })
+      : new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: 0x111311,
+          emissiveIntensity: 0.18,
+          roughness: 0.82,
+          metalness,
+        });
     const mesh = new THREE.InstancedMesh(geometry, material, MAX_VISIBLE);
     mesh.name = name;
     mesh.count = 0;
@@ -207,7 +280,38 @@ export class BattlefieldDressing {
     return mesh;
   }
 
+  private readonly syncMotionPreference = (): void => {
+    this.setMotionEnabled(!(this.motionPreference?.matches ?? false));
+  };
+
   private generate(seed: number): void {
+    for (const cell of this.plan.ringLifeCells) {
+      const style = DISTRICT_SILHOUETTE_STYLES[cell.silhouette];
+      const rng = new Rng(seed ^ hashSeed(cell.id) ^ 0x19f41d);
+      const item: GeneratedDressingItem = {
+        districtId: 'inhabited-ring-corridor',
+        layerId: cell.id,
+        palette: cell.palette,
+        silhouette: cell.silhouette,
+        lifeCue: cell.lifeCue,
+        scale: 'overhead',
+        shape: style.shape,
+        color: style.color,
+        s: cell.centerS,
+        z: cell.z,
+        yaw: rng.range(0, Math.PI),
+        width: cell.width,
+        height: cell.height,
+        depth: cell.depth,
+        maxSlope: 1,
+        phase: rng.range(0, Math.PI * 2),
+      };
+      this.items.push(item);
+      this.candidates.push({ item, distanceSq: 0 });
+      this.generatedCounts[item.scale]++;
+      this.generatedPaletteCounts[item.palette]++;
+      this.generatedLifeCueCounts[cell.lifeCue]++;
+    }
     for (const district of this.plan.districts) {
       for (const layer of district.layers) {
         const style = DISTRICT_SILHOUETTE_STYLES[layer.silhouette];
@@ -220,6 +324,7 @@ export class BattlefieldDressing {
             layerId: layer.id,
             palette: district.palette,
             silhouette: layer.silhouette,
+            lifeCue: layer.lifeCue,
             scale: layer.scale,
             shape: style.shape,
             color: style.color,
@@ -230,43 +335,58 @@ export class BattlefieldDressing {
             height: rng.range(layer.height[0], layer.height[1]),
             depth: rng.range(layer.depth[0], layer.depth[1]),
             maxSlope: layer.maxSlope,
+            phase: rng.range(0, Math.PI * 2),
           };
           this.items.push(item);
           this.candidates.push({ item, distanceSq: 0 });
           this.generatedCounts[item.scale]++;
           this.generatedPaletteCounts[item.palette]++;
+          if (item.lifeCue !== null) this.generatedLifeCueCounts[item.lifeCue]++;
         }
       }
     }
   }
 
-  private place(mesh: THREE.InstancedMesh, item: GeneratedDressingItem, anchor: RenderAnchor, terrain: Terrain): void {
-    const ground = terrain.heightAt(item.s, item.z);
-    anchor.toVector(item.s, ground, item.z, this.position);
-    anchor.orientation(item.s, 0, this.orientation);
+  private place(
+    mesh: THREE.InstancedMesh,
+    item: GeneratedDressingItem,
+    anchor: RenderAnchor,
+    terrain: Terrain,
+    visualTime: number,
+  ): void {
+    const signal = this.motionEnabled && item.lifeCue !== null
+      ? Math.sin(visualTime * cueSpeed(item.lifeCue) + item.phase)
+      : 0;
+    const renderedS = item.s;
+    const renderedYaw = item.lifeCue === 'vegetation' ? item.yaw + signal * 0.08 : item.yaw;
+    const renderedHeight = item.height;
+    const ground = terrain.heightAt(renderedS, item.z);
+    anchor.toVector(renderedS, ground, item.z, this.position);
+    anchor.orientation(renderedS, 0, this.orientation);
     this.basis.compose(this.position, this.orientation, ONE);
-    this.localOrientation.setFromAxisAngle(UP, item.yaw);
-    let centerY = item.height * 0.5;
+    this.localOrientation.setFromAxisAngle(UP, renderedYaw);
+    let centerY = renderedHeight * 0.5;
     if (item.shape === 'pipe') {
-      const tiltAngle = Math.PI * 0.5 + Math.sin(item.yaw * 3.1) * 0.12;
+      const tiltAngle = Math.PI * 0.5 + Math.sin(renderedYaw * 3.1) * 0.12;
       this.tilt.setFromAxisAngle(AXIAL, tiltAngle);
       this.localOrientation.multiply(this.tilt);
-      centerY = item.width * 1.05 + Math.abs(Math.cos(tiltAngle)) * item.height * 0.5;
+      centerY = item.width * 1.05 + Math.abs(Math.cos(tiltAngle)) * renderedHeight * 0.5;
     }
-    this.scale.set(item.width, item.height, item.depth);
+    this.scale.set(item.width, renderedHeight, item.depth);
     this.local.compose(LOCAL_CENTER.set(0, centerY, 0), this.localOrientation, this.scale);
     this.result.multiplyMatrices(this.basis, this.local);
     mesh.setMatrixAt(mesh.count++, this.result);
-    mesh.setColorAt(mesh.count - 1, this.color.setHex(item.color));
+    const brightness = item.lifeCue === null || item.lifeCue === 'vegetation'
+      ? 1
+      : 0.72 + (signal + 1) * 0.14;
+    mesh.setColorAt(mesh.count - 1, this.color.setHex(item.color).multiplyScalar(brightness));
   }
 
-  private addVisible(item: GeneratedDressingItem, anchor: RenderAnchor, terrain: Terrain): void {
-    const mesh = this.buckets[item.shape];
-    if (mesh.count >= MAX_VISIBLE) return;
-    this.place(mesh, item, anchor, terrain);
+  private selectVisible(item: GeneratedDressingItem): void {
     this.visible.push(item);
     this.visibleCounts[item.scale]++;
     this.visiblePaletteCounts[item.palette]++;
+    if (item.lifeCue !== null) this.visibleLifeCueCounts[item.lifeCue]++;
   }
 }
 
@@ -323,6 +443,17 @@ function emptyPaletteCounts(): PaletteCounts {
     'spinal-industrial': 0,
     'breach-evacuation': 0,
   };
+}
+
+function emptyLifeCueCounts(): LifeCueCounts {
+  return { habitation: 0, vegetation: 0, transit: 0, ambient: 0 };
+}
+
+function cueSpeed(lifeCue: DistrictLifeCue): number {
+  if (lifeCue === 'transit') return 1.4;
+  if (lifeCue === 'vegetation') return 0.7;
+  if (lifeCue === 'habitation') return 0.45;
+  return 0.9;
 }
 
 function scaleRank(scale: DistrictScale): number {

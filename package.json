@@ -13,6 +13,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ls12": "playwright test --config playwright.ls12.config.ts",
     "test:e2e:ls13": "playwright test --config playwright.ls13.config.ts",
+    "test:e2e:ls14": "playwright test --config playwright.ls14.config.ts",
     "test:e2e:qualify": "node tools/phase4e-qualification.mjs",
     "rww": "node tools/rww.mjs",
     "media:check": "node tools/media/validate-manifests.mjs",

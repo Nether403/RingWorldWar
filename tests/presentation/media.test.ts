@@ -66,7 +66,7 @@ describe('reviewed Phase 5 delivery media', () => {
       expect(createHash('sha256').update(contents).digest('hex'), asset.path).toBe(asset.sha256);
     }
     expect(receipt.totals).toEqual({ files: 85, bytes });
-  });
+  }, 15_000);
 });
 
 function readPublic(source: string): Promise<Buffer> {

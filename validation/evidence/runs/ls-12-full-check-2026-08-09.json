@@ -5,7 +5,7 @@
   "command": "npm run check",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "afadbeec042087f67a1346f2056208d118cc33ae8d92d9c7223ffd68a55ff5cc",
+  "sourceSnapshotSha256": "6ec3f24ca3c86b29db6c3674ca353a35e713031c994acbc90f262a9f408c6709",
   "passedTestIds": ["full-check"],
   "summary": "The final serial full check passed source-boundary lint, TypeScript, the palette-extended test suite with only the opt-in performance profile skipped, the exact evidence manifest, and the production Vite build."
 }

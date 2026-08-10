@@ -29,6 +29,7 @@ const runsDirectory = resolve(root, 'output/runs');
 const MAX_TEXT_BYTES = 256 * 1024;
 const MAX_RECEIPT_BYTES = 512 * 1024;
 const MAX_EVIDENCE_SOURCE_BYTES = 2 * 1024 * 1024;
+const evidenceDigestCache = new Map<string, { size: number; mtimeMs: number; digest: string }>();
 const RECEIPT_LIMIT = 8;
 const LOOP_FILE_LIMIT = 3;
 const RECEIPT_COMMANDS = new Set([
@@ -176,6 +177,17 @@ export const CLAIM_EVIDENCE_POLICY = Object.freeze({
     ]),
     checkIds: Object.freeze(['environmental-district-palettes']),
   }),
+  'LS-14': Object.freeze({
+    acceptedState: 'complete',
+    receiptPath: 'validation/evidence/launch-scope/LS-14.json',
+    sourcePaths: Object.freeze([
+      'validation/evidence/ls-14-inhabited-ring-life-2026-08-10.json',
+      'validation/evidence/reviews/ls-14-criterion-review-2026-08-10.json',
+      'docs/launch-scope/ls-14-inhabited-ring-life.md',
+      'docs/launch-scope-execution-policy.md',
+    ]),
+    checkIds: Object.freeze(['inhabited-ring-life']),
+  }),
   'G-01': Object.freeze({
     acceptedState: 'passed',
     receiptPath: 'validation/evidence/launch-scope/G-01.json',
@@ -184,6 +196,16 @@ export const CLAIM_EVIDENCE_POLICY = Object.freeze({
       'docs/playtests/2026-08-09-directional-artillery-g01.md',
     ]),
     checkIds: Object.freeze(['developer-reviewed-initial-cohort']),
+  }),
+  'G-05': Object.freeze({
+    acceptedState: 'passed',
+    receiptPath: 'validation/evidence/launch-scope/G-05.json',
+    sourcePaths: Object.freeze([
+      'validation/evidence/ls-14-inhabited-ring-life-2026-08-10.json',
+      'validation/evidence/reviews/ls-14-criterion-review-2026-08-10.json',
+      'docs/launch-scope/ls-14-inhabited-ring-life.md',
+    ]),
+    checkIds: Object.freeze(['inhabited-battlefield-legibility']),
   }),
   'G-07': Object.freeze({
     acceptedState: 'passed',
@@ -554,6 +576,75 @@ export const LS13_CHECK_POLICY = Object.freeze({
   'regression-review': Object.freeze({ runIds: Object.freeze(['focused-browser', 'full-check', 'core-match'] as LS13RunId[]), testIds: Object.freeze(['production-palette-quality-authority', 'full-check', 'core-match-cohorts']) }),
 } as const);
 
+export const LS14_ACCEPTANCE_IDS = Object.freeze([
+  'strict-cue-grammar',
+  'ring-wide-inhabited-coverage',
+  'deterministic-bounded-activity',
+  'placement-authority',
+  'fixed-topology-low-readability',
+  'accessibility-lifecycle',
+  'regression-review',
+] as const);
+
+export const LS14_REQUIRED_SOURCE_PATHS = Object.freeze([
+  'src/render/districtPlan.ts',
+  'src/render/battlefieldDressing.ts',
+  'tests/render/districtPlan.test.ts',
+  'tests/render/battlefieldDressing.test.ts',
+  'e2e/inhabited-ring-life.spec.ts',
+  'playwright.ls14.config.ts',
+] as const);
+
+export const LS14_RUN_POLICY = Object.freeze({
+  'focused-unit': Object.freeze({
+    command: 'npx vitest run tests/render/districtPlan.test.ts tests/render/battlefieldDressing.test.ts tests/render/disposal.test.ts tests/render/settings.test.ts',
+    artifactPath: 'validation/evidence/runs/ls-14-focused-unit-2026-08-10.json',
+  }),
+  'focused-browser': Object.freeze({
+    command: 'npm run test:e2e:ls14',
+    artifactPath: 'validation/evidence/runs/ls-14-focused-browser-2026-08-10.json',
+  }),
+  'full-check': Object.freeze({
+    command: 'npm run check',
+    artifactPath: 'validation/evidence/runs/ls-14-full-check-2026-08-10.json',
+  }),
+  'core-match': Object.freeze({
+    command: 'npm run validate:core-match',
+    artifactPath: 'validation/evidence/runs/ls-14-core-match-2026-08-10.json',
+  }),
+} as const);
+
+type LS14RunId = keyof typeof LS14_RUN_POLICY;
+
+export const LS14_RUN_TEST_IDS = Object.freeze({
+  'focused-unit': Object.freeze([
+    'strict-life-cue-grammar',
+    'ring-wide-inhabited-coverage',
+    'deterministic-bounded-activity',
+    'placement-authority',
+    'fixed-topology',
+    'reduced-motion-lifecycle',
+  ]),
+  'focused-browser': Object.freeze([
+    'production-low-life-cues',
+    'production-activity-authority',
+    'production-reduced-motion',
+    'production-sustained-resource-budget',
+  ]),
+  'full-check': Object.freeze(['full-check']),
+  'core-match': Object.freeze(['core-match-cohorts']),
+} as const);
+
+export const LS14_CHECK_POLICY = Object.freeze({
+  'strict-cue-grammar': Object.freeze({ runIds: Object.freeze(['focused-unit'] as LS14RunId[]) }),
+  'ring-wide-inhabited-coverage': Object.freeze({ runIds: Object.freeze(['focused-unit'] as LS14RunId[]) }),
+  'deterministic-bounded-activity': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS14RunId[]) }),
+  'placement-authority': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser', 'core-match'] as LS14RunId[]) }),
+  'fixed-topology-low-readability': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS14RunId[]) }),
+  'accessibility-lifecycle': Object.freeze({ runIds: Object.freeze(['focused-unit', 'focused-browser'] as LS14RunId[]) }),
+  'regression-review': Object.freeze({ runIds: Object.freeze(['focused-browser', 'full-check', 'core-match'] as LS14RunId[]) }),
+} as const);
+
 export const LS09_RUN_POLICY = Object.freeze({
   'focused-unit': Object.freeze({
     command: 'npx vitest run tests/core/shadow.test.ts tests/sim/shadowIntelligence.test.ts tests/sim/vision.test.ts tests/render/environment.test.ts tests/render/presentationEvents.test.ts tests/audio/audioEngine.test.ts tests/ai/strategist.test.ts tests/ui/hud.test.ts',
@@ -818,7 +909,7 @@ function isSafeImplementationPath(path: string): boolean {
   return !path.includes('\\')
     && !path.startsWith('/')
     && !segments.includes('..')
-    && (/^(?:src|tests|e2e)\/[A-Za-z0-9._/-]+$/.test(path) || /^playwright\.ls(?:12|13)\.config\.ts$/.test(path));
+    && (/^(?:src|tests|e2e)\/[A-Za-z0-9._/-]+$/.test(path) || /^playwright\.ls(?:12|13|14)\.config\.ts$/.test(path));
 }
 
 function requireSha256(value: unknown, label: string): string {
@@ -1133,6 +1224,167 @@ export function ls13SourceSnapshotSha256(sourceRefsValue: unknown): string {
     sha256: requireSha256(source.sha256, `LS-13 source snapshot[${index}].sha256`),
   }));
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function ls14SourceSnapshotSha256(sourceRefsValue: unknown): string {
+  const sourceRefs = asArray(sourceRefsValue).map((source, index) =>
+    requireRecord(source, `LS-14 source snapshot[${index}]`));
+  const canonical = sourceRefs.map((source, index) => ({
+    path: requireNonEmptyString(source.path, `LS-14 source snapshot[${index}].path`),
+    sha256: requireSha256(source.sha256, `LS-14 source snapshot[${index}].sha256`),
+  }));
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function validateLS14EvidenceShape(
+  machineValue: unknown,
+  reviewValue: unknown,
+  runArtifactValues: Record<string, unknown>,
+  expectedHashes?: { contractSha256: string; policySha256: string },
+): void {
+  const machine = requireRecord(machineValue, 'LS-14 machine evidence');
+  requireExactKeys(machine, [
+    'schema', 'version', 'sliceId', 'contractSha256', 'sourceSnapshotSha256',
+    'sourceRefs', 'visualRefs', 'runs', 'checks',
+  ], 'LS-14 machine evidence');
+  if (machine.schema !== 'rww.ls-14-verification' || machine.version !== 1 || machine.sliceId !== 'LS-14') {
+    throw new Error('LS-14 machine evidence has an invalid identity');
+  }
+  const contractSha256 = requireSha256(machine.contractSha256, 'LS-14 machine contractSha256');
+  if (expectedHashes && contractSha256 !== expectedHashes.contractSha256) {
+    throw new Error('LS-14 machine evidence does not bind the current contract');
+  }
+
+  const sourceRefs = asArray(machine.sourceRefs).map((source, index) =>
+    requireRecord(source, `LS-14 machine sourceRefs[${index}]`));
+  const sourcePaths = sourceRefs.map((source, index) => {
+    requireExactKeys(source, ['path', 'sha256'], `LS-14 machine sourceRefs[${index}]`);
+    const path = requireNonEmptyString(source.path, `LS-14 machine sourceRefs[${index}].path`);
+    if (!isSafeImplementationPath(path)) throw new Error(`Unsafe LS-14 implementation source path: ${path}`);
+    requireSha256(source.sha256, `LS-14 machine sourceRefs[${index}].sha256`);
+    return path;
+  });
+  if (JSON.stringify(sourcePaths) !== JSON.stringify(LS14_REQUIRED_SOURCE_PATHS)) {
+    throw new Error('LS-14 machine evidence does not bind the exact implementation sources');
+  }
+  const sourceSnapshotSha256 = ls14SourceSnapshotSha256(sourceRefs);
+  if (requireSha256(machine.sourceSnapshotSha256, 'LS-14 machine sourceSnapshotSha256') !== sourceSnapshotSha256) {
+    throw new Error('LS-14 machine evidence source snapshot is invalid');
+  }
+
+  const visualRefs = asArray(machine.visualRefs).map((source, index) =>
+    requireRecord(source, `LS-14 visualRefs[${index}]`));
+  const visualPaths = visualRefs.map((source, index) => {
+    requireExactKeys(source, ['path', 'sha256'], `LS-14 visualRefs[${index}]`);
+    const path = requireNonEmptyString(source.path, `LS-14 visualRefs[${index}].path`);
+    if (!isSafeRepositoryPath(path) || !path.startsWith('validation/evidence/')) {
+      throw new Error(`Unsafe LS-14 visual evidence path: ${path}`);
+    }
+    requireSha256(source.sha256, `LS-14 visualRefs[${index}].sha256`);
+    return path;
+  });
+  if (JSON.stringify(visualPaths) !== JSON.stringify([
+    'validation/evidence/ls-14-low-runtime.jpeg',
+    'validation/evidence/ls-14-performance-trace.json.gz',
+  ])) throw new Error('LS-14 visual evidence paths are incomplete');
+
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-14 machine runs[${index}]`));
+  const runIds = runs.map((run, index) => {
+    requireExactKeys(run, ['id', 'command', 'result', 'exitCode', 'artifact'], `LS-14 machine runs[${index}]`);
+    return requireNonEmptyString(run.id, `LS-14 machine runs[${index}].id`);
+  });
+  if (JSON.stringify(runIds) !== JSON.stringify(Object.keys(LS14_RUN_POLICY))) {
+    throw new Error('LS-14 machine runs do not match the exact verification policy');
+  }
+  for (const [index, run] of runs.entries()) {
+    const id = runIds[index] as LS14RunId;
+    const policy = LS14_RUN_POLICY[id];
+    if (run.command !== policy.command || run.result !== 'passed' || run.exitCode !== 0) {
+      throw new Error(`LS-14 verification run ${id} did not pass its exact command`);
+    }
+    const artifact = requireRecord(run.artifact, `LS-14 machine runs[${index}].artifact`);
+    requireExactKeys(artifact, ['path', 'sha256'], `LS-14 machine runs[${index}].artifact`);
+    if (artifact.path !== policy.artifactPath) throw new Error(`LS-14 verification run ${id} has the wrong artifact path`);
+    requireSha256(artifact.sha256, `LS-14 machine runs[${index}].artifact.sha256`);
+    const runArtifact = requireRecord(runArtifactValues[id], `LS-14 run artifact ${id}`);
+    requireExactKeys(runArtifact, [
+      'schema', 'version', 'id', 'command', 'result', 'exitCode',
+      'sourceSnapshotSha256', 'passedTestIds', 'summary',
+    ], `LS-14 run artifact ${id}`);
+    if (runArtifact.schema !== 'rww.command-verification' || runArtifact.version !== 1
+      || runArtifact.id !== id || runArtifact.command !== policy.command
+      || runArtifact.result !== 'passed' || runArtifact.exitCode !== 0) {
+      throw new Error(`LS-14 run artifact ${id} does not prove the exact passing command`);
+    }
+    if (requireSha256(runArtifact.sourceSnapshotSha256, `LS-14 run artifact ${id}.sourceSnapshotSha256`) !== sourceSnapshotSha256) {
+      throw new Error(`LS-14 run artifact ${id} does not bind the implementation source snapshot`);
+    }
+    if (JSON.stringify(requireStringArray(runArtifact.passedTestIds, `LS-14 run artifact ${id}.passedTestIds`))
+      !== JSON.stringify(LS14_RUN_TEST_IDS[id])) {
+      throw new Error(`LS-14 run artifact ${id} does not contain the exact predeclared test IDs`);
+    }
+    if (requireNonEmptyString(runArtifact.summary, `LS-14 run artifact ${id}.summary`).length < 20) {
+      throw new Error(`LS-14 run artifact ${id} lacks a substantive summary`);
+    }
+  }
+
+  const checks = asArray(machine.checks).map((check, index) => requireRecord(check, `LS-14 machine checks[${index}]`));
+  const checkIds = checks.map((check, index) => {
+    requireExactKeys(check, ['id', 'result', 'runIds'], `LS-14 machine checks[${index}]`);
+    if (check.result !== 'passed') throw new Error(`LS-14 machine check ${String(check.id)} did not pass`);
+    return requireNonEmptyString(check.id, `LS-14 machine checks[${index}].id`);
+  });
+  if (JSON.stringify(checkIds) !== JSON.stringify(LS14_ACCEPTANCE_IDS)) {
+    throw new Error('LS-14 machine checks do not cover the exact acceptance matrix');
+  }
+  for (const [index, check] of checks.entries()) {
+    const id = checkIds[index] as keyof typeof LS14_CHECK_POLICY;
+    const runIdsForCheck = requireStringArray(check.runIds, `LS-14 machine checks[${index}].runIds`);
+    if (JSON.stringify(runIdsForCheck) !== JSON.stringify(LS14_CHECK_POLICY[id].runIds)) {
+      throw new Error(`LS-14 machine check ${id} does not match its exact run policy`);
+    }
+  }
+
+  const review = requireRecord(reviewValue, 'LS-14 criterion review');
+  requireExactKeys(review, [
+    'schema', 'version', 'reviewId', 'claimId', 'contractSha256', 'policySha256',
+    'reviewRound', 'reviewType', 'independentContext', 'reviewer', 'scores',
+    'dependencyReady', 'blockers', 'requiredQualityFindings', 'humanValidation', 'polish',
+  ], 'LS-14 criterion review');
+  if (review.schema !== 'rww.criterion-review' || review.version !== 1 || review.claimId !== 'LS-14'
+    || review.reviewType !== 'platform-presentation-accessibility' || review.independentContext !== true
+    || !Number.isInteger(review.reviewRound) || Number(review.reviewRound) < 1 || Number(review.reviewRound) > 2) {
+    throw new Error('LS-14 criterion review has an invalid identity or review round');
+  }
+  const reviewer = requireRecord(review.reviewer, 'LS-14 criterion review reviewer');
+  requireExactKeys(reviewer, ['role', 'taskId', 'model', 'completedAt', 'sourceSnapshotSha256'], 'LS-14 criterion review reviewer');
+  if (reviewer.role !== 'independent-critic'
+    || !/^ses_[A-Za-z0-9]+$/.test(requireNonEmptyString(reviewer.taskId, 'LS-14 reviewer taskId'))
+    || !isoDateString(requireNonEmptyString(reviewer.completedAt, 'LS-14 reviewer completedAt'))
+    || requireSha256(reviewer.sourceSnapshotSha256, 'LS-14 reviewer sourceSnapshotSha256') !== sourceSnapshotSha256) {
+    throw new Error('LS-14 criterion review has invalid independent provenance');
+  }
+  requireNonEmptyString(reviewer.model, 'LS-14 reviewer model');
+  if (expectedHashes && (
+    requireSha256(review.contractSha256, 'LS-14 review contractSha256') !== expectedHashes.contractSha256
+    || requireSha256(review.policySha256, 'LS-14 review policySha256') !== expectedHashes.policySha256
+  )) throw new Error('LS-14 criterion review does not bind the current contract and execution policy');
+  const scores = requireRecord(review.scores, 'LS-14 criterion review scores');
+  requireExactKeys(scores, [...LS14_ACCEPTANCE_IDS], 'LS-14 criterion review scores');
+  for (const id of LS14_ACCEPTANCE_IDS) {
+    const score = requireRecord(scores[id], `LS-14 criterion review scores.${id}`);
+    requireExactKeys(score, ['score', 'checkId', 'rationale'], `LS-14 criterion review scores.${id}`);
+    if (score.checkId !== id || !Number.isInteger(score.score) || Number(score.score) < 3 || Number(score.score) > 4
+      || requireNonEmptyString(score.rationale, `LS-14 criterion review scores.${id}.rationale`).length < 20) {
+      throw new Error(`LS-14 criterion ${id} is below ship-ready or lacks rationale`);
+    }
+  }
+  if (review.dependencyReady !== true
+    || requireStringArray(review.blockers, 'LS-14 review blockers').length !== 0
+    || requireStringArray(review.requiredQualityFindings, 'LS-14 review requiredQualityFindings').length !== 0
+    || requireStringArray(review.humanValidation, 'LS-14 review humanValidation').length !== 0) {
+    throw new Error('LS-14 criterion review is not dependency-ready');
+  }
 }
 
 export function validateLS13EvidenceShape(
@@ -1993,6 +2245,47 @@ async function validateLS13CurrentSources(machineValue: unknown): Promise<void> 
   }));
 }
 
+async function validateLS14CurrentSources(machineValue: unknown): Promise<void> {
+  const machine = requireRecord(machineValue, 'LS-14 machine evidence');
+  const refs = [...asArray(machine.sourceRefs), ...asArray(machine.visualRefs)].map((source, index) =>
+    requireRecord(source, `LS-14 current source[${index}]`));
+  await Promise.all(refs.map(async (source, index) => {
+    const path = requireNonEmptyString(source.path, `LS-14 current source[${index}].path`);
+    const expected = requireSha256(source.sha256, `LS-14 current source[${index}].sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+    } catch {
+      throw new Error(`LS-14 source is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-14 source SHA-256 mismatch: ${path}`);
+  }));
+}
+
+async function loadLS14RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
+  const machine = requireRecord(machineValue, 'LS-14 machine evidence');
+  const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-14 machine runs[${index}]`));
+  const result: Record<string, unknown> = {};
+  for (const [index, run] of runs.entries()) {
+    const id = requireNonEmptyString(run.id, `LS-14 machine runs[${index}].id`);
+    const artifact = requireRecord(run.artifact, `LS-14 machine runs[${index}].artifact`);
+    const path = requireNonEmptyString(artifact.path, `LS-14 machine runs[${index}].artifact.path`);
+    if (!isSafeRepositoryPath(path) || !path.startsWith('validation/evidence/runs/')) {
+      throw new Error(`Unsafe LS-14 run artifact path: ${path}`);
+    }
+    const expected = requireSha256(artifact.sha256, `LS-14 machine runs[${index}].artifact.sha256`);
+    let actual: string;
+    try {
+      actual = await sha256File(resolve(root, path));
+      result[id] = await readJson(resolve(root, path));
+    } catch {
+      throw new Error(`LS-14 run artifact is absent or unbounded: ${path}`);
+    }
+    if (actual !== expected) throw new Error(`LS-14 run artifact SHA-256 mismatch: ${path}`);
+  }
+  return result;
+}
+
 async function loadLS13RunArtifacts(machineValue: unknown): Promise<Record<string, unknown>> {
   const machine = requireRecord(machineValue, 'LS-13 machine evidence');
   const runs = asArray(machine.runs).map((run, index) => requireRecord(run, `LS-13 machine runs[${index}]`));
@@ -2159,7 +2452,11 @@ async function sha256File(path: string): Promise<string> {
   if (!info.isFile() || info.size > MAX_EVIDENCE_SOURCE_BYTES) {
     throw new Error('Evidence source is not a bounded file');
   }
-  return createHash('sha256').update(await readFile(path)).digest('hex');
+  const cached = evidenceDigestCache.get(path);
+  if (cached?.size === info.size && cached.mtimeMs === info.mtimeMs) return cached.digest;
+  const digest = createHash('sha256').update(await readFile(path)).digest('hex');
+  evidenceDigestCache.set(path, { size: info.size, mtimeMs: info.mtimeMs, digest });
+  return digest;
 }
 
 function validateOrderedIds(items: Record<string, unknown>[], prefix: string, count: number, label: string) {
@@ -2337,6 +2634,27 @@ export async function validateClaimEvidenceReceipt(
       policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
     });
     await validateLS13CurrentSources(machine);
+  }
+  if (claimId === 'LS-14') {
+    const digestByPath = new Map(sourceRefs.map((source, index) => [
+      sourcePaths[index]!,
+      requireSha256(source.sha256, `${claimId}.sourceRefs[${index}].sha256`),
+    ]));
+    const machine = await readJson(resolve(root, policy.sourcePaths[0]));
+    const review = await readJson(resolve(root, policy.sourcePaths[1]));
+    const runArtifacts = await loadLS14RunArtifacts(machine);
+    validateLS14EvidenceShape(machine, review, runArtifacts, {
+      contractSha256: digestByPath.get('docs/launch-scope/ls-14-inhabited-ring-life.md')!,
+      policySha256: digestByPath.get('docs/launch-scope-execution-policy.md')!,
+    });
+    await validateLS14CurrentSources(machine);
+  }
+  if (claimId === 'G-05') {
+    const machine = await readJson(resolve(root, policy.sourcePaths[0]));
+    const review = await readJson(resolve(root, policy.sourcePaths[1]));
+    const runArtifacts = await loadLS14RunArtifacts(machine);
+    validateLS14EvidenceShape(machine, review, runArtifacts);
+    await validateLS14CurrentSources(machine);
   }
   return receipt;
 }

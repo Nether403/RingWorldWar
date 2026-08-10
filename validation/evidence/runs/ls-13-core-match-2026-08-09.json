@@ -5,7 +5,7 @@
   "command": "npm run validate:core-match",
   "result": "passed",
   "exitCode": 0,
-  "sourceSnapshotSha256": "9e37d83ecdae52ee199d3d0d1ae20cd0416171825c96a2447f40bdf832be01c4",
+  "sourceSnapshotSha256": "594d655b51cfa6f711fb01d1ff93e05bfa7b81e03a21d35351cc5e722a66565f",
   "passedTestIds": ["core-match-cohorts"],
   "summary": "The protected veteran-mirror core-match qualification passed in 829.82 seconds with environmental palettes remaining outside simulation, AI, physics, and outcome authority."
 }

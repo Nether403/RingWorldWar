@@ -4,12 +4,12 @@
   "sliceId": "LS-12",
   "contractSha256": "8e3fce00f076962f3f004b7593390ae68a15d033a019a5d4aa9c00e91403a318",
   "sourceRefs": [
-    { "path": "src/render/districtPlan.ts", "sha256": "746a305f2f56c5511d964be0e885d4a64a3fbbed483a44a1bb9cb729f52efa09" },
-    { "path": "src/render/battlefieldDressing.ts", "sha256": "1e5a729c52f0b3aa599e3ab6682096edae82db876b0231c0837da42d8a28ddfb" },
+    { "path": "src/render/districtPlan.ts", "sha256": "3333466b6967bcf7acfa52e131cbb100a6d8a36e2dd609247068ccedef6f5777" },
+    { "path": "src/render/battlefieldDressing.ts", "sha256": "e4511f1a7e05c090db62c16258a9bdcde1d828e51a15696f7902cf655970bc16" },
     { "path": "src/render/renderer.ts", "sha256": "d6ecf758c13a397e5c9238c6b0ca23c21d0c1e2b96050c0caa4296bfd75e566c" },
     { "path": "src/main.ts", "sha256": "d7da5d6e3364bbb21e90905d94a32965edccf80d02140e8b1ea89c8fcc7f10f2" },
-    { "path": "tests/render/districtPlan.test.ts", "sha256": "a8f10acbafa9112f2644a53268caebfe5ed535afc45767624ccd5b7313be240e" },
-    { "path": "tests/render/battlefieldDressing.test.ts", "sha256": "63c1dc709d3298b8234713340edc171c14c26c3cd32c94ed7c7ef370209083ce" },
+    { "path": "tests/render/districtPlan.test.ts", "sha256": "5c2230e2de1f9b2407bac55100582a114f33f906108919414744babfc3ede1e4" },
+    { "path": "tests/render/battlefieldDressing.test.ts", "sha256": "217569c70196d09f2fbb794ff074cf040bf3aea852a14115322432486b90c196" },
     { "path": "tests/render/disposal.test.ts", "sha256": "98ccd25c4ccc2cc8c35778bb54be2cbbe874fcbd3dbdae410d0168d67cb9f019" },
     { "path": "tests/render/settings.test.ts", "sha256": "0e94c6a0e02dff445f5edb5990d1928ba2ab870c399703eae996081ce934875c" },
     { "path": "e2e/layered-district-scatter.spec.ts", "sha256": "b7722ccef03cefcba858f8e2acdae4b1c03259febf51ed9fca64d40b2732e799" },
@@ -21,28 +21,28 @@
       "command": "npx vitest run tests/render/districtPlan.test.ts tests/render/battlefieldDressing.test.ts tests/render/disposal.test.ts tests/render/settings.test.ts",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-12-focused-unit-2026-08-09.json", "sha256": "b2ccf782c9fa42c8dfcdafeedf7abf29cd5f5c7575f62646dee6eafbb37728cb" }
+      "artifact": { "path": "validation/evidence/runs/ls-12-focused-unit-2026-08-09.json", "sha256": "14365998bf66b91845bb829fa34199ae3590ef2520e2bebedb7f18030fea723b" }
     },
     {
       "id": "focused-browser",
       "command": "npm run test:e2e:ls12",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-12-focused-browser-2026-08-09.json", "sha256": "3cff7cb6014a34437adcec2a8eff0332965d2b1f228da4b964b7366236d0ebc2" }
+      "artifact": { "path": "validation/evidence/runs/ls-12-focused-browser-2026-08-09.json", "sha256": "207853908b1a7f7790603c432c4d1086fb447d9a98d03aeaefc43ccf72b0952b" }
     },
     {
       "id": "full-check",
       "command": "npm run check",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-12-full-check-2026-08-09.json", "sha256": "b0fd744914a34c635d5548df4603de4e2449d31220786cf4cb6a2d60c2a3070b" }
+      "artifact": { "path": "validation/evidence/runs/ls-12-full-check-2026-08-09.json", "sha256": "d228ce70c4a8bc5d0ca2e3007199fafadf2fa1160b1f2fa0b8c71fd58b4a906e" }
     },
     {
       "id": "core-match",
       "command": "npm run validate:core-match",
       "result": "passed",
       "exitCode": 0,
-      "artifact": { "path": "validation/evidence/runs/ls-12-core-match-2026-08-09.json", "sha256": "828a3b48002c4c0c0a8d5529fcb08b2eb1d0c5ea908f7ec04f9be2da7072ee12" }
+      "artifact": { "path": "validation/evidence/runs/ls-12-core-match-2026-08-09.json", "sha256": "c91ceecff638f282a8c5155d05853a759d51edf07d3fe59c8e9ee0a1524d28e2" }
     }
   ],
   "checks": [

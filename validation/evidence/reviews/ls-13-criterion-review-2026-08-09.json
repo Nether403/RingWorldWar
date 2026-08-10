@@ -1,7 +1,7 @@
 {
   "schema": "rww.criterion-review",
   "version": 1,
-  "reviewId": "ls-13-readability-remediation-review-2026-08-09",
+  "reviewId": "ls-13-ls14-extension-regression-review-2026-08-10",
   "claimId": "LS-13",
   "contractSha256": "14cf8ad485e5804537de3edce19f57b3e99fac8f155a649b39668ba2298709c3",
   "policySha256": "7e074e41b6209c5e52e3574586441f70f9c598e1aac9ca88ce8e27c02587d66c",
@@ -10,10 +10,10 @@
   "independentContext": true,
   "reviewer": {
     "role": "independent-critic",
-    "taskId": "ses_0178ff313ffeflYml3oRR4ur7l",
+    "taskId": "ses_017290689ffebOdZzzyN2VbhUo",
     "model": "azure/gpt-5.6-sol",
-    "completedAt": "2026-08-09T21:33:39.472Z",
-    "sourceSnapshotSha256": "9e37d83ecdae52ee199d3d0d1ae20cd0416171825c96a2447f40bdf832be01c4"
+    "completedAt": "2026-08-10T00:02:54.293Z",
+    "sourceSnapshotSha256": "594d655b51cfa6f711fb01d1ff93e05bfa7b81e03a21d35351cc5e722a66565f"
   },
   "scores": {
     "strict-palette-contract": { "score": 4, "checkId": "strict-palette-contract", "rationale": "The parser declares exactly four stable palettes, owns four silhouettes per palette, rejects unknown fields, and fails closed on cross-palette silhouettes." },
