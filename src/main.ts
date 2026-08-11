@@ -16,6 +16,7 @@ import { BASE_EXPOSURE, QUALITY, Renderer, type QualityLevel } from '@render/ren
 import { Settings } from '@render/settings';
 import { RingMesh } from '@render/ringMesh';
 import { BattlefieldDressing } from '@render/battlefieldDressing';
+import { AuthoredBuildingPilot } from '@render/authoredBuildingPilot';
 import { StrategicAnnulus } from '@render/strategicAnnulus';
 import { BUILDABLE, Faction, STRUCTURES } from '@sim/data';
 import { Game, SAVE_SLOT_KEY } from './game';
@@ -195,6 +196,7 @@ async function startSession(
   const container = document.getElementById('app')!;
   const scenarioDriverEnabled = import.meta.env.DEV && params.get('scenarioDriver') === '1';
   const ls12QualificationEnabled = params.get('qualification') === 'ls12';
+  const assetPilotQualificationEnabled = params.get('qualification') === 'asset-pilot';
   const requestedSeed = Number(params.get('seed') ?? '20260731') || 20260731;
   const seed = runtimeScenario?.worldSeed ?? requestedSeed;
   const playerFaction = runtimeScenario?.playerFaction ?? (titleAction.kind === 'continue'
@@ -277,6 +279,12 @@ async function startSession(
   const dressing = new BattlefieldDressing(seed);
   cleanup.defer(() => dressing.dispose());
   renderer.scene.add(dressing.object);
+  await boot.step(0.74, 'placing static structures');
+  const authoredBuildings = new AuthoredBuildingPilot();
+  cleanup.defer(() => authoredBuildings.dispose());
+  await authoredBuildings.load();
+  authoredBuildings.update(anchor, game.terrain);
+  renderer.scene.add(authoredBuildings.object);
 
   await boot.step(0.86, 'igniting the solar filament');
   const environment = new Environment(seed);
@@ -302,6 +310,7 @@ async function startSession(
     game.effects.setAftermathCaps(quality.scarCap, quality.debrisCap, quality.smokeEmitterCap);
     game.entities.setLowQuality(renderer.quality === 'low');
     dressing.setQuality(quality.dressingDistance, quality.dressingCap, quality.dressingShadows);
+    authoredBuildings.setQuality(quality.dressingShadows);
     environment.setLowQuality(renderer.quality === 'low');
     cameraController.setTacticalDrawDistance(quality.drawDistance);
     cameraController.update(0, { anchor, terrain: game.terrain });
@@ -420,6 +429,7 @@ async function startSession(
       cameraController.update(0, { anchor, terrain: game.terrain });
     }
     dressing.update(anchor, game.terrain);
+    authoredBuildings.update(anchor, game.terrain);
 
     game.effects.viewportHeight = renderer.gl.getContext().drawingBufferHeight;
     if (advanceSimulation) game.update(dt, visualTime);
@@ -679,13 +689,14 @@ async function startSession(
       delete (window as unknown as { RWWDiagnostics?: unknown }).RWWDiagnostics;
     });
   }
-  if (ls12QualificationEnabled) {
+  if (ls12QualificationEnabled || assetPilotQualificationEnabled) {
     const snapshot = () => ({
       ownerName: dressing.object.name,
       bucketNames: dressing.object.children.map((child) => child.name),
       bucketCounts: dressing.object.children.map((child) =>
         child instanceof THREE.InstancedMesh ? child.count : 0),
       diagnostics: dressing.diagnostics(),
+      authoredBuildings: authoredBuildings.diagnostics(),
       quality: renderer.quality,
       drawCalls: renderer.drawCalls,
       triangles: renderer.triangles,
@@ -704,6 +715,7 @@ async function startSession(
         if (!Object.hasOwn(QUALITY, quality)) throw new Error(`Unsupported qualification quality: ${quality}`);
         renderer.setQuality(quality);
         dressing.update(anchor, game.terrain);
+        authoredBuildings.update(anchor, game.terrain);
         renderer.render(1 / 60);
         return snapshot();
       },
