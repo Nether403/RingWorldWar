@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ring World War — Official Strategy & Lore Portal</title>
+  <meta name="description" content="Official website for Ring World War. A procedural real-time strategy game on the inner surface of a rotating ring megastructure featuring Coriolis rocket warfare, mech direct control, and theater-scale survival protocols.">
+  <meta name="keywords" content="Ring World War, RTS, Sci-Fi Strategy, Coriolis Physics, Mechs, Ringworld, Game Lore, Tutorial">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Sticky Glassmorphic Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="#hero" class="nav-brand">
+        <img src="assets/last-rotation-title.webp" alt="Ring World War Logo" style="height:28px;">
+        <span>RING WORLD WAR</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#hero" class="active">Overview</a></li>
+        <li><a href="#lore">Lore & Setting</a></li>
+        <li><a href="#mechanics">Mechanics & Physics</a></li>
+        <li><a href="#armory">Unit Armory</a></li>
+        <li><a href="#tutorial">Tutorial</a></li>
+        <li><a href="#controls">Controls & Launch</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="#controls" class="btn btn-primary">Play Game</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header id="hero" class="hero">
+    <div class="hero-bg-ring"></div>
+    <div class="hero-content">
+      <img src="assets/last-rotation-title.webp" alt="Ring World War" class="hero-title-img">
+      <p class="hero-tagline">
+        <strong>Command & Conquer meets Kerbal ballistics on a Halo ring megastructure.</strong><br>
+        War in three registers: ground mech maneuver, over-the-horizon rocket artillery, and the overhead enemy hanging in your sky.
+      </p>
+      
+      <div class="hero-badges">
+        <div class="stat-badge">Radius: <span class="val">3.6 km</span></div>
+        <div class="stat-badge">Centrifugal Gravity: <span class="val">6.0 m/s²</span></div>
+        <div class="stat-badge">Circumference: <span class="val">22.6 km</span></div>
+        <div class="stat-badge">Topology: <span class="val">Wrapping Cylinder</span></div>
+      </div>
+
+      <div class="hero-buttons">
+        <a href="#mechanics" class="btn btn-primary">Explore Mechanics</a>
+        <a href="#lore" class="btn btn-secondary">Read setting Lore</a>
+      </div>
+
+      <!-- Cinematic Video Theater -->
+      <div class="video-theater">
+        <video controls poster="assets/last-rotation-poster.jpg" preload="metadata">
+          <source src="assets/last-rotation-intro.mp4" type="video/mp4">
+          Your browser does not support HTML5 video playback.
+        </video>
+      </div>
+    </div>
+  </header>
+
+  <!-- Lore & Setting Section -->
+  <section id="lore">
+    <div class="container">
+      <div class="section-title-wrap">
+        <span class="section-tag">Narrative Codex</span>
+        <h2 class="section-title">The Last Rotation</h2>
+        <p class="section-subtitle">
+          The central Solar Filament is failing. The Shadow-Square Network is drifting out of sync. The ring's surviving Spinal Network can authorize only one final habitat-scale operation.
+        </p>
+      </div>
+
+      <!-- Faction Clash Cards -->
+      <div class="lore-grid">
+        <div class="glass-panel faction-card choir">
+          <div class="faction-header">
+            <h3 class="faction-name gradient-text-choir">The Axiom Choir</h3>
+            <span class="faction-protocol">Migration Protocol</span>
+          </div>
+          <p class="faction-desc">
+            A mobile society descended from maintenance guilds, sensor operators, and machine-integrated communities. They believe the habitat is beyond repair and seek to launch a new starship into the deep cosmos.
+          </p>
+          <ul class="faction-list">
+            <li><strong>Objective:</strong> Dismantle selected ring sectors for reaction mass and starship construction.</li>
+            <li><strong>Doctrine:</strong> High mobility, stealth scouting, superior optical vision, and rapid drone production.</li>
+            <li><strong>Moral Stance:</strong> Long-term species survival over preserving crumbling ground.</li>
+          </ul>
+        </div>
+
+        <div class="glass-panel faction-card compact">
+          <div class="faction-header">
+            <h3 class="faction-name gradient-text-compact">The Meridian Compact</h3>
+            <span class="faction-protocol">Anchor Protocol</span>
+          </div>
+          <p class="faction-desc">
+            A coalition of permanent arc-cities, civil governments, industrial families, and military commands. They fight to preserve the ring's existing population and stabilize the habitat's rotational velocity.
+          </p>
+          <ul class="faction-list">
+            <li><strong>Objective:</strong> Stabilize angular momentum and seal failing ring arcs to save present cities.</li>
+            <li><strong>Doctrine:</strong> Heavy kinetic armor, high-durability mechs, and cost-effective ballistic emplacements.</li>
+            <li><strong>Moral Stance:</strong> Living citizens today are not raw material for a speculative stellar launch.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Story Artwork Gallery -->
+      <div class="narrative-gallery">
+        <div class="narrative-card">
+          <img src="assets/narrative/signal-briefing.webp" alt="Signal Briefing">
+          <div class="narrative-info">
+            <div class="narrative-title">A Signal in the Spine</div>
+            <div class="narrative-desc">Spinal Node authentication broadcasts across the arc.</div>
+          </div>
+        </div>
+        <div class="narrative-card">
+          <img src="assets/narrative/signal-hunters.webp" alt="Signal Hunters">
+          <div class="narrative-info">
+            <div class="narrative-title">Signal Hunters</div>
+            <div class="narrative-desc">Scout Wisps probe enemy territory under day/night shadow bands.</div>
+          </div>
+        </div>
+        <div class="narrative-card">
+          <img src="assets/narrative/signal-last-correction.webp" alt="Last Correction">
+          <div class="narrative-info">
+            <div class="narrative-title">The Last Correction</div>
+            <div class="narrative-desc">Spinal Network structural alignment in progress.</div>
+          </div>
+        </div>
+        <div class="narrative-card">
+          <img src="assets/narrative/signal-migration.webp" alt="Migration Arc">
+          <div class="narrative-info">
+            <div class="narrative-title">The Migration Fleet</div>
+            <div class="narrative-desc">Choir assemblies prepare for inter-stellar launch.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game Mechanics & Physics Simulator Section -->
+  <section id="mechanics">
+    <div class="container">
+      <div class="section-title-wrap">
+        <span class="section-tag">Interactive Physics</span>
+        <h2 class="section-title">Ring Habitat Ballistics & Mechanics</h2>
+        <p class="section-subtitle">
+          In a rotating cylinder world, projectiles experience true Coriolis accelerations. Firing spinward vs. antispinward yields fundamentally asymmetric trajectory behavior.
+        </p>
+      </div>
+
+      <!-- 3 Pillars -->
+      <div class="mechanics-pillars">
+        <div class="glass-panel pillar-card">
+          <span class="pillar-icon">🚀</span>
+          <h3 class="pillar-title">Rocket Ballistics</h3>
+          <p class="pillar-desc">
+            All artillery fire is simulated in real-time within the rotating frame. Antispinward shots subtract tangential spin speed to fly much further.
+          </p>
+        </div>
+        <div class="glass-panel pillar-card">
+          <span class="pillar-icon">🤖</span>
+          <h3 class="pillar-title">Direct Mech Piloting</h3>
+          <p class="pillar-desc">
+            Press <strong style="color:var(--color-choir)">V</strong> at any time to drop into third-person over-the-shoulder direct combat control with WASD + torso aiming.
+          </p>
+        </div>
+        <div class="glass-panel pillar-card">
+          <span class="pillar-icon">⚡</span>
+          <h3 class="pillar-title">Spinal Alignment</h3>
+          <p class="pillar-desc">
+            Capture neutral Spinal Nodes to earn Command Points (C). Control paired Nodes to form Spinal Alignment and earn Dominance for victory.
+          </p>
+        </div>
+      </div>
+
+      <!-- Interactive Canvas Ballistics Simulator Box -->
+      <div class="simulator-box">
+        <div class="sim-canvas-wrap">
+          <canvas id="ballisticsCanvas"></canvas>
+        </div>
+        <div class="sim-controls">
+          <h3 style="font-size:1.15rem; margin-bottom:0.5rem;">Trajectory Simulator</h3>
+          
+          <div class="sim-control-group">
+            <label>Fire Direction</label>
+            <div class="dir-toggle-btn-group">
+              <button id="btnAntispinward" class="dir-btn active">Antispinward (Long)</button>
+              <button id="btnSpinward" class="dir-btn">Spinward (Short)</button>
+            </div>
+          </div>
+
+          <div class="sim-control-group">
+            <label>Launch Muzzle Velocity: <span id="velVal" class="val">600</span> m/s</label>
+            <input type="range" id="simVelocity" min="200" max="1200" value="600" step="50">
+          </div>
+
+          <div class="sim-control-group">
+            <label>Launch Angle: <span id="angleVal" class="val">45</span>°</label>
+            <input type="range" id="simAngle" min="15" max="85" value="45" step="5">
+          </div>
+
+          <div class="sim-control-group" style="flex-direction:row; align-items:center; justify-content:space-between; margin-top:0.5rem;">
+            <label style="margin:0;">Chord Shot (Interior Cross)</label>
+            <input type="checkbox" id="chordToggle" style="accent-color:var(--color-choir); width:18px; height:18px; cursor:pointer;">
+          </div>
+
+          <div class="sim-explainer-card">
+            <strong>Physics Live Readout:</strong><br>
+            • Flight Duration: <span id="simStatTime" style="color:var(--color-choir)">0.0 s</span><br>
+            • Effective Range: <span id="simStatRange" style="color:var(--color-choir)">0 m</span><br>
+            • Apex Altitude: <span id="simStatAlt" style="color:var(--color-choir)">0 m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resource Economy Cards -->
+      <div class="economy-grid">
+        <div class="glass-panel econ-card">
+          <div class="econ-header">
+            <span class="econ-icon">💎</span>
+            <h4 class="econ-title">Scrith Salvage (S)</h4>
+          </div>
+          <p style="font-size:0.9rem; color:var(--text-secondary);">
+            Mined from ruin fields by Extractor structures and hauler drones. Primary currency for building structures and massing unit production. Deposits are finite!
+          </p>
+        </div>
+
+        <div class="glass-panel econ-card energy">
+          <div class="econ-header">
+            <span class="econ-icon">⚡</span>
+            <h4 class="econ-title">Energy Upkeep (E)</h4>
+          </div>
+          <p style="font-size:0.9rem; color:var(--text-secondary);">
+            Generated by Solar Arrays (day-dependent) & Fusion Cores. Actively consumed by radar masts, point defense lasers, and rocket guidance systems.
+          </p>
+        </div>
+
+        <div class="glass-panel econ-card command">
+          <div class="econ-header">
+            <span class="econ-icon">👑</span>
+            <h4 class="econ-title">Command Points (C)</h4>
+          </div>
+          <p style="font-size:0.9rem; color:var(--text-secondary);">
+            Cap on concurrent active combat mechs. Earned exclusively by contesting and capturing neutral Spinal Node towers across the ring.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Factions & Unit Armory Section -->
+  <section id="armory">
+    <div class="container">
+      <div class="section-title-wrap">
+        <span class="section-tag">Unit Intelligence</span>
+        <h2 class="section-title">Combat Mech & Structure Armory</h2>
+        <p class="section-subtitle">
+          Explore the tactical roster of mechs, drones, and artillery batteries fielded in the Last Rotation.
+        </p>
+      </div>
+
+      <!-- Armory Tabs -->
+      <div class="armory-tabs">
+        <button class="tab-btn active" data-tab="all">All Roster</button>
+        <button class="tab-btn" data-tab="choir">Axiom Choir</button>
+        <button class="tab-btn compact-tab" data-tab="compact">Meridian Compact</button>
+      </div>
+
+      <!-- Unit Cards Grid -->
+      <div id="dossierGrid" class="dossier-grid">
+        <!-- Javascript dynamically populates authentic game dossier cards -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Unit Modal Inspection -->
+  <div id="unitModal" class="modal-overlay">
+    <div class="modal-content">
+      <button id="modalClose" class="modal-close">&times;</button>
+      <div class="modal-grid">
+        <div class="modal-img-wrap">
+          <img id="modalImg" src="" alt="Unit Image">
+        </div>
+        <div class="modal-body">
+          <span id="modalFaction" class="unit-faction-badge">Faction</span>
+          <h2 id="modalTitle" style="font-size:1.8rem; margin:0.5rem 0;">Unit Name</h2>
+          <div id="modalRole" style="font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:1rem;">Role</div>
+          <p id="modalDesc" style="font-size:0.95rem; color:var(--text-secondary); margin-bottom:1.5rem; flex-grow:1;">Description...</p>
+          
+          <div style="background:rgba(0,0,0,0.4); padding:1rem; border-radius:8px; margin-bottom:1rem;">
+            <strong style="color:var(--color-choir); font-size:0.85rem;">SPECIAL ABILITY:</strong>
+            <p id="modalAbility" style="font-size:0.9rem; color:#fff; margin-top:0.25rem;">Ability description</p>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; border-top:1px solid var(--glass-border); padding-top:1rem;">
+            <div><span style="font-size:0.75rem; color:var(--text-muted);">HIT POINTS:</span> <strong id="modalHp" style="font-family:'Orbitron'; color:#fff;">1200</strong></div>
+            <div><span style="font-size:0.75rem; color:var(--text-muted);">RESOURCE COST:</span> <strong id="modalCost" style="font-family:'Orbitron'; color:#fff;">450 S</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- First Contact Tutorial & Field Guide Section -->
+  <section id="tutorial">
+    <div class="container">
+      <div class="section-title-wrap">
+        <span class="section-tag">Commander Training</span>
+        <h2 class="section-title">First Contact Scenario Guide</h2>
+        <p class="section-subtitle">
+          Master the official 10-step tactical scenario from early solar construction to antispinward siege strikes.
+        </p>
+      </div>
+
+      <div class="glass-panel tutorial-stepper">
+        <!-- Step Navigation List -->
+        <div class="step-list">
+          <div class="step-item active" data-step="1">
+            <span class="step-num">01</span>
+            <span class="step-title">Select Engineer Unit</span>
+          </div>
+          <div class="step-item" data-step="2">
+            <span class="step-num">02</span>
+            <span class="step-title">Build 2 Solar Arrays</span>
+          </div>
+          <div class="step-item" data-step="3">
+            <span class="step-num">03</span>
+            <span class="step-title">Construct Extractor</span>
+          </div>
+          <div class="step-item" data-step="4">
+            <span class="step-num">04</span>
+            <span class="step-title">Build Fabricator</span>
+          </div>
+          <div class="step-item" data-step="5">
+            <span class="step-num">05</span>
+            <span class="step-title">Build Mech Foundry</span>
+          </div>
+          <div class="step-item" data-step="6">
+            <span class="step-num">06</span>
+            <span class="step-title">Produce Wisp Scout</span>
+          </div>
+          <div class="step-item" data-step="7">
+            <span class="step-num">07</span>
+            <span class="step-title">Capture Forward Node</span>
+          </div>
+          <div class="step-item" data-step="8">
+            <span class="step-num">08</span>
+            <span class="step-title">Produce Longbow Walker</span>
+          </div>
+          <div class="step-item" data-step="9">
+            <span class="step-num">09</span>
+            <span class="step-title">Deploy Siege Mode</span>
+          </div>
+          <div class="step-item" data-step="10">
+            <span class="step-num">10</span>
+            <span class="step-title">Antispinward Mortar Strike</span>
+          </div>
+        </div>
+
+        <!-- Step Display Panel -->
+        <div class="step-display-panel">
+          <div>
+            <div id="stepTag" class="step-header-tag">OBJECTIVE 01 / 10</div>
+            <h3 id="stepHeading" class="step-heading">Select Engineer Unit</h3>
+            <p id="stepDetailText" class="step-detail-text">
+              Click to select your starting construction Engineer. Engineers are the backbone of fabrication and resource infrastructure.
+            </p>
+          </div>
+          
+          <div class="step-tactical-tip">
+            Pro Tip: You can assign hotkeys (<strong style="color:var(--color-choir)">Ctrl+1..9</strong>) to your engineers and fabricators to queue structures quickly without losing camera focus.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Controls & Launch Hub Section -->
+  <section id="controls">
+    <div class="container">
+      <div class="section-title-wrap">
+        <span class="section-tag">Field Operations</span>
+        <h2 class="section-title">Controls & Execution Guide</h2>
+        <p class="section-subtitle">
+          Command reference chart and local game launcher instructions.
+        </p>
+      </div>
+
+      <div class="controls-grid" style="margin-bottom:4rem;">
+        <div class="glass-panel keybind-card">
+          <span class="key-badge">WASD</span>
+          <span class="key-desc">Pan tactical camera / Move piloted mech</span>
+        </div>
+        <div class="glass-panel keybind-card">
+          <span class="key-badge">Q / E</span>
+          <span class="key-desc">Rotate camera view horizontally</span>
+        </div>
+        <div class="glass-panel keybind-card">
+          <span class="key-badge">V</span>
+          <span class="key-desc">Direct Control Over-The-Shoulder Takeover</span>
+        </div>
+        <div class="glass-panel keybind-card">
+          <span class="key-badge">M</span>
+          <span class="key-desc">Toggle live read-only whole-ring map</span>
+        </div>
+        <div class="glass-panel keybind-card">
+          <span class="key-badge">1..9</span>
+          <span class="key-desc">Select / recall control groups</span>
+        </div>
+        <div class="glass-panel keybind-card">
+          <span class="key-badge">Esc</span>
+          <span class="key-desc">Cancel order / return to tactical view</span>
+        </div>
+      </div>
+
+      <!-- Launch Terminal Box -->
+      <div class="glass-panel" style="padding:2.5rem; text-align:center; max-width:800px; margin:0 auto; border-color:var(--glass-border-glow);">
+        <h3 style="font-size:1.5rem; margin-bottom:1rem;" class="gradient-text">Run Ring World War Locally</h3>
+        <p style="color:var(--text-secondary); margin-bottom:1.5rem;">
+          To launch the game development server or execute the First Contact scenario directly:
+        </p>
+        
+        <div style="background:#030509; padding:1.25rem; border-radius:8px; border:1px solid var(--glass-border); text-align:left; font-family:monospace; color:#00f3ff; font-size:0.95rem; margin-bottom:1.5rem;">
+          # Start dev server (open http://localhost:5180)<br>
+          <span style="color:#fff;">npm run dev</span><br><br>
+          # Run First Contact Tutorial scenario<br>
+          <span style="color:#fff;">npm run rww -- play first-contact</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <h3 class="gradient-text">RING WORLD WAR</h3>
+          <p>
+            A procedural browser RTS set on the inner surface of a rotating ring habitat. Built with simulated Coriolis ballistics, mechs, and strategic artillery warfare.
+          </p>
+        </div>
+        <div class="footer-links-group">
+          <h4>Navigation</h4>
+          <ul>
+            <li><a href="#hero">Overview</a></li>
+            <li><a href="#lore">Lore & Setting</a></li>
+            <li><a href="#mechanics">Ballistics Simulator</a></li>
+            <li><a href="#armory">Unit Dossiers</a></li>
+          </ul>
+        </div>
+        <div class="footer-links-group">
+          <h4>Documentation</h4>
+          <ul>
+            <li><a href="#tutorial">Tutorial Walkthrough</a></li>
+            <li><a href="#controls">Controls Reference</a></li>
+            <li><a href="#controls">Local Launch Guide</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        &copy; 2026 Ring World War Project. All game assets, lore, and visual designs reserved.
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
