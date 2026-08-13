@@ -1,113 +1,141 @@
-# Graph Report - .  (2026-08-09)
+# Graph Report - C:\Users\van_d\RingWorldWar  (2026-08-11)
 
 ## Corpus Check
-- cluster-only mode — file stats not available
+- Large corpus: 481 files · ~790,787 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
 
 ## Summary
-- 2681 nodes · 6842 edges · 190 communities (147 shown, 43 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 306 edges (avg confidence: 0.8)
+- 3212 nodes · 7892 edges · 242 communities (192 shown, 50 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 346 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
-
-## Graph Freshness
-- Built from commit: `56a07093`
-- Run `git rev-parse HEAD` and compare to check if the graph is stale.
-- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - serialize.ts
-- mission.ts
+- tactician.ts
+- World
 - vite.config.ts
+- Hud
+- runtimeScenario.ts
 - world.ts
-- Game
+- terrain.ts
 - scenario.mjs
 - manifests.mjs
-- Hud
+- Launch Scope Control
 - compilerOptions
-- game.ts
-- World
+- Game
+- Terrain
 - scripts
-- constants.ts
-- environment.ts
-- runtimeScenario.ts
-- rww.test.ts
-- commands.mjs
 - coreMatch.ts
-- Spinal Alignment
-- tactician.ts
-- TitleScreen
-- Phase 2 Systems Depth
+- rww.test.ts
 - opponent.ts
 - campaignProfile.ts
-- terrain.ts
-- ringMath.ts
-- Terrain
-- wireKeys
-- main.ts
-- settings.ts
-- models.ts
-- RING_CIRCUMFERENCE
-- ballistics.ts
-- AiOpponent
-- .structureById
-- calibration.ts
-- startSession
+- environment.ts
+- districtPlan.ts
+- TitleScreen
+- Spinal Alignment
+- Phase 2 Systems Depth
+- game.ts
 - runner.ts
-- SimEvent
-- Renderer
-- scenario-driver.ts
-- CameraRig
-- BTNode
+- ballistics.ts
+- battlefieldDressing.ts
+- models.ts
+- main.ts
+- mission.ts
+- commands.mjs
+- QualityLevel
+- Environment
+- requireNonEmptyString
 - deltaS
-- UnitKind
-- campaignRoute.ts
-- InputController
-- .emit
-- .stepUnits
-- SurfaceNav
-- entityRenderer.ts
-- titleScreen.ts
-- performance-profile.test.ts
 - headless/core-match.test.ts
-- WholeRingModeController
-- args.mjs
+- performance-profile.test.ts
+- CameraRig
+- UnitKind
+- startSession
+- Effects
+- InputController
+- SurfaceNav
+- Ring World War Briefing Slide 3
+- scenario.test.ts
 - strategicAnnulus.ts
-- Launch Scope
-- Rng
+- .constructor
+- mission.ts
+- wrapS
+- settings.ts
+- args.mjs
+- entityRenderer.ts
+- mission.ts
 - WebAudioBackend
+- titleScreen.ts
+- wireKeys
+- Hud
+- mission.ts
+- Launch Scope
+- LS-10 Whole-Ring Strategic Side View
+- Gemini Generated Image
+- voiceDirector.ts
+- constants.ts
 - missionRegistry.ts
 - browser-scenario.mjs
-- BTStatus
-- AudioBackend
-- audioEngine.test.ts
+- Technical Architecture
+- LS-12 Layered District And Bounded Scatter Foundation
 - ProceduralAudio
+- CameraRig
+- RigModeController
+- EntityRenderer
+- LS-13 Production Low 2026-08-09 Screenshot
+- audioEngine.test.ts
+- AudioBackend
+- missionRegistry.ts
+- abilities.ts
+- mission.ts
 - visual-signature.mjs
+- readJson
+- validateLS14EvidenceShape
 - Headless Performance Gate
-- surfaceDistSq
+- LS-13 Four Reusable Environmental District Palettes
+- Rng
 - parseCoreMatchManifest
+- scenario.test.ts
 - doctor.mjs
+- LS-11 Gravity Range
+- Ring World War Briefing Slide 2
 - webAudioBackend.ts
+- BattlefieldDressing
+- mission.ts
 - write-delivery-receipt.mjs
 - Chord Shot
+- Axiom Choir
 - audioEngine.ts
-- validation/core-match.test.ts
-- abilities.ts
-- .isEntityVisible
+- WholeRingModeController
 - shot.mjs
+- Ring World War Briefing Slide 2
+- LS-15 Bounded Acceptance Contract: Integrated Public-Alpha Tutorial Arc
 - Direction Is Territory
-- EntityRenderer
+- lifecycle.spec.ts
+- GravityRangePanel
+- Launch Scope Control Screenshot
+- Last Rotation Poster
 - Ability System
 - Sensor Coverage
 - Battlefield Memory
-- Noise
-- StructureKind
+- Terrain
 - lint.mjs
 - Launch-Scope Ship-First Execution Policy
+- LS-14 Habitation, Vegetation, Transit, And Ambient Life
 - Last Rotation Transmission Alert Poster
-- browser-metrics.mjs
+- voiceMedia.ts
+- app.js
 - RenderAnchor
 - Player Observation Protocol
-- title-screen.spec.ts
-- AI Strategist
+- README
+- Low-Quality Presentation Findings
+- LS-14 Low Runtime Evidence
+- Signal Briefing Image
+- Signal Hunters Scene
+- Choir Engineer
+- Choir Wisp Dossier Image
+- Bulwark Unit Dossier Image
+- Longbow Combat Mech
+- Compact Vanguard Dossier Image
 - AI Strategist
 - Presentation-Only Boundary
 - Faction Geometry Variants
@@ -122,7 +150,16 @@
 - Holographic Transmission Path
 - Axiom Choir Vanguard
 - Self-Propelled Artillery Platform
-- tactician.test.ts
+- world.ts
+- Last Rotation Title Image
+- Signal Last Correction Image
+- Signal Migration Image
+- Choir Longbow Artillery Unit
+- Mechanical Unit
+- Choir Vanguard Mech
+- Aegis
+- Compact Engineer Dossier Image
+- Compact Wisp Unit Dossier Image
 - Story Mission
 - Versioned Receipts
 - Phase 5 Tactical Media Delivery
@@ -134,7 +171,6 @@
 - Tactical HUD and Command Feedback
 - Phase 4A Provisional Baseline
 - Heavy-Combat Renderer Profile
-- Launch Scope Control
 - Choir Engineer
 - Choir Longbow
 - Axiom Choir Needle
@@ -142,7 +178,7 @@
 - Compact Bulwark
 - Compact Engineer Unit
 - Compact Vanguard
-- .tick
+- Choir Aegis
 - Cinematic Presentation Layer
 - Core Match Validation
 - Directional Reach Profile
@@ -155,7 +191,9 @@
 - Aegis
 - Compact Wisp Unit
 - Delivered Phase 2 Systems
-- probe.mjs
+- Optional Media Manifest
+- MemoryStorage
+- ls11SourceSnapshotSha256
 - Browser Job
 - Gate 2 Match Quality Criteria
 - Strategist
@@ -173,8 +211,9 @@
 - Dense Spatial Query Cache
 - Session Cleanup Stack
 - Procedural Mech Locomotion
-- gameplay.spec.ts
-- runtime-scenario.spec.ts
+- Ring Physics
+- play.spec.ts
+- Game
 - Ring Math Task
 - Verify Job
 - Quality Preset Framework
@@ -186,22 +225,27 @@
 - Drag Selection Rectangle
 - Shader-Based Atmosphere
 - Environmental District Palettes
-- playwright.config.ts
+- Phase 4 Performance and Hardening
+- Identity
+- Playstyle
 - Mech Abilities
+- Quality Presets
 
 ## God Nodes (most connected - your core abstractions)
-1. `World` - 194 edges
-2. `Faction` - 160 edges
-3. `deltaS()` - 78 edges
-4. `Game` - 72 edges
-5. `Terrain` - 66 edges
-6. `wrapS()` - 60 edges
-7. `RenderAnchor` - 53 edges
-8. `surfaceDist()` - 49 edges
-9. `startSession()` - 47 edges
-10. `AiOpponent` - 40 edges
+1. `World` - 229 edges
+2. `Faction` - 186 edges
+3. `Game` - 89 edges
+4. `deltaS()` - 84 edges
+5. `Terrain` - 70 edges
+6. `wrapS()` - 64 edges
+7. `RenderAnchor` - 58 edges
+8. `startSession()` - 57 edges
+9. `surfaceDist()` - 53 edges
+10. `AiOpponent` - 41 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `Live Whole-Ring View` --semantically_similar_to--> `Whole-Ring Strategic View`  [INFERRED] [semantically similar]
+  README.md → docs/launch-scope/ls-10-whole-ring-strategic-view.md
 - `Directional Artillery High Ground` --semantically_similar_to--> `Direction Is Territory`  [INFERRED] [semantically similar]
   game ideas plus.md → docs/publishable-game-roadmap.md
 - `Gravity Range Arcade Mode` --semantically_similar_to--> `Launch Scope`  [INFERRED] [semantically similar]
@@ -210,8 +254,6 @@
   src/main.ts → tests/audio/audioEngine.test.ts
 - `Faction Asymmetry` --semantically_similar_to--> `Faction Modifiers`  [INFERRED] [semantically similar]
   .kiro/specs/phase-2-systems-depth/design.md → tasks/phase-2-systems-depth/design.md
-- `Axiom Choir` --conceptually_related_to--> `Wisp Unit`  [INFERRED]
-  CONTEXT.md → public/media/presentation/units/dossier.choir.wisp.webp
 
 ## Import Cycles
 - None detected.
@@ -241,552 +283,745 @@
 - **Compact Engineer Unit Assembly** — public_media_presentation_units_dossier_compact_engineer_compact_engineer_unit, public_media_presentation_units_dossier_compact_engineer_armored_biped_chassis, public_media_presentation_units_dossier_compact_engineer_cable_spool, public_media_presentation_units_dossier_compact_engineer_articulated_tool_arm [EXTRACTED 1.00]
 - **Longbow Artillery Walker Configuration** — public_media_presentation_units_dossier_compact_longbow_self_propelled_artillery_platform, public_media_presentation_units_dossier_compact_longbow_long_range_cannon, public_media_presentation_units_dossier_compact_longbow_quadrupedal_chassis, public_media_presentation_units_dossier_compact_longbow_sensor_module [EXTRACTED 1.00]
 - **Compact Vanguard Combat Unit Configuration** — public_media_presentation_units_dossier_compact_vanguard_armored_bipedal_combat_chassis, public_media_presentation_units_dossier_compact_vanguard_layered_heavy_armor, public_media_presentation_units_dossier_compact_vanguard_dual_rotary_cannon_armament [EXTRACTED 1.00]
+- **Ring Coordinate and Rendering Stack** — docs_architecture_canonical_ring_space, docs_architecture_wrapped_surface_space, docs_architecture_render_space, docs_architecture_rotating_frame_kinematics [EXTRACTED 1.00]
+- **Strategic Observation and Gravity Exercise Contract** — docs_launch_scope_ls_10_whole_ring_strategic_view_docs_launch_scope_ls_10_whole_ring_strategic_view, docs_launch_scope_ls_11_gravity_range_docs_launch_scope_ls_11_gravity_range, docs_launch_scope_ls_11_gravity_range_docs_launch_scope_ls_11_ls_10_observation_view [INFERRED 0.80]
+- **Layered District Presentation and Palette System** — docs_launch_scope_ls_12_layered_district_scatter_docs_launch_scope_ls_12_district_plan, docs_launch_scope_ls_12_layered_district_scatter_docs_launch_scope_ls_12_scatter_layers, docs_launch_scope_ls_13_environmental_district_palettes_docs_launch_scope_ls_13_environmental_palettes, docs_launch_scope_ls_13_environmental_district_palettes_docs_launch_scope_ls_13_fixed_render_topology [EXTRACTED 1.00]
+- **LS-14 Renderer-Owned Inhabited Ring Contract** — docs_launch_scope_ls_14_inhabited_ring_life_contract, docs_launch_scope_ls_14_inhabited_ring_life_four_life_cues, docs_launch_scope_ls_14_inhabited_ring_life_corridor_cell_grid, docs_launch_scope_ls_14_inhabited_ring_life_bounded_visual_activity, docs_launch_scope_ls_14_inhabited_ring_life_presentation_only_authority, docs_launch_scope_ls_14_inhabited_ring_life_reduced_motion_lifecycle [EXTRACTED 1.00]
+- **LS-15 Integrated Tutorial Acceptance Boundary** — docs_launch_scope_ls_15_integrated_tutorial_arc_contract, docs_launch_scope_ls_15_integrated_tutorial_arc_first_contact_compact_01, docs_launch_scope_ls_15_integrated_tutorial_arc_ten_objectives, docs_launch_scope_ls_15_integrated_tutorial_arc_validated_save_envelope, docs_launch_scope_ls_15_integrated_tutorial_arc_campaign_profile, docs_launch_scope_ls_15_integrated_tutorial_arc_g_02_novice_cohort [EXTRACTED 1.00]
+- **Ring World War Public Portal Sections** — website_index_game_lore_portal, website_index_coriolis_ballistics, website_index_trajectory_simulator, website_index_unit_armory, website_index_first_contact_scenario_guide, website_index_controls_and_local_launch [EXTRACTED 1.00]
+- **Orbital Ballistics Panel** — gemini_generated_image_image, gemini_generated_image_coriolis_drift_ballistics, gemini_generated_image_projected_trajectory, gemini_generated_image_orbital_marker [EXTRACTED 1.00]
+- **Spinal Node Tutorial Panel** — gemini_generated_image_image, gemini_generated_image_capturing_spinal_nodes, gemini_generated_image_spinal_alignment, gemini_generated_image_dominance_flow_active [EXTRACTED 1.00]
+- **Compact Longbow Dossier Panel** — gemini_generated_image_image, gemini_generated_image_compact_longbow, gemini_generated_image_heavy_artillery_walker, gemini_generated_image_recoilless_long_range_fire, gemini_generated_image_crew_three [EXTRACTED 1.00]
+- **Meridian Compact survival doctrine** — ring_world_war_briefing_slide_3_meridian_compact, ring_world_war_briefing_slide_3_anchor_protocol, ring_world_war_briefing_slide_3_permanent_arc_cities_civil_governments, ring_world_war_briefing_slide_3_durable_mechs_fortified_artillery [EXTRACTED 1.00]
+- **Axiom Choir survival doctrine** — ring_world_war_briefing_slide_3_axiom_choir, ring_world_war_briefing_slide_3_migration_protocol, ring_world_war_briefing_slide_3_mobile_society_distributed_machine_integrated_communities, ring_world_war_briefing_slide_3_speed_superior_sensors_interception [EXTRACTED 1.00]
+- **Tactical Command Scene** — validation_evidence_screenshots_ls_13_production_low_2026_08_09_ls_13_production_low_2026_08_09_image, validation_evidence_screenshots_ls_13_production_low_2026_08_09_tactical_command, validation_evidence_screenshots_ls_13_production_low_2026_08_09_armored_vehicle, validation_evidence_screenshots_ls_13_production_low_2026_08_09_ring_minimap [EXTRACTED 0.90]
+- **Launch Scope Control Dashboard Sections** — validation_evidence_screenshots_progress_ls_13_complete_2026_08_09_launch_scope_control, validation_evidence_screenshots_progress_ls_13_complete_2026_08_09_remaining_work, validation_evidence_screenshots_progress_ls_13_complete_2026_08_09_validation_gates, validation_evidence_screenshots_progress_ls_13_complete_2026_08_09_launch_slices, validation_evidence_screenshots_progress_ls_13_complete_2026_08_09_reference_manifest, validation_evidence_screenshots_progress_ls_13_complete_2026_08_09_local_run_telemetry, validation_evidence_screenshots_progress_ls_13_complete_2026_08_09_source_monitor [EXTRACTED 1.00]
+- **Ring Measurements** — website_assets_ring_world_war_briefing_slide_2_ring_world_war_briefing_slide_2_ring_radius_3_6_km, website_assets_ring_world_war_briefing_slide_2_ring_world_war_briefing_slide_2_ring_circumference_22_6_km, website_assets_ring_world_war_briefing_slide_2_ring_world_war_briefing_slide_2_centrifugal_gravity_6_m_s2, website_assets_ring_world_war_briefing_slide_2_ring_world_war_briefing_slide_2_far_side_distance_7_2_km [EXTRACTED 1.00]
+- **Failing Ring Systems** — website_assets_ring_world_war_briefing_slide_2_ring_world_war_briefing_slide_2_failing_megastructure, website_assets_ring_world_war_briefing_slide_2_ring_world_war_briefing_slide_2_central_solar_filament, website_assets_ring_world_war_briefing_slide_2_ring_world_war_briefing_slide_2_shadow_square_network [EXTRACTED 1.00]
+- **Meridian Compact profile** — website_assets_ring_world_war_briefing_slide_3_ring_world_war_briefing_slide_3_meridian_compact, website_assets_ring_world_war_briefing_slide_3_ring_world_war_briefing_slide_3_anchor_protocol, website_assets_ring_world_war_briefing_slide_3_ring_world_war_briefing_slide_3_permanent_arc_cities, website_assets_ring_world_war_briefing_slide_3_ring_world_war_briefing_slide_3_durable_mechs [EXTRACTED 1.00]
+- **Axiom Choir profile** — website_assets_ring_world_war_briefing_slide_3_ring_world_war_briefing_slide_3_axiom_choir, website_assets_ring_world_war_briefing_slide_3_ring_world_war_briefing_slide_3_migration_protocol, website_assets_ring_world_war_briefing_slide_3_ring_world_war_briefing_slide_3_mobile_society, website_assets_ring_world_war_briefing_slide_3_ring_world_war_briefing_slide_3_speed [EXTRACTED 1.00]
+- **Cockpit View of Ringworld Cityscape** — website_assets_last_rotation_title_last_rotation_title_image, website_assets_last_rotation_title_last_rotation_title_spacecraft_cockpit, website_assets_last_rotation_title_last_rotation_title_ringworld_megastructure, website_assets_last_rotation_title_last_rotation_title_futuristic_cityscape [EXTRACTED 1.00]
+- **Megastructure Above Industrial City Center** — website_assets_narrative_signal_briefing_signal_briefing_overhead_ring_megastructure, website_assets_narrative_signal_briefing_signal_briefing_central_tower, website_assets_narrative_signal_briefing_signal_briefing_industrial_cityscape [INFERRED 0.85]
+- **Signal Hunters Scene Composition** — website_assets_narrative_signal_hunters_signal_hunters_image, website_assets_narrative_signal_hunters_signal_hunters_futuristic_industrial_city, website_assets_narrative_signal_hunters_signal_hunters_central_cable_structure, website_assets_narrative_signal_hunters_signal_hunters_spherical_drone, website_assets_narrative_signal_hunters_signal_hunters_glowing_signal_arcs [EXTRACTED 1.00]
+- **Choir Needle Display** — website_assets_units_dossier_choir_needle_dossier_choir_needle_choir_needle, website_assets_units_dossier_choir_needle_dossier_choir_needle_mechanical_unit, website_assets_units_dossier_choir_needle_dossier_choir_needle_industrial_chamber [EXTRACTED 1.00]
+- **Choir Vanguard Visual Profile** — website_assets_units_dossier_choir_vanguard_dossier_choir_vanguard_mech, website_assets_units_dossier_choir_vanguard_dossier_choir_vanguard_energy_lighting, website_assets_units_dossier_choir_vanguard_dossier_choir_vanguard_twin_firearms, website_assets_units_dossier_choir_vanguard_dossier_choir_vanguard_armored_humanoid [EXTRACTED 1.00]
+- **Choir Wisp Visual Features** — website_assets_units_dossier_choir_wisp_dossier_choir_wisp, website_assets_units_dossier_choir_wisp_dossier_choir_wisp_humanoid_robot, website_assets_units_dossier_choir_wisp_dossier_choir_wisp_surveillance_camera, website_assets_units_dossier_choir_wisp_dossier_choir_wisp_antenna_array, website_assets_units_dossier_choir_wisp_dossier_choir_wisp_blue_lights, website_assets_units_dossier_choir_wisp_dossier_choir_wisp_industrial_chamber [EXTRACTED 1.00]
+- **Aegis Mech Assembly** — website_assets_units_dossier_compact_aegis_aegis, website_assets_units_dossier_compact_aegis_humanoid_mech, website_assets_units_dossier_compact_aegis_satellite_dish [EXTRACTED 1.00]
+- **Bulwark Unit Configuration** — website_assets_units_dossier_compact_bulwark_dossier_compact_bulwark_armored_combat_walker, website_assets_units_dossier_compact_bulwark_dossier_compact_bulwark_frontal_shield, website_assets_units_dossier_compact_bulwark_dossier_compact_bulwark_twin_cannons [INFERRED 0.95]
+- **Mech Weapon Platform** — website_assets_units_dossier_compact_longbow_dossier_compact_longbow_longbow_combat_mech, website_assets_units_dossier_compact_longbow_dossier_compact_longbow_long_barrel_cannon, website_assets_units_dossier_compact_longbow_dossier_compact_longbow_armored_chassis [EXTRACTED 1.00]
+- **Wisp Unit Visual Form** — website_assets_units_dossier_compact_wisp_image_dossier_compact_wisp, website_assets_units_dossier_compact_wisp_concept_wisp, website_assets_units_dossier_compact_wisp_concept_bipedal_robotic_unit, website_assets_units_dossier_compact_wisp_concept_armored_mechanical_chassis [EXTRACTED 1.00]
 
-## Communities (190 total, 43 thin omitted)
+## Communities (242 total, 50 thin omitted)
 
 ### Community 0 - "serialize.ts"
 Cohesion: 0.06
-Nodes (98): MAX_BALLISTIC_PLAN_RETRY_TICKS, MAX_FAILED_BALLISTIC_PLANS, assertFactionPair(), assertGameSaveSize(), createGameSaveSnapshot(), deserializeGameSave(), faction(), fail() (+90 more)
+Nodes (100): ArtilleryRevealTrackingState, FailedBallisticPlanState, MAX_BALLISTIC_PLAN_FAILURE_COUNT, MAX_BALLISTIC_PLAN_RETRY_TICKS, MAX_FAILED_BALLISTIC_PLANS, assertFactionPair(), assertGameSaveSize(), createGameSaveSnapshot() (+92 more)
 
-### Community 1 - "mission.ts"
-Cohesion: 0.06
-Nodes (76): BREAK_LINE_HOLD_TICKS, BREAK_LINE_OBJECTIVES, BreakLineBindings, BreakLineMilestones, breakLineObjectiveMet(), emptyBreakLineMilestones(), COUNTERFIRE_OBJECTIVES, CounterfireBindings (+68 more)
-
-### Community 2 - "vite.config.ts"
-Cohesion: 0.07
-Nodes (74): ls07CriterionReview(), ls07RunArtifacts(), alias, allowlistedString(), asArray(), asRecord(), buildProgressPayload(), CLAIM_EVIDENCE_POLICY (+66 more)
-
-### Community 3 - "world.ts"
+### Community 1 - "tactician.ts"
 Cohesion: 0.04
-Nodes (60): ATMOSPHERE_HEIGHT, HeadlessMatchObservation, ABILITIES, BallisticState, RingPoint, TrajectorySample, ArmorClass, BASE_ENERGY (+52 more)
+Nodes (62): BTContext, BTNode, BTStatus, Cooldown, DIFFICULTY_RANK, DifficultyGate, finite(), Selector (+54 more)
 
-### Community 4 - "Game"
+### Community 2 - "World"
 Cohesion: 0.07
-Nodes (6): wrapS(), abilityName(), clamp(), Game, wireCommands(), disconnectedWorld()
+Nodes (15): GravityRangeStage, AudioFrame, surfaceDistSq(), createRuntimeScenarioWorld(), DAMAGE_TABLE, Faction, WeaponDef, angleDelta() (+7 more)
 
-### Community 5 - "scenario.mjs"
+### Community 3 - "vite.config.ts"
+Cohesion: 0.04
+Nodes (69): ls07CriterionReview(), ls07RunArtifacts(), alias, CLAIM_EVIDENCE_POLICY, ClaimEvidenceId, COMPLETE_DISPOSITIONS, evidenceDigestCache, GATE_STATES (+61 more)
+
+### Community 4 - "Hud"
+Cohesion: 0.06
+Nodes (32): ShadowTiming, FactionMatchResult, HeadlessStructureObservation, RuntimeScenarioStructure, RuntimeScenarioUnit, BUILDABLE, effectiveSalvageCost(), effectiveStructureStats() (+24 more)
+
+### Community 5 - "runtimeScenario.ts"
+Cohesion: 0.08
+Nodes (49): GravityRangeController, GRAVITY_RANGE_PLAYER_FACTION, GRAVITY_RANGE_SCENARIO, GravityRangeBindings, requiredBinding(), resolveGravityRangeBindings(), arcPosition(), axialPosition() (+41 more)
+
+### Community 6 - "world.ts"
+Cohesion: 0.05
+Nodes (51): BallisticState, TrajectorySample, ArmorClass, BASE_ENERGY, COMMAND_PER_NODE, Cost, DamageType, DOMINANCE_PER_ALIGNED_PAIR_PER_SEC (+43 more)
+
+### Community 7 - "terrain.ts"
+Cohesion: 0.05
+Nodes (36): ATMOSPHERE_HEIGHT, CORIOLIS_SCALE, MAX_FLIGHT_HEIGHT, RING_CIRCUMFERENCE, RING_PERIOD, RING_SURFACE_SPEED, RING_WIDTH, SIM_DT (+28 more)
+
+### Community 8 - "scenario.mjs"
 Cohesion: 0.09
 Nodes (46): scenario, scenarioBytes, scenarioSha256, scenario, signalScenario, directionalScenario, scenario, scenario (+38 more)
 
-### Community 6 - "manifests.mjs"
+### Community 9 - "manifests.mjs"
 Cohesion: 0.09
 Nodes (46): root, run, buildImageRequest(), decodeImage(), finalPrompt(), main(), parseArgs(), pathExists() (+38 more)
 
-### Community 7 - "Hud"
-Cohesion: 0.10
-Nodes (9): AudioFrame, RestoredGameSave, TrajectoryWork, Faction, normalizeBallisticTarget(), snapshotPlayer(), withBallisticTarget(), World (+1 more)
+### Community 10 - "Launch Scope Control"
+Cohesion: 0.05
+Nodes (47): Bounded Presentation Activity, LS-14 Inhabited Ring Life Contract, Ring-Wide Corridor Cell Grid, LS-14 Inhabited Ring Life Document, Four Stable Life Cues, LS-14 Acceptance Criteria, Presentation-Only Life Authority, Reduced-Motion Lifecycle (+39 more)
 
-### Community 8 - "compilerOptions"
+### Community 11 - "compilerOptions"
 Cohesion: 0.04
 Nodes (46): DOM, DOM.Iterable, e2e, ES2022, node, playwright.config.ts, src, ./src/ai/* (+38 more)
 
-### Community 9 - "game.ts"
-Cohesion: 0.08
-Nodes (28): PlayerVoiceAction, SaveActionResult, CameraMode, Markers, RuntimeScenario, createRuntimeScenarioWorld(), requiredId(), RuntimeScenarioResolvedOpeningView (+20 more)
+### Community 12 - "Game"
+Cohesion: 0.09
+Nodes (3): clamp(), Game, wireCommands()
 
-### Community 10 - "World"
-Cohesion: 0.10
-Nodes (11): button(), decorativeImage(), el(), formatOrder(), formatRange(), Hud, hudEventText(), shadowTimingCopy() (+3 more)
+### Community 13 - "Terrain"
+Cohesion: 0.09
+Nodes (21): clamp01(), GRAD3, hash2(), smootherstep(), smoothstep(), worley2(), clampAxial(), deltaWrapped() (+13 more)
 
-### Community 11 - "scripts"
+### Community 14 - "scripts"
 Cohesion: 0.05
-Nodes (39): dependencies, three, description, devDependencies, playwright, @types/node, @types/three, typescript (+31 more)
+Nodes (42): dependencies, three, description, devDependencies, playwright, @types/node, @types/three, typescript (+34 more)
 
-### Community 12 - "constants.ts"
-Cohesion: 0.09
-Nodes (26): CORIOLIS_SCALE, MAX_FLIGHT_HEIGHT, RING_HALF_WIDTH, RING_PERIOD, RING_RADIUS, RING_SURFACE_SPEED, RING_WIDTH, SHADOW_SQUARE_COUNT (+18 more)
-
-### Community 13 - "environment.ts"
-Cohesion: 0.09
-Nodes (32): DAY_LENGTH, clamp01(), distanceToPanelCenter(), normalizePanelAngle(), panelPhaseAt(), relativePanelAngle(), SHADOW_MAX_OCCLUSION, SHADOW_PANEL_HALF_SPAN (+24 more)
-
-### Community 14 - "runtimeScenario.ts"
-Cohesion: 0.16
-Nodes (37): arcPosition(), axialPosition(), boolean(), boundedArray(), difficulty(), faction(), factionLabel(), fail() (+29 more)
-
-### Community 15 - "rww.test.ts"
+### Community 15 - "coreMatch.ts"
 Cohesion: 0.07
-Nodes (34): CoreMatchFactionInactivity, CoreMatchFactionSample, CoreMatchFactionSummary, CoreMatchGateCheck, CoreMatchGateEvaluation, CoreMatchGatePolicy, CoreMatchManifestValidationError, CoreMatchMilestone (+26 more)
+Nodes (39): Difficulty, CoreMatchFactionInactivity, CoreMatchFactionSample, CoreMatchFactionSummary, CoreMatchGateCheck, CoreMatchGateEvaluation, CoreMatchGatePolicy, CoreMatchManifestValidationError (+31 more)
 
-### Community 16 - "commands.mjs"
-Cohesion: 0.16
-Nodes (35): evaluateBrowserBudget(), readJsonFile(), captureBrowserState(), describeArtifact(), executeBrowserPerf(), executeCommand(), executePerf(), executePlay() (+27 more)
+### Community 16 - "rww.test.ts"
+Cohesion: 0.11
+Nodes (38): cwd, receipt, reportPath, runDirectory, runId, runsRoot, startedAt, executePerf() (+30 more)
 
-### Community 17 - "coreMatch.ts"
+### Community 17 - "opponent.ts"
+Cohesion: 0.09
+Nodes (16): AiOpponent, artilleryTargetValue(), ballisticPlanKey(), clamp(), clearAiOrder(), createBallisticPlanState(), isReachable(), isScenarioKnownEnemyBastion() (+8 more)
+
+### Community 18 - "campaignProfile.ts"
+Cohesion: 0.14
+Nodes (35): CAMPAIGN_PROFILE_KEY, CAMPAIGN_PROFILE_SCHEMA, CAMPAIGN_PROFILE_VERSION, CampaignActionError, CampaignProfileLoadResult, CampaignProfileStorage, CampaignProfileValidationError, completeCampaignMission() (+27 more)
+
+### Community 19 - "environment.ts"
+Cohesion: 0.10
+Nodes (30): DAY_LENGTH, clamp01(), distanceToPanelCenter(), normalizePanelAngle(), panelPhaseAt(), relativePanelAngle(), SHADOW_MAX_OCCLUSION, SHADOW_PANEL_HALF_SPAN (+22 more)
+
+### Community 20 - "districtPlan.ts"
+Cohesion: 0.09
+Nodes (28): array(), axialRange(), DISTRICT_LIFE_CUES, DISTRICT_PALETTES, DISTRICT_SILHOUETTE_STYLES, DistrictDefinition, DistrictExclusion, DistrictLayer (+20 more)
+
+### Community 21 - "TitleScreen"
+Cohesion: 0.12
+Nodes (4): configureButton(), div(), field(), TitleScreen
+
+### Community 22 - "Spinal Alignment"
 Cohesion: 0.06
 Nodes (35): Anchor Protocol, Axiom Choir, Last Rotation, Meridian Compact, Migration Protocol, Scrith Salvage, Shadow-Square Network, Solar Filament (+27 more)
 
-### Community 18 - "Spinal Alignment"
-Cohesion: 0.10
-Nodes (22): ActivateAbility, AlwaysSuccess, attackRange(), averageDistance(), centroid(), chooseFocusTarget(), createSquadTree(), finite() (+14 more)
-
-### Community 19 - "tactician.ts"
-Cohesion: 0.13
-Nodes (4): configureButton(), div(), field(), TitleScreen
-
-### Community 20 - "TitleScreen"
+### Community 23 - "Phase 2 Systems Depth"
 Cohesion: 0.06
 Nodes (34): Deterministic Simulation Boundary, Faction Asymmetry, Headless Sim Runner, Sim Snapshot, Phase 4 Performance and Hardening Goal, Phase 4C Renderer and GPU, Phase 4D Memory, Startup, and Recovery, Phase 4E Device and Browser Matrix (+26 more)
 
-### Community 21 - "Phase 2 Systems Depth"
-Cohesion: 0.09
-Nodes (29): AiPoint, issueAttackMove(), issueBuild(), Difficulty, StrategicGoal, AiOpponentPersistenceState, ARTILLERY_REPOSITION_OFFSETS, ArtilleryRevealTrackingState (+21 more)
-
-### Community 22 - "opponent.ts"
-Cohesion: 0.13
-Nodes (29): cwd, receipt, reportPath, runDirectory, runId, runsRoot, startedAt, writeSanitizedErrorArtifact() (+21 more)
-
-### Community 23 - "campaignProfile.ts"
+### Community 24 - "game.ts"
 Cohesion: 0.08
-Nodes (11): LifecycleApi, QUALITY_THRASH_SEQUENCE, StartupMetrics, Window, BASE_EXPOSURE, ORDER, QUALITY, QualitySettings (+3 more)
+Nodes (22): _axial, _basis, _forward, _right, _tangent, _up, disposeObject(), AXIAL (+14 more)
 
-### Community 24 - "terrain.ts"
+### Community 25 - "runner.ts"
 Cohesion: 0.10
-Nodes (20): BrowserScenario, CalibrationManifest, QualityLevel, browserSearch(), browserStorage(), clamp01(), DEFAULT_VOICE_VOLUME, DEFAULT_VOLUME (+12 more)
+Nodes (31): ExpandedCoreMatch, averages(), controllerSeed(), countTotal(), createFactionResult(), createFactionResults(), EconomyResult, emptyFactionTotals() (+23 more)
 
-### Community 25 - "ringMath.ts"
-Cohesion: 0.15
-Nodes (25): CAMPAIGN_PROFILE_KEY, CAMPAIGN_PROFILE_SCHEMA, CAMPAIGN_PROFILE_VERSION, CampaignActionError, CampaignProfileLoadResult, CampaignProfileStorage, CampaignProfileValidationError, createCampaignProfile() (+17 more)
+### Community 26 - "ballistics.ts"
+Cohesion: 0.13
+Nodes (29): RING_OMEGA, AimOptions, AimSolution, airDensityAt(), clamp(), directionalReachProfile, inertialToRing(), inertialToRingVelocity() (+21 more)
 
-### Community 26 - "Terrain"
-Cohesion: 0.07
-Nodes (20): SIM_DT, createTerrain(), MAX_TERRAIN_HEIGHT, RIM_WALL_HEIGHT, standardCorridors(), standardFlatZones(), TERRAIN_CELL, TerrainConfig (+12 more)
+### Community 27 - "battlefieldDressing.ts"
+Cohesion: 0.09
+Nodes (26): hashSeed(), AXIAL, BattlefieldDressingDiagnostics, Candidate, cueSpeed(), DISTRICT_ANCHORS, emptyLifeCueCounts(), emptyPaletteCounts() (+18 more)
 
-### Community 27 - "wireKeys"
-Cohesion: 0.07
-Nodes (16): SURFACE_GRAVITY, renderToRing(), ringToRender(), tangentAt(), TAU, upAt(), Vec3Out, FlowField (+8 more)
-
-### Community 28 - "main.ts"
-Cohesion: 0.12
-Nodes (13): clamp01(), GRAD3, hash2(), lerp(), smootherstep(), smoothstep(), worley2(), clampAxial() (+5 more)
-
-### Community 29 - "settings.ts"
-Cohesion: 0.10
-Nodes (21): CampaignTransition, continueCampaign(), CampaignRouteIntent, SAVE_SLOT_KEY, BASE_SEPARATION, boot, CleanupStack, CommandWiring (+13 more)
-
-### Community 30 - "models.ts"
+### Community 28 - "models.ts"
 Cohesion: 0.11
 Nodes (23): addBlock(), addCylinder(), addGreebles(), BlockSpec, buildMech(), buildStructure(), _e1, _e2 (+15 more)
 
-### Community 31 - "RING_CIRCUMFERENCE"
-Cohesion: 0.10
-Nodes (19): RING_CIRCUMFERENCE, AXIAL, DressingItem, LOCAL_CENTER, ONE, UP, disposeObject(), AXIAL (+11 more)
+### Community 29 - "main.ts"
+Cohesion: 0.12
+Nodes (21): CampaignTransition, continueCampaign(), CampaignRouteContext, CampaignRouteIntent, BASE_SEPARATION, boot, factionFromParams(), gravityRangeFromParams() (+13 more)
 
-### Community 32 - "ballistics.ts"
-Cohesion: 0.16
-Nodes (26): RING_OMEGA, AimOptions, AimSolution, airDensityAt(), clamp(), directionalReachProfile, inertialToRing(), inertialToRingVelocity() (+18 more)
-
-### Community 33 - "AiOpponent"
-Cohesion: 0.17
-Nodes (9): AiOpponent, artilleryTargetValue(), ballisticPlanKey(), clamp(), clearAiOrder(), createBallisticPlanState(), isReachable(), isScenarioKnownEnemyBastion() (+1 more)
-
-### Community 34 - ".structureById"
-Cohesion: 0.14
-Nodes (4): WeaponDef, angleDelta(), BallisticSource, turnToward()
-
-### Community 35 - "calibration.ts"
-Cohesion: 0.13
-Nodes (12): MatrixSession, addPart(), addStandingLeg(), buildColorChart(), buildMaterialSwatches(), buildReferenceMech(), buildSweep(), COLOR (+4 more)
-
-### Community 36 - "startSession"
+### Community 30 - "mission.ts"
 Cohesion: 0.11
-Nodes (4): VoiceDirector, savedPlayerFaction(), startSession(), CameraController
+Nodes (19): abilityName(), PlayerVoiceAction, SAVE_SLOT_KEY, SaveActionResult, BREAK_LINE_HOLD_TICKS, BREAK_LINE_OBJECTIVES, BreakLineBindings, CounterfireBindings (+11 more)
 
-### Community 37 - "runner.ts"
-Cohesion: 0.13
-Nodes (25): averages(), controllerSeed(), countTotal(), createFactionResult(), createFactionResults(), EconomyResult, emptyFactionTotals(), emptyStructureCounts() (+17 more)
+### Community 31 - "commands.mjs"
+Cohesion: 0.19
+Nodes (26): normalizeCommand(), readJsonFile(), captureBrowserState(), describeArtifact(), executeCommand(), executeDoctor(), executePlay(), executeRun() (+18 more)
 
-### Community 38 - "SimEvent"
-Cohesion: 0.13
-Nodes (4): distanceAttenuation(), Effects, hashUnit(), SimEvent
-
-### Community 39 - "Renderer"
-Cohesion: 0.16
-Nodes (15): applyBrowserScenario(), applyScenarioHealth(), benchmarkScenario(), captureScenarioFrame(), captureScenarioState(), captureScenarioStateHash(), installUploadProfiler(), requiredRww() (+7 more)
-
-### Community 40 - "scenario-driver.ts"
+### Community 32 - "QualityLevel"
 Cohesion: 0.10
-Nodes (4): RwwWindow, clamp(), RigModeController, CameraRig
+Nodes (14): DistrictQualification, DistrictSnapshot, LifeQualification, LifeSnapshot, DistrictQualification, DistrictSnapshot, BrowserScenario, CalibrationManifest (+6 more)
 
-### Community 41 - "CameraRig"
-Cohesion: 0.13
-Nodes (9): BTContext, BTNode, Cooldown, DIFFICULTY_RANK, DifficultyGate, finite(), Selector, Sequence (+1 more)
+### Community 33 - "Environment"
+Cohesion: 0.12
+Nodes (13): addPart(), addStandingLeg(), buildColorChart(), buildMaterialSwatches(), buildReferenceMech(), buildSweep(), COLOR, referenceBall() (+5 more)
 
-### Community 42 - "BTNode"
-Cohesion: 0.23
+### Community 34 - "requireNonEmptyString"
+Cohesion: 0.35
+Nodes (27): asArray(), isSafeRepositoryPath(), loadLS07RunArtifacts(), loadLS09RunArtifacts(), loadLS10RunArtifacts(), loadLS11RunArtifacts(), loadLS12RunArtifacts(), loadLS13RunArtifacts() (+19 more)
+
+### Community 35 - "deltaS"
+Cohesion: 0.20
 Nodes (3): deltaS(), RenderAnchor, wrapLerp()
 
-### Community 43 - "deltaS"
-Cohesion: 0.14
-Nodes (7): launchToInertial(), clampAxial(), artilleryWorld(), emptyWorld(), node(), battlefield(), storyWorld()
+### Community 36 - "headless/core-match.test.ts"
+Cohesion: 0.11
+Nodes (17): collectCoreMatchTimeline(), CORE_MATCH_MANIFEST_SCHEMA, CORE_MATCH_MANIFEST_VERSION, CoreMatchManifest, CoreMatchRecord, CoreMatchTimelineCollector, createExpandedMatch(), expandCoreMatchManifest() (+9 more)
 
-### Community 44 - "UnitKind"
-Cohesion: 0.13
-Nodes (16): isUnitKind(), VoiceClip, VoicePlayback, VoicePlaybackSink, VoiceTrigger, VoiceUnitRef, factionClips(), GROUP_TRIGGERS (+8 more)
+### Community 37 - "performance-profile.test.ts"
+Cohesion: 0.11
+Nodes (15): STRUCTURES, UNITS, BallisticAttempt, BallisticWorkSnapshot, config, flatTerrain, PROFILE_TICKS, profileBallisticCommands() (+7 more)
 
-### Community 45 - "campaignRoute.ts"
-Cohesion: 0.20
-Nodes (20): completeCampaignMission(), launchFor(), recordCampaignFailure(), recordCampaignReplayResult(), replayCampaignMission(), requireLaunchable(), retryCampaignMission(), revise() (+12 more)
-
-### Community 48 - ".stepUnits"
-Cohesion: 0.13
-Nodes (20): makeHullMaterial(), MechClass, StructureModel, angleLerp(), angleWrap(), clampN(), FactionMaterials, FootState (+12 more)
-
-### Community 49 - "SurfaceNav"
-Cohesion: 0.21
-Nodes (19): boundedNonNegativeInteger(), boundedPositiveInteger(), nonNegativeInteger(), normalizeCommand(), normalizePath(), optionValue(), parseBrowserPerf(), parseCliArgs() (+11 more)
-
-### Community 50 - "entityRenderer.ts"
-Cohesion: 0.15
-Nodes (3): wireKeys(), DebugOverlay, SettingsMenu
-
-### Community 51 - "titleScreen.ts"
-Cohesion: 0.16
-Nodes (16): CampaignProfile, CampaignResult, CampaignRouteContext, CampaignMissionId, PRESENTATION_MEDIA, PresentationMedia, UnitDossierMedia, REVIEWED_VOICE_CLIPS (+8 more)
-
-### Community 52 - "performance-profile.test.ts"
-Cohesion: 0.13
-Nodes (13): BallisticAttempt, BallisticWorkSnapshot, config, flatTerrain, PROFILE_TICKS, profileBallisticCommands(), profileNearbyCache(), recordTiming() (+5 more)
-
-### Community 53 - "headless/core-match.test.ts"
-Cohesion: 0.22
-Nodes (3): spinalMainForceBonus(), spinalNodePriority(), minimapAriaLabel()
-
-### Community 54 - "WholeRingModeController"
-Cohesion: 0.13
-Nodes (15): CORE_MATCH_MANIFEST_SCHEMA, CORE_MATCH_MANIFEST_VERSION, CoreMatchManifest, CoreMatchRecord, createCoreMatchReport(), equalCheck(), evaluateCoreMatchGates(), maximumCheck() (+7 more)
-
-### Community 55 - "args.mjs"
+### Community 38 - "CameraRig"
 Cohesion: 0.12
-Nodes (5): CameraCapabilities, CameraModeController, WholeRingModeController, directCapabilities, tacticalCapabilities
+Nodes (7): MatrixSession, Window, RwwWindow, clamp(), lerp(), CameraRig, shortestDelta()
 
-### Community 56 - "strategicAnnulus.ts"
+### Community 39 - "UnitKind"
+Cohesion: 0.13
+Nodes (9): StrategicState, STRATEGIST_CONFIG, wrapS(), effectiveUnitStats(), clampAxial(), BASE_STATE, disconnectedWorld(), createWorld() (+1 more)
+
+### Community 40 - "startSession"
+Cohesion: 0.13
+Nodes (7): CleanupStack, CommandWiring, navigateToGravityRange(), navigateToMainMenu(), startSession(), Renderer, snapRatio()
+
+### Community 41 - "Effects"
+Cohesion: 0.15
+Nodes (3): distanceAttenuation(), Effects, hashUnit()
+
+### Community 44 - "Ring World War Briefing Slide 3"
+Cohesion: 0.14
+Nodes (23): Ring World War Briefing Slide 3, Anchor Protocol, Axiom Choir, Civil governments, Dismantle sectors, Distributed machine-integrated communities, Durable mechs, Evacuate to another star (+15 more)
+
+### Community 45 - "scenario.test.ts"
+Cohesion: 0.17
+Nodes (13): applyBrowserScenario(), applyScenarioHealth(), benchmarkScenario(), captureScenarioFrame(), captureScenarioState(), captureScenarioStateHash(), installUploadProfiler(), requiredRww() (+5 more)
+
+### Community 46 - "strategicAnnulus.ts"
+Cohesion: 0.16
+Nodes (13): SHADOW_SQUARE_COUNT, CATEGORIES, countRenderables(), createAnnulusGeometry(), createMarkerGeometries(), createOutline(), markerPool(), projectSurfaceToAnnulus() (+5 more)
+
+### Community 47 - ".constructor"
 Cohesion: 0.18
-Nodes (11): CATEGORIES, countRenderables(), createAnnulusGeometry(), createMarkerGeometries(), createOutline(), markerPool(), projectSurfaceToAnnulus(), StrategicAnnulus (+3 more)
+Nodes (5): clamp01(), Settings, field(), KEYBINDINGS, SettingsMenu
 
-### Community 57 - "Launch Scope"
+### Community 48 - "mission.ts"
+Cohesion: 0.15
+Nodes (20): BreakLineMilestones, breakLineObjectiveMet(), emptyBreakLineMilestones(), COUNTERFIRE_OBJECTIVES, CounterfireMilestones, counterfireObjectiveMet(), emptyCounterfireMilestones(), bool() (+12 more)
+
+### Community 49 - "wrapS"
+Cohesion: 0.12
+Nodes (7): SURFACE_GRAVITY, renderToRing(), ringToRender(), tangentAt(), TAU, upAt(), Vec3Out
+
+### Community 50 - "settings.ts"
+Cohesion: 0.14
+Nodes (13): QUALITY, browserSearch(), browserStorage(), DEFAULT_VOICE_VOLUME, DEFAULT_VOLUME, isQualityLevel(), isRecord(), isVolume() (+5 more)
+
+### Community 51 - "args.mjs"
+Cohesion: 0.22
+Nodes (18): boundedNonNegativeInteger(), boundedPositiveInteger(), nonNegativeInteger(), normalizePath(), optionValue(), parseBrowserPerf(), parseCliArgs(), parseDoctor() (+10 more)
+
+### Community 52 - "entityRenderer.ts"
+Cohesion: 0.14
+Nodes (18): MechClass, StructureModel, angleLerp(), angleWrap(), clampN(), FootState, _local, markInstanceUpdates() (+10 more)
+
+### Community 53 - "mission.ts"
+Cohesion: 0.28
+Nodes (20): array(), countRecord(), fail(), finiteNumber(), idArray(), integer(), narrativeBeats(), parseJson() (+12 more)
+
+### Community 54 - "WebAudioBackend"
+Cohesion: 0.19
+Nodes (3): createNoiseBuffer(), stopQuietly(), WebAudioBackend
+
+### Community 55 - "titleScreen.ts"
+Cohesion: 0.17
+Nodes (15): CampaignProfile, CampaignResult, CampaignMissionId, PRESENTATION_MEDIA, PresentationMedia, UnitDossierMedia, REVIEWED_VOICE_CLIPS, campaignMissionAction() (+7 more)
+
+### Community 57 - "Hud"
+Cohesion: 0.25
+Nodes (3): spinalNodePriority(), BallisticFireResult, Structure
+
+### Community 58 - "mission.ts"
+Cohesion: 0.14
+Nodes (7): observeCounterfireAction(), formatMissionClock(), MissionController, missionObjectives(), missionTitle(), objectiveMet(), terrain
+
+### Community 59 - "Launch Scope"
 Cohesion: 0.12
 Nodes (17): Procedural Asset Budget, Greeble Compiler, MechDef, Presentation Simulation Boundary, Procedural-Only Gameplay Rule, Seeded Generation, Axiom Choir Campaign, Campaign Platform (+9 more)
 
-### Community 59 - "WebAudioBackend"
-Cohesion: 0.23
-Nodes (3): createNoiseBuffer(), stopQuietly(), WebAudioBackend
+### Community 60 - "LS-10 Whole-Ring Strategic Side View"
+Cohesion: 0.16
+Nodes (15): Acceptance Criteria, Bounded Contract, Deliberate Exclusions, Strategic View Accessibility Contract, Canonical Shared Shadow Model, Whole-Ring Input Isolation, Strategic-Only Render Layer, Tactical State Preservation (+7 more)
 
-### Community 60 - "missionRegistry.ts"
+### Community 61 - "Gemini Generated Image"
+Cohesion: 0.15
+Nodes (16): Capturing Spinal Nodes, Compact Longbow, Coriolis Drift & Ballistics, Crew 3, Directional Advantage, Dominance Flow Active, Elevation Bonus, Heavy Artillery Walker (+8 more)
+
+### Community 62 - "voiceDirector.ts"
+Cohesion: 0.17
+Nodes (7): isUnitKind(), VoiceDirector, VoicePlayback, VoicePlaybackSink, VoiceUnitRef, clip(), CLIPS
+
+### Community 63 - "constants.ts"
+Cohesion: 0.26
+Nodes (7): RING_HALF_WIDTH, RING_RADIUS, makeLowTerrainMaterial(), makeTerrainMaterial(), TerrainUniforms, buildRingGeometry(), RingMesh
+
+### Community 64 - "missionRegistry.ts"
 Cohesion: 0.16
 Nodes (12): CampaignLaunch, CAMPAIGN_MISSIONS, CampaignMissionAvailability, CampaignMissionStatus, CampaignRuntimeScenarioId, DEFINITIONS, fail(), MISSION_BY_ID (+4 more)
 
-### Community 61 - "browser-scenario.mjs"
+### Community 65 - "browser-scenario.mjs"
 Cohesion: 0.25
 Nodes (13): acquireVite(), availablePort(), isRingWorldWar(), once(), probeBrowser(), benchmarkBrowserScenario(), captureVisualScenario(), decodeScreenshot() (+5 more)
 
-### Community 62 - "BTStatus"
+### Community 66 - "Technical Architecture"
 Cohesion: 0.24
-Nodes (14): executeDoctor(), loadTarget(), printDoctor(), buildDoctorReport(), check(), evaluateTarget(), parseTarget(), probeSystem() (+6 more)
+Nodes (14): Canonical Ring Space, Complete Procedural Ring Mesh, Coriolis Acceleration Gameplay, Deterministic Simulation Contract, Technical Architecture, Floating Origin Rebase, Render Quality and Frame Budgets, Floating-Origin Render Space (+6 more)
 
-### Community 63 - "AudioBackend"
-Cohesion: 0.16
-Nodes (7): BTStatus, issueMove(), clamp(), deterministicAngle(), DodgeIncoming, Retreat, ScriptedNode
+### Community 67 - "LS-12 Layered District And Bounded Scatter Foundation"
+Cohesion: 0.14
+Nodes (13): Acceptance Criteria, Bounded Contract, Deliberate Exclusions, Deterministic Bounded Scatter, Renderer-Owned District Plan, Presentation-Only District Scatter, Four Fixed Instanced Render Buckets, Overhead Tactical Micro Scatter Layers (+5 more)
 
-### Community 64 - "audioEngine.test.ts"
-Cohesion: 0.19
-Nodes (3): surfaceDistSq(), structure(), unit()
+### Community 71 - "EntityRenderer"
+Cohesion: 0.15
+Nodes (3): EntityRenderer, withInstanceDamage(), mechScene()
 
-### Community 66 - "visual-signature.mjs"
+### Community 72 - "LS-13 Production Low 2026-08-09 Screenshot"
+Cohesion: 0.14
+Nodes (14): Align Objective, Armored Vehicle, Command Capacity, Engineer, Foundry, LS-13 Production Low 2026-08-09 Screenshot, No Selection, Penumbra Day (+6 more)
+
+### Community 73 - "audioEngine.test.ts"
 Cohesion: 0.18
-Nodes (3): AudioCue, frame(), RecordingBackend
+Nodes (4): armAudioUnlock(), AudioCue, frame(), RecordingBackend
 
-### Community 69 - "parseCoreMatchManifest"
+### Community 75 - "missionRegistry.ts"
+Cohesion: 0.29
+Nodes (10): recordCampaignFailure(), applyCampaignRouteContext(), CAMPAIGN_INTENT_PARAM, CAMPAIGN_MISSION_PARAM, campaignIntent(), campaignRouteContextFromParams(), CampaignRouteValidationError, routeFail() (+2 more)
+
+### Community 76 - "abilities.ts"
+Cohesion: 0.22
+Nodes (10): ABILITIES, AbilityDef, AbilityId, AbilityState, BaseAbilityDef, CloakDef, createAbilityState(), ShieldWallDef (+2 more)
+
+### Community 77 - "mission.ts"
+Cohesion: 0.24
+Nodes (11): SimEvent, updateBreakLineMilestones(), breakLineBindings(), counterfireBindings(), firstContactBindings(), milestoneMet(), signalBindings(), validateBreakLineWorldBindings() (+3 more)
+
+### Community 78 - "visual-signature.mjs"
 Cohesion: 0.29
 Nodes (11): averageHash(), bitsToHex(), buildGrid(), check(), compareVisualSignatures(), computeVisualSignature(), differenceHash(), edgeDensity() (+3 more)
 
-### Community 70 - "doctor.mjs"
+### Community 79 - "readJson"
+Cohesion: 0.24
+Nodes (13): allowlistedString(), asRecord(), buildProgressPayload(), evidencePolicy(), newestReceipts(), readBoundedText(), readJson(), summarizeGoals() (+5 more)
+
+### Community 80 - "validateLS14EvidenceShape"
+Cohesion: 0.44
+Nodes (13): isoDateString(), isSafeImplementationPath(), requireExactKeys(), requireStringArray(), validateLS07EvidenceShape(), validateLS08CriterionReview(), validateLS09EvidenceShape(), validateLS10EvidenceShape() (+5 more)
+
+### Community 81 - "Headless Performance Gate"
 Cohesion: 0.17
 Nodes (12): Headless 40m Qualification, Pinned Headless Runner, Canonical Headless Workload, Headless Performance Gate, Protected Headless Qualification Workflow, Protected Qualification Evidence, T480s Reference Runner, Requirement 17.5 (+4 more)
 
-### Community 71 - "webAudioBackend.ts"
+### Community 82 - "LS-13 Four Reusable Environmental District Palettes"
+Cohesion: 0.21
+Nodes (11): LS-13 Palette Dependency, Acceptance Criteria, Bounded Contract, Deliberate Exclusions, Two Districts per Palette, Reusable Environmental District Palettes, Four Stable Palette IDs, Palette-Owned Silhouette Sets (+3 more)
+
+### Community 84 - "parseCoreMatchManifest"
 Cohesion: 0.41
 Nodes (12): fail(), parseCoreMatchManifest(), readArray(), readDifficulty(), readFinite(), readGates(), readInteger(), readNonEmptyString() (+4 more)
 
-### Community 72 - "write-delivery-receipt.mjs"
+### Community 85 - "scenario.test.ts"
+Cohesion: 0.30
+Nodes (9): scenario, distribution(), evaluateBrowserBudget(), percentile(), summarizeDistributions(), summarizeFrameMetrics(), executeBrowserPerf(), printBrowserPerf() (+1 more)
+
+### Community 86 - "doctor.mjs"
+Cohesion: 0.30
+Nodes (11): loadTarget(), buildDoctorReport(), check(), evaluateTarget(), parseTarget(), TARGET_SCHEMA, TARGET_VERSION, thresholdCheck() (+3 more)
+
+### Community 87 - "LS-11 Gravity Range"
+Cohesion: 0.20
+Nodes (10): Acceptance Criteria, Bounded Contract, Deliberate Exclusions, Authored Range Deterministic Reset, Inertial-Frame Ballistic Authority, Ordered Spinward and Antispinward Marker Exercise, Tactical Minimap Firing Surface, LS-11 Gravity Range (+2 more)
+
+### Community 88 - "Ring World War Briefing Slide 2"
+Cohesion: 0.29
+Nodes (11): Central Solar Filament Destabilization, Centrifugal Gravity: 6 m/s², Circumference: 22.6 km, Failing Megastructure, Far Side Distance: 7.2 km Overhead, Habitat-Scale Correction, Ring World War Briefing Slide 2, Radius: 3.6 km (+3 more)
+
+### Community 89 - "webAudioBackend.ts"
 Cohesion: 0.24
 Nodes (8): createWebAudioBackend(), noiseRate(), oscillatorType(), pitchDrop(), preloadRank(), SpeechRecord, usesNoise(), VoiceRecord
 
-### Community 73 - "Chord Shot"
+### Community 91 - "mission.ts"
+Cohesion: 0.24
+Nodes (8): acknowledgeNarrative(), NarrativeBeat, NarrativeHudModel, SIGNAL_HOLD_TICKS, SIGNAL_NARRATIVE, SIGNAL_OBJECTIVES, updateSignalMilestones(), terrain
+
+### Community 92 - "write-delivery-receipt.mjs"
 Cohesion: 0.18
 Nodes (9): assets, DELIVERY_DIRS, EXTRA_FILES, files, IMAGE_REQUEST_IDS, OUTPUT, PUBLIC, receipt (+1 more)
 
-### Community 74 - "audioEngine.ts"
+### Community 93 - "Chord Shot"
 Cohesion: 0.20
 Nodes (10): Counter-Battery Flash, Silo, Chord Shot, Authoritative Projectile ID, Compact Rocket Battery, Counterfire Objective 6, Standard Rocket, Cruise Missile (+2 more)
 
-### Community 75 - "validation/core-match.test.ts"
+### Community 94 - "Axiom Choir"
+Cohesion: 0.20
+Nodes (10): Anchor Protocol: Lock rotation, seal failing sections, preserve existing cities, Axiom Choir, Durable mechs and fortified artillery, Meridian Compact, Migration Protocol: Dismantle sectors, launch archive and evacuate to another star, Mobile society and distributed machine-integrated communities, Permanent arc-cities and civil governments, Ring World War Briefing Slide 3 (+2 more)
+
+### Community 95 - "audioEngine.ts"
 Cohesion: 0.31
 Nodes (8): AudioBackendFactory, AudioCueKind, AudioState, clamp(), cue(), cueForEvent(), cuePriority(), hashUnit()
 
-### Community 76 - "abilities.ts"
-Cohesion: 0.20
-Nodes (7): collectCoreMatchTimeline(), CoreMatchTimelineCollector, createExpandedMatch(), expandCoreMatchManifest(), formatCoreMatchJson(), runCoreMatchCohort(), manifestPath
-
-### Community 77 - ".isEntityVisible"
-Cohesion: 0.29
-Nodes (9): AbilityDef, AbilityId, AbilityState, BaseAbilityDef, CloakDef, createAbilityState(), ShieldWallDef, SiegeModeDef (+1 more)
-
-### Community 78 - "shot.mjs"
+### Community 97 - "shot.mjs"
 Cohesion: 0.20
 Nodes (8): args, height, logs, out, panS, url, width, zoomNotches
 
-### Community 79 - "Direction Is Territory"
+### Community 98 - "Ring World War Briefing Slide 2"
+Cohesion: 0.24
+Nodes (10): Central Solar Filament, Centrifugal Gravity 6 m/s², Failing Megastructure, Far Side Distance 7.2 km Overhead, Habitat-Scale Correction, Ring World War Briefing Slide 2, Ring Circumference 22.6 km, Ring Radius 3.6 km (+2 more)
+
+### Community 99 - "LS-15 Bounded Acceptance Contract: Integrated Public-Alpha Tutorial Arc"
+Cohesion: 0.22
+Nodes (8): Bounded Acceptance Matrix, Canonical Behavior, Completion Boundary, Explicit Exclusions, Human Gate: G-02, LS-15 Bounded Acceptance Contract: Integrated Public-Alpha Tutorial Arc, Player Outcome, Required Automation Lanes
+
+### Community 100 - "Direction Is Territory"
 Cohesion: 0.22
 Nodes (9): Direction Is Territory, Physics Guardrails, Product Thesis, Ring USP Slice, Launch Validation Gates, Directional Artillery Authority, Directional Artillery High Ground, Revised Core Loop (+1 more)
 
-### Community 81 - "Ability System"
+### Community 101 - "lifecycle.spec.ts"
+Cohesion: 0.22
+Nodes (3): LifecycleApi, QUALITY_THRASH_SEQUENCE, StartupMetrics
+
+### Community 102 - "GravityRangePanel"
+Cohesion: 0.28
+Nodes (3): GravityRangeHudModel, button(), GravityRangePanel
+
+### Community 103 - "Launch Scope Control Screenshot"
+Cohesion: 0.28
+Nodes (9): Launch Scope Control, Launch Slices, Local Run Telemetry, LS-13 Habitation, Vegetation, Transit, and Ambient Life, Launch Scope Control Screenshot, Reference Manifest, Remaining Work, Source Monitor (+1 more)
+
+### Community 104 - "Last Rotation Poster"
+Cohesion: 0.22
+Nodes (9): AES-256-Malfunction Encryption, August 05 2026, Communications Tower, Last Rotation Poster, 482ms Latency, Signal Degraded, Source Unknown, Terminal 04-B (+1 more)
+
+### Community 105 - "Ability System"
 Cohesion: 0.25
 Nodes (8): Mech Damage States, Ability System, AI Systems, Data Layer Extensions, Headless Balance Runner, Phase 2 Implementation Plan, Task Dependency Graph, Weapon Systems
 
-### Community 82 - "Sensor Coverage"
+### Community 106 - "Sensor Coverage"
 Cohesion: 0.25
 Nodes (8): Artillery Authority, Minimap and Selection Inputs, Sensor Coverage, Directional Artillery Comprehension, Minimap Commands, Structured Fire Command Reasons, Terrain Line of Sight, Tactical UI Task
 
-### Community 83 - "Battlefield Memory"
+### Community 107 - "Battlefield Memory"
 Cohesion: 0.25
 Nodes (8): Aftermath Authority Boundary, Chord Launch and Impact Sequence, Transient Aftermath Pools, Battlefield Memory, Phase 3D and 3E Risks, Presentation-Only Boundary, Tactical HUD, Phase 3D and 3E Checklist
 
-### Community 85 - "StructureKind"
-Cohesion: 0.25
-Nodes (7): FactionMatchResult, HeadlessStructureObservation, RuntimeScenarioStructure, StructureKind, Order, PlayerState, WorldPlayerPersistenceState
-
-### Community 86 - "lint.mjs"
+### Community 109 - "lint.mjs"
 Cohesion: 0.39
 Nodes (6): auditRepository(), auditSource(), boundaries, formatViolation(), walk(), worldAuthority
 
-### Community 87 - "Launch-Scope Ship-First Execution Policy"
+### Community 110 - "Launch-Scope Ship-First Execution Policy"
 Cohesion: 0.29
 Nodes (7): Absolute Acceptance Rubric, Bounded Review and Remediation, Class-Specific Acceptance, Launch-Scope Ship-First Execution Policy, Launch-Scope Quality Ladder, Stop and Reopen Rules, Validation Gate Lanes
 
-### Community 88 - "Last Rotation Transmission Alert Poster"
+### Community 111 - "LS-14 Habitation, Vegetation, Transit, And Ambient Life"
+Cohesion: 0.29
+Nodes (6): Acceptance Criteria, Bounded Contract, Deliberate Exclusions, LS-14 Habitation, Vegetation, Transit, And Ambient Life, Player Outcome, Qualification
+
+### Community 112 - "Last Rotation Transmission Alert Poster"
 Cohesion: 0.38
 Nodes (7): AES-256 Encryption Malfunction, Degraded Signal, Industrial Communications Site, Terminal 04-B, Last Rotation Transmission Alert Poster, Unknown Source, Urgent Transmission
 
-### Community 89 - "browser-metrics.mjs"
+### Community 113 - "voiceMedia.ts"
+Cohesion: 0.33
+Nodes (6): VoiceTrigger, factionClips(), GROUP_TRIGGERS, priority(), UNIT_TRIGGERS, UNITS
+
+### Community 115 - "RenderAnchor"
 Cohesion: 0.33
 Nodes (6): Ring Space, Rotating-frame Ballistics, Deterministic Rng, Module Contracts, RenderAnchor, VfxSystem
 
-### Community 90 - "RenderAnchor"
+### Community 116 - "Player Observation Protocol"
 Cohesion: 0.33
 Nodes (6): G-01 Human Comprehension Gate, Five Directional Artillery Questions, Initial Human Cohort, Player Observation Protocol, Privacy-Preserving Observation Evidence, Uncoached Directional Artillery Session
 
-### Community 91 - "Player Observation Protocol"
+### Community 117 - "README"
+Cohesion: 0.33
+Nodes (6): Gravity Range Mode, Rocket Battery Targeting Preview, README, Gravity Range Arcade Exercise, Ring World War Browser RTS, Live Whole-Ring View
+
+### Community 118 - "Low-Quality Presentation Findings"
 Cohesion: 0.33
 Nodes (6): Deposit Placement Guidance, Directional Artillery Comprehension Finding, First Contact Completion Playtest, Inertial Starfield, Low-Quality Presentation Findings, Outward Procedural Hull Winding
 
-### Community 93 - "title-screen.spec.ts"
-Cohesion: 0.60
-Nodes (4): distribution(), percentile(), summarizeDistributions(), summarizeFrameMetrics()
+### Community 120 - "LS-14 Low Runtime Evidence"
+Cohesion: 0.47
+Nodes (6): Axiom Choir, Bastion, Defeat, Fight Again, LS-14 Low Runtime Evidence, Ring
 
-### Community 94 - "AI Strategist"
+### Community 121 - "Signal Briefing Image"
+Cohesion: 0.40
+Nodes (6): Amber Glowing Core, Central Tower, Signal Briefing Image, Industrial Cityscape, Overhead Ring Megastructure, Smoke Plumes
+
+### Community 122 - "Signal Hunters Scene"
+Cohesion: 0.40
+Nodes (6): Central Cable-Covered Structure, Futuristic Industrial City, Glowing Signal Arcs, Signal Hunters Scene, Orbital Ring Backdrop, Spherical Drone
+
+### Community 123 - "Choir Engineer"
+Cohesion: 0.33
+Nodes (6): Choir Engineer, Articulated Legs, Flexible Cables, Cyan Illuminated Accents, Mechanical Unit, Mounted Tools
+
+### Community 124 - "Choir Wisp Dossier Image"
+Cohesion: 0.33
+Nodes (6): Choir Wisp Dossier Image, Antenna Array, Blue Indicator Lights, Humanoid Robot, Industrial Chamber, Surveillance Camera
+
+### Community 125 - "Bulwark Unit Dossier Image"
+Cohesion: 0.47
+Nodes (6): Armored Combat Walker, Bulwark, Frontal Armor Shield, Bulwark Unit Dossier Image, Orange Status Lights, Twin Forward Cannons
+
+### Community 126 - "Longbow Combat Mech"
+Cohesion: 0.33
+Nodes (6): Armored Chassis, Articulated Mechanical Legs, Long-Barrel Cannon, Longbow Combat Mech, Longbow Unit Dossier Image, Orange Sensor Lights
+
+### Community 127 - "Compact Vanguard Dossier Image"
+Cohesion: 0.33
+Nodes (6): Compact Vanguard, Paired Arm-Mounted Cannons, Heavily Armored Humanoid Mech, Dark Gray Armor with Orange Accents, Compact Vanguard Dossier Image, Industrial Interior Setting
+
+### Community 128 - "AI Strategist"
 Cohesion: 0.50
 Nodes (5): AI Tactician, AI Strategist, AI Tactician, Behavior Tree, AI Difficulty Tiers
 
-### Community 95 - "AI Strategist"
+### Community 129 - "Presentation-Only Boundary"
 Cohesion: 0.40
 Nodes (5): Bounded Combat Atmosphere, Fog-Safe Procedural Audio, Presentation-Only Boundary, Render-Only Mech Weight, Signature Battlefield
 
-### Community 96 - "Presentation-Only Boundary"
+### Community 130 - "Faction Geometry Variants"
 Cohesion: 0.40
 Nodes (5): Axiom Choir Visual Language, Faction Geometry Variants, Meridian Compact Visual Language, Neutral Spinal Infrastructure, Render-Derived Damage Surfaces
 
-### Community 97 - "Faction Geometry Variants"
+### Community 131 - "Device and Browser Matrix Contract"
 Cohesion: 0.40
 Nodes (5): Available Engine Qualification, Cross-Browser Scenario Determinism, Device and Browser Matrix Contract, Unavailable Matrix Cells, WebKit Recovery Fix
 
-### Community 98 - "Device and Browser Matrix Contract"
+### Community 132 - "Phase 5 Voice and Visual Identity"
 Cohesion: 0.40
 Nodes (5): Faction Voice Identity, Offline Media Authoring, Phase 5 Voice and Visual Identity, Presentation Media Manifest, VoiceDirector
 
-### Community 99 - "Phase 5 Voice and Visual Identity"
+### Community 133 - "G-01 Gate"
 Cohesion: 0.40
 Nodes (5): Developer Review, Directional Artillery Criteria, G-01 Gate, Uncoached Human Tester, Human Playtesting Evidence
 
-### Community 101 - "campaign.spec.ts"
+### Community 135 - "Habitat Ring Interior"
 Cohesion: 0.40
 Nodes (5): Central Luminary, Damaged Superstructure, Habitat Ring Interior, Inhabited Cityscape, Observation Deck
 
-### Community 102 - "Habitat Ring Interior"
+### Community 136 - "Central Signal Tower"
 Cohesion: 0.40
 Nodes (5): Central Signal Tower, Industrial Settlement, Orange Signal Aperture, Ring Superstructure, Signal Briefing
 
-### Community 103 - "Central Signal Tower"
+### Community 137 - "Central Signal Spire"
 Cohesion: 0.40
 Nodes (5): Central Signal Spire, Industrial Settlement, Ring Habitat Interior, Signal Hunter Drone, Signal Tracking Overlay
 
-### Community 104 - "Central Signal Spire"
+### Community 138 - "Perimeter Correction Signal"
 Cohesion: 0.60
 Nodes (5): Central Energy Discharge, Habitat Ring, Last Correction, Perimeter Correction Signal, Signal Last Correction Illustration
 
-### Community 105 - "Perimeter Correction Signal"
+### Community 139 - "Holographic Transmission Path"
 Cohesion: 0.60
 Nodes (5): Holographic Transmission Path, Ring Infrastructure, Signal Emitter, Signal Migration, Stellar Focal Point
 
-### Community 106 - "Holographic Transmission Path"
+### Community 140 - "Axiom Choir Vanguard"
 Cohesion: 0.40
 Nodes (5): Axiom Choir Vanguard, Bipedal Combat Mech, Dual Heavy Armament, Industrial Staging Bay, Axiom Choir Vanguard Unit Dossier
 
-### Community 107 - "Axiom Choir Vanguard"
+### Community 141 - "Self-Propelled Artillery Platform"
 Cohesion: 0.40
 Nodes (5): Long-Range Cannon, Longbow, Quadrupedal Chassis, Self-Propelled Artillery Platform, Sensor Module
 
-### Community 108 - "Self-Propelled Artillery Platform"
+### Community 142 - "world.ts"
 Cohesion: 0.70
 Nodes (4): abilityWorld(), dodgeWorld(), emptyWorld(), focusWorld()
 
-### Community 109 - "tactician.test.ts"
+### Community 143 - "Last Rotation Title Image"
+Cohesion: 0.50
+Nodes (5): Futuristic Cityscape, Last Rotation Title Image, Orange Orbital Streaks, Ringworld Megastructure, Spacecraft Cockpit
+
+### Community 144 - "Signal Last Correction Image"
+Cohesion: 0.50
+Nodes (5): Circular Ring Structure, Electrical Light Trails, Futuristic Industrial Environment, Luminous Energy Sphere, Signal Last Correction Image
+
+### Community 145 - "Signal Migration Image"
+Cohesion: 0.60
+Nodes (5): Bright Celestial Body, Signal Migration Image, Orbital Megastructure, Signal Emitter, Signal Transmission Path
+
+### Community 146 - "Choir Longbow Artillery Unit"
+Cohesion: 0.40
+Nodes (5): Articulated Mechanical Legs, Choir Longbow Artillery Unit, Dark Industrial Interior, Elevated Long-Barrel Cannon, Vertical Fin-Like Panels
+
+### Community 147 - "Mechanical Unit"
+Cohesion: 0.40
+Nodes (5): Choir Needle, Choir Needle Image, Industrial Chamber, Mechanical Unit, Teal Light Accents
+
+### Community 148 - "Choir Vanguard Mech"
+Cohesion: 0.40
+Nodes (5): Armored Humanoid Form, Blue Energy Lighting, Choir Vanguard Dossier, Choir Vanguard Mech, Twin Mounted Firearms
+
+### Community 149 - "Aegis"
+Cohesion: 0.40
+Nodes (5): Aegis, Armored Robot, Humanoid Combat Mech, Satellite Dish, Weapon Mount
+
+### Community 150 - "Compact Engineer Dossier Image"
+Cohesion: 0.40
+Nodes (5): Bipedal Mechanical Unit, Mounted Cable Reel, Engineer Unit, Orange Utility Lights, Compact Engineer Dossier Image
+
+### Community 151 - "Compact Wisp Unit Dossier Image"
+Cohesion: 0.40
+Nodes (5): Armored Mechanical Chassis, Bipedal Robotic Unit, Orange Accent Lighting, Wisp, Compact Wisp Unit Dossier Image
+
+### Community 152 - "Story Mission"
 Cohesion: 0.50
 Nodes (4): Bulwark, Narrative Layer, Needle, Story Mission
 
-### Community 110 - "Story Mission"
+### Community 153 - "Versioned Receipts"
 Cohesion: 0.50
 Nodes (4): Browser Scenarios, Headless Qualification, RWW CLI, Versioned Receipts
 
-### Community 111 - "Versioned Receipts"
+### Community 154 - "Phase 5 Tactical Media Delivery"
 Cohesion: 0.50
 Nodes (4): Azure OpenAI GPT-image-2, Deepgram Aura-2, Phase 5 Tactical Media Delivery, Media Review Gates
 
-### Community 112 - "Phase 5 Tactical Media Delivery"
+### Community 155 - "Last Rotation Opening"
 Cohesion: 0.50
 Nodes (4): HeyGen Video Agent, Last Rotation Opening, Reviewed Last Rotation Media, Generated Media Usage Rights Basis
 
-### Community 113 - "Last Rotation Opening"
+### Community 156 - "Directional Artillery Advantage"
 Cohesion: 0.50
 Nodes (4): Authoritative Artillery Targeting, Directional Artillery Advantage, Directional Range Footprint, First Contact Directional Objective
 
-### Community 114 - "Directional Artillery Advantage"
+### Community 157 - "Current Gameplay Mechanics"
 Cohesion: 0.50
 Nodes (4): Current Gameplay Mechanics, Proposed Future Mechanics, Skirmish Theater, Theater Commander
 
-### Community 115 - "Current Gameplay Mechanics"
+### Community 158 - "Failed Ballistic Attempts"
 Cohesion: 0.50
 Nodes (4): Canonical Ballistic Verification, Failed Ballistic Attempts, Failed AI Plan Cache, Signed Ring Reach Envelope
 
-### Community 116 - "Failed Ballistic Attempts"
+### Community 159 - "Analytic Ring Atmosphere"
 Cohesion: 0.50
 Nodes (4): Analytic Ring Atmosphere, Direct Renderer Boundary, Environmental Quality Budgets, PBR Calibration Scene
 
-### Community 117 - "Analytic Ring Atmosphere"
+### Community 160 - "Tactical HUD and Command Feedback"
 Cohesion: 0.50
 Nodes (4): Bounded Visibility-Filtered Event Rail, HUD Authority Boundary, Responsive HUD Zones, Tactical HUD and Command Feedback
 
-### Community 118 - "Tactical HUD and Command Feedback"
+### Community 161 - "Phase 4A Provisional Baseline"
 Cohesion: 0.50
 Nodes (4): Hardware Doctor, Headless 40-Minute Profile, Phase 4A Provisional Baseline, T480s Heavy Combat Profile
 
-### Community 119 - "Phase 4A Provisional Baseline"
+### Community 162 - "Heavy-Combat Renderer Profile"
 Cohesion: 0.50
 Nodes (4): Procedural PBR Terrain GPU Bottleneck, Heavy-Combat Renderer Profile, Renderer Attribution, Active Quality Shader Prewarm
 
-### Community 120 - "Heavy-Combat Renderer Profile"
-Cohesion: 0.50
-Nodes (4): Launch Scope Control, Plan Freshness, Progress Endpoint, Remaining Work Dashboard
-
-### Community 121 - "Launch Scope Control"
+### Community 163 - "Choir Engineer"
 Cohesion: 0.50
 Nodes (4): Articulated Bipedal Chassis, Choir Engineer, Cyan Illuminated Accents, Tool Appendages
 
-### Community 122 - "Choir Engineer"
+### Community 164 - "Choir Longbow"
 Cohesion: 0.50
 Nodes (4): Armored Weapon Platform, Articulated Quadrupedal Chassis, Choir Longbow, Elevated Tubular Launcher
 
-### Community 123 - "Choir Longbow"
+### Community 165 - "Axiom Choir Needle"
 Cohesion: 0.50
 Nodes (4): Axiom Choir Needle, Faceted Dark Armor, Humanoid Combat Construct, Integrated Lance Weapon
 
-### Community 124 - "Axiom Choir Needle"
+### Community 166 - "Armored Bipedal Combat Walker"
 Cohesion: 0.50
 Nodes (4): Aegis, Armored Bipedal Combat Walker, Dual Sensor Dish Array, Shoulder Mounted Weapon Turrets
 
-### Community 125 - "Armored Bipedal Combat Walker"
+### Community 167 - "Compact Bulwark"
 Cohesion: 0.50
 Nodes (4): Compact Bulwark, Dual Cannon Armament, Frontal Shield Armor, Quadrupedal Combat Chassis
 
-### Community 126 - "Compact Bulwark"
+### Community 168 - "Compact Engineer Unit"
 Cohesion: 0.50
 Nodes (4): Armored Biped Chassis, Articulated Tool Arm, Cable Spool, Compact Engineer Unit
 
-### Community 127 - "Compact Engineer Unit"
+### Community 169 - "Compact Vanguard"
 Cohesion: 0.50
 Nodes (4): Armored Bipedal Combat Chassis, Compact Vanguard, Dual Rotary Cannon Armament, Layered Heavy Armor
 
-### Community 129 - ".tick"
+### Community 171 - "Choir Aegis"
+Cohesion: 0.50
+Nodes (4): Blue Accent Lighting, Futuristic Combat Mech, Choir Aegis, Dark Industrial Interior
+
+### Community 172 - "Cinematic Presentation Layer"
 Cohesion: 0.67
 Nodes (3): Cinematic Presentation Layer, Optional Media Boundary, Title Screen
 
-### Community 130 - "Cinematic Presentation Layer"
+### Community 173 - "Core Match Validation"
 Cohesion: 0.67
 Nodes (3): Balance Gates, Core Match Validation, Validation Observer
 
-### Community 131 - "Core Match Validation"
+### Community 174 - "Directional Reach Profile"
 Cohesion: 0.67
 Nodes (3): Authoritative Preview/Fire Agreement, Directional Artillery USP, Directional Reach Profile
 
-### Community 132 - "Directional Reach Profile"
+### Community 175 - "First Contact Tutorial"
 Cohesion: 0.67
 Nodes (3): First Contact Tutorial, Mission Persistence, Objective Sequence
 
-### Community 133 - "First Contact Tutorial"
+### Community 176 - "Rocket Warfare"
 Cohesion: 0.67
 Nodes (3): AI Opponent, Mech Combat, Rocket Warfare
 
-### Community 134 - "Rocket Warfare"
+### Community 177 - "Gate 1 Playable Slice"
 Cohesion: 0.67
 Nodes (3): Gate 1 Playable Slice, Human Gate, Locked Decisions
 
-### Community 135 - "Gate 1 Playable Slice"
+### Community 178 - "Strategic Contacts"
 Cohesion: 0.67
 Nodes (3): LS-09 Automation Acceptance, Strategic Contacts, Strategic Contact Authority Boundary
 
-### Community 136 - "Strategic Contacts"
+### Community 179 - "Accelerated Lifecycle Soak"
 Cohesion: 0.67
 Nodes (3): Accelerated Lifecycle Soak, Bounded Memory Indexes, First Playable Frame Measurement
 
-### Community 137 - "Accelerated Lifecycle Soak"
+### Community 181 - "Boot Loading Screen"
 Cohesion: 0.67
 Nodes (3): Application Bootstrap, Boot Loading Screen, Ring World War Title
 
-### Community 138 - "Boot Loading Screen"
+### Community 182 - "Aegis"
 Cohesion: 0.67
 Nodes (3): Aegis, Illuminated Sensor Arrays, Quadruped Armored Walker
 
-### Community 139 - "Aegis"
+### Community 183 - "Compact Wisp Unit"
 Cohesion: 0.67
 Nodes (3): Bipedal Walker, Compact Wisp Unit, Sensor Communications Mast
 
-### Community 140 - "Compact Wisp Unit"
+### Community 184 - "Delivered Phase 2 Systems"
 Cohesion: 0.67
 Nodes (3): Delivered Phase 2 Systems, Phase 2 Design Corrections, Verified Vertical Increments
 
-### Community 141 - "Delivered Phase 2 Systems"
+### Community 185 - "Optional Media Manifest"
 Cohesion: 0.67
 Nodes (3): Audio Expansion, Cinematic Presentation, Optional Media Manifest
 
+### Community 187 - "ls11SourceSnapshotSha256"
+Cohesion: 0.67
+Nodes (3): ls11CriterionReview(), ls11RunArtifacts(), ls11SourceSnapshotSha256()
+
+## Ambiguous Edges - Review These
+- `README` → `Technical Architecture`  [AMBIGUOUS]
+  README.md · relation: references
+- `Custom Rotating-Frame Kinematics` → `Inertial-Frame Ballistic Authority`  [AMBIGUOUS]
+  docs/launch-scope/ls-11-gravity-range.md · relation: semantically_similar_to
+
 ## Knowledge Gaps
-- **597 isolated node(s):** `POST_MISSION_VISUAL_PROFILE`, `StartupMetrics`, `QUALITY_THRASH_SEQUENCE`, `execFileAsync`, `TimerQueryExtension` (+592 more)
+- **800 isolated node(s):** `scenarioBytes`, `scenario`, `scenarioSha256`, `POST_MISSION_VISUAL_PROFILE`, `scenario` (+795 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **43 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **50 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Faction` connect `Hud` to `serialize.ts`, `mission.ts`, `world.ts`, `game.ts`, `World`, `constants.ts`, `runtimeScenario.ts`, `rww.test.ts`, `Spinal Alignment`, `Phase 2 Systems Depth`, `Terrain`, `settings.ts`, `RING_CIRCUMFERENCE`, `.structureById`, `startSession`, `runner.ts`, `SimEvent`, `Renderer`, `BTNode`, `deltaS`, `UnitKind`, `campaignRoute.ts`, `.stepUnits`, `titleScreen.ts`, `performance-profile.test.ts`, `headless/core-match.test.ts`, `WholeRingModeController`, `strategicAnnulus.ts`, `missionRegistry.ts`, `audioEngine.test.ts`, `visual-signature.mjs`, `surfaceDistSq`, `write-delivery-receipt.mjs`, `validation/core-match.test.ts`, `StructureKind`, `Self-Propelled Artillery Platform`?**
-  _High betweenness centrality (0.073) - this node is a cross-community bridge._
-- **Why does `World` connect `Hud` to `serialize.ts`, `mission.ts`, `world.ts`, `game.ts`, `World`, `constants.ts`, `Spinal Alignment`, `Phase 2 Systems Depth`, `Terrain`, `wireKeys`, `main.ts`, `RING_CIRCUMFERENCE`, `.structureById`, `startSession`, `runner.ts`, `SimEvent`, `BTNode`, `deltaS`, `UnitKind`, `.emit`, `.stepUnits`, `performance-profile.test.ts`, `headless/core-match.test.ts`, `strategicAnnulus.ts`, `Rng`, `audioEngine.test.ts`, `visual-signature.mjs`, `surfaceDistSq`, `validation/core-match.test.ts`, `EntityRenderer`, `Self-Propelled Artillery Platform`?**
-  _High betweenness centrality (0.070) - this node is a cross-community bridge._
-- **Why does `Game` connect `Game` to `AiOpponent`, `mission.ts`, `calibration.ts`, `startSession`, `Renderer`, `scenario-driver.ts`, `game.ts`, `World`, `constants.ts`, `entityRenderer.ts`, `Phase 2 Systems Depth`, `campaignProfile.ts`, `terrain.ts`, `settings.ts`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
-- **What connects `POST_MISSION_VISUAL_PROFILE`, `StartupMetrics`, `QUALITY_THRASH_SEQUENCE` to the rest of the system?**
-  _597 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What is the exact relationship between `README` and `Technical Architecture`?**
+  _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
+- **What is the exact relationship between `Custom Rotating-Frame Kinematics` and `Inertial-Frame Ballistic Authority`?**
+  _Edge tagged AMBIGUOUS (relation: semantically_similar_to) - confidence is low._
+- **Why does `Faction` connect `World` to `serialize.ts`, `tactician.ts`, `Hud`, `runtimeScenario.ts`, `world.ts`, `terrain.ts`, `Game`, `world.ts`, `coreMatch.ts`, `opponent.ts`, `game.ts`, `runner.ts`, `main.ts`, `mission.ts`, `deltaS`, `headless/core-match.test.ts`, `performance-profile.test.ts`, `UnitKind`, `Effects`, `anchor.ts`, `scenario.test.ts`, `strategicAnnulus.ts`, `mission.ts`, `entityRenderer.ts`, `titleScreen.ts`, `Hud`, `mission.ts`, `voiceDirector.ts`, `missionRegistry.ts`, `EntityRenderer`, `audioEngine.test.ts`, `AudioBackend`, `missionRegistry.ts`, `abilities.ts`, `mission.ts`, `webAudioBackend.ts`, `mission.ts`, `audioEngine.ts`, `voiceMedia.ts`?**
+  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+- **Why does `World` connect `World` to `serialize.ts`, `tactician.ts`, `Hud`, `runtimeScenario.ts`, `world.ts`, `terrain.ts`, `Game`, `Terrain`, `world.ts`, `opponent.ts`, `game.ts`, `runner.ts`, `ballistics.ts`, `main.ts`, `mission.ts`, `deltaS`, `performance-profile.test.ts`, `UnitKind`, `Effects`, `anchor.ts`, `SurfaceNav`, `strategicAnnulus.ts`, `mission.ts`, `entityRenderer.ts`, `Hud`, `mission.ts`, `voiceDirector.ts`, `EntityRenderer`, `audioEngine.test.ts`, `abilities.ts`, `mission.ts`, `Rng`, `mission.ts`, `audioEngine.ts`?**
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
+- **Why does `Terrain` connect `Terrain` to `serialize.ts`, `World`, `runtimeScenario.ts`, `world.ts`, `terrain.ts`, `Game`, `world.ts`, `coreMatch.ts`, `opponent.ts`, `districtPlan.ts`, `game.ts`, `runner.ts`, `battlefieldDressing.ts`, `main.ts`, `mission.ts`, `deltaS`, `performance-profile.test.ts`, `CameraRig`, `UnitKind`, `SurfaceNav`, `strategicAnnulus.ts`, `mission.ts`, `constants.ts`, `EntityRenderer`, `abilities.ts`, `mission.ts`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
+- **What connects `scenarioBytes`, `scenario`, `scenarioSha256` to the rest of the system?**
+  _800 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `serialize.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.06373626373626373 - nodes in this community are weakly interconnected._
-- **Should `mission.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.05570175438596491 - nodes in this community are weakly interconnected._
-- **Should `vite.config.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.07253086419753087 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0612668743509865 - nodes in this community are weakly interconnected._
