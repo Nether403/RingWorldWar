@@ -7,6 +7,9 @@ interface PilotSnapshot {
     assetIds: string[];
     placementIds: string[];
     meshCount: number;
+    materialColors: string[];
+    minRoughness: number;
+    maxMetalness: number;
   };
   contextLost: boolean;
   worldHash: string;
@@ -56,7 +59,11 @@ test('loads the bounded authored-building pilot without touching simulation stat
       'choir-pilot-narrow',
     ],
     meshCount: 5,
+    materialColors: ['#927456'],
+    minRoughness: 0.9,
+    maxMetalness: expect.any(Number),
   });
+  expect(result.initial.authoredBuildings.maxMetalness).toBeLessThanOrEqual(0.08);
   expect(result.ultra.authoredBuildings).toEqual(result.initial.authoredBuildings);
   expect(result.restored.authoredBuildings).toEqual(result.initial.authoredBuildings);
   expect(result.restored.worldHash).toBe(result.initial.worldHash);

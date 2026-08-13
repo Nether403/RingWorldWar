@@ -22,9 +22,16 @@ export interface AuthoredBuildingPilotDiagnostics {
   readonly assetIds: readonly string[];
   readonly placementIds: readonly string[];
   readonly meshCount: number;
+  readonly materialColors: readonly string[];
+  readonly minRoughness: number;
+  readonly maxMetalness: number;
 }
 
 const ASSET_ROOT = '/assets/buildings/ondrasaur';
+const SANDSTONE_COLOR = new THREE.Color('#927456');
+const TEXTURED_SAND_TINT = new THREE.Color('#d6bea0');
+const MIN_ROUGHNESS = 0.9;
+const MAX_METALNESS = 0.08;
 
 /** Bounded first cohort: five static models chosen for a close-range visual review. */
 const ASSETS: readonly AuthoredBuildingAsset[] = [
@@ -110,14 +117,27 @@ export class AuthoredBuildingPilot {
 
   diagnostics(): AuthoredBuildingPilotDiagnostics {
     let meshCount = 0;
+    const materialColors = new Set<string>();
+    let minRoughness = 1;
+    let maxMetalness = 0;
     this.object.traverse((object) => {
-      if (object instanceof THREE.Mesh) meshCount++;
+      if (!(object instanceof THREE.Mesh)) return;
+      meshCount++;
+      for (const material of this.materialsOf(object)) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+        materialColors.add(`#${material.color.getHexString()}`);
+        minRoughness = Math.min(minRoughness, material.roughness);
+        maxMetalness = Math.max(maxMetalness, material.metalness);
+      }
     });
     return {
       loaded: this.loaded,
       assetIds: ASSETS.map((asset) => asset.id),
       placementIds: PLACEMENTS.map((placement) => placement.id),
       meshCount,
+      materialColors: [...materialColors].sort(),
+      minRoughness,
+      maxMetalness,
     };
   }
 
@@ -131,6 +151,19 @@ export class AuthoredBuildingPilot {
   private normalise(gltf: { scene: THREE.Group }, assetId: string): THREE.Group {
     const scene = gltf.scene;
     scene.name = `authored-building-source:${assetId}`;
+    scene.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      for (const material of this.materialsOf(object)) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+        // The split pilot GLBs contain no texture or UV data. Give those bare
+        // materials a deliberate sandstone albedo; future textured variants
+        // receive only a light warm multiplier so their authored detail stays.
+        material.color.copy(material.map ? TEXTURED_SAND_TINT : SANDSTONE_COLOR);
+        material.roughness = Math.max(material.roughness, MIN_ROUGHNESS);
+        material.metalness = Math.min(material.metalness, MAX_METALNESS);
+        material.needsUpdate = true;
+      }
+    });
     scene.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(scene);
     if (bounds.isEmpty()) throw new Error(`Authored-building pilot asset has no visible bounds: ${assetId}`);
@@ -138,5 +171,9 @@ export class AuthoredBuildingPilot {
     scene.position.set(-center.x, -bounds.min.y, -center.z);
     scene.updateMatrixWorld(true);
     return scene;
+  }
+
+  private materialsOf(mesh: THREE.Mesh): THREE.Material[] {
+    return Array.isArray(mesh.material) ? mesh.material : [mesh.material];
   }
 }
