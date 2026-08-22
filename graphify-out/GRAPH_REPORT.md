@@ -1,111 +1,117 @@
-# Graph Report - C:\Users\van_d\RingWorldWar  (2026-08-11)
+# Graph Report - RingWorldWar  (2026-08-13)
 
 ## Corpus Check
-- Large corpus: 481 files · ~790,787 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
+- 369 files · ~945,733 words
+- Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3212 nodes · 7892 edges · 242 communities (192 shown, 50 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 346 edges (avg confidence: 0.8)
+- 3267 nodes · 8005 edges · 242 communities (192 shown, 50 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 354 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `6b75111e`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - serialize.ts
 - tactician.ts
 - World
 - vite.config.ts
-- Hud
+- hud.ts
 - runtimeScenario.ts
 - world.ts
-- terrain.ts
+- Terrain
 - scenario.mjs
 - manifests.mjs
 - Launch Scope Control
 - compilerOptions
 - Game
-- Terrain
+- smoothstep
 - scripts
 - coreMatch.ts
 - rww.test.ts
-- opponent.ts
+- surfaceDist
 - campaignProfile.ts
 - environment.ts
 - districtPlan.ts
 - TitleScreen
 - Spinal Alignment
 - Phase 2 Systems Depth
-- game.ts
+- effects.ts
 - runner.ts
 - ballistics.ts
 - battlefieldDressing.ts
 - models.ts
 - main.ts
-- mission.ts
+- game.ts
 - commands.mjs
 - QualityLevel
 - Environment
 - requireNonEmptyString
 - deltaS
-- headless/core-match.test.ts
+- opponent.ts
 - performance-profile.test.ts
-- CameraRig
-- UnitKind
-- startSession
+- wrapS
+- StructureKind
+- Renderer
 - Effects
-- InputController
+- cameraController.ts
 - SurfaceNav
 - Ring World War Briefing Slide 3
-- scenario.test.ts
+- scenario-driver.ts
 - strategicAnnulus.ts
-- .constructor
+- wireKeys
 - mission.ts
-- wrapS
+- ringMath.ts
 - settings.ts
 - args.mjs
 - entityRenderer.ts
-- mission.ts
+- gameSave.ts
 - WebAudioBackend
 - titleScreen.ts
-- wireKeys
-- Hud
-- mission.ts
+- BTNode
+- .isEntityVisible
+- session.ts
 - Launch Scope
 - LS-10 Whole-Ring Strategic Side View
 - Gemini Generated Image
-- voiceDirector.ts
-- constants.ts
+- Faction
+- ringMesh.ts
 - missionRegistry.ts
 - browser-scenario.mjs
 - Technical Architecture
 - LS-12 Layered District And Bounded Scatter Foundation
 - ProceduralAudio
-- CameraRig
+- startSession
 - RigModeController
 - EntityRenderer
 - LS-13 Production Low 2026-08-09 Screenshot
-- audioEngine.test.ts
+- RecordingBackend
 - AudioBackend
-- missionRegistry.ts
-- abilities.ts
-- mission.ts
+- authoredBuildingPilot.ts
+- renderer.ts
+- .structureById
 - visual-signature.mjs
 - readJson
 - validateLS14EvidenceShape
 - Headless Performance Gate
 - LS-13 Four Reusable Environmental District Palettes
 - Rng
-- parseCoreMatchManifest
+- runtimeScenario.test.ts
 - scenario.test.ts
 - doctor.mjs
 - LS-11 Gravity Range
 - Ring World War Briefing Slide 2
 - webAudioBackend.ts
 - BattlefieldDressing
-- mission.ts
+- calibration.ts
 - write-delivery-receipt.mjs
 - Chord Shot
 - Axiom Choir
-- audioEngine.ts
-- WholeRingModeController
+- dressingModels.ts
+- battlefieldDressing.test.ts
 - shot.mjs
 - Ring World War Briefing Slide 2
 - LS-15 Bounded Acceptance Contract: Integrated Public-Alpha Tutorial Arc
@@ -117,12 +123,11 @@
 - Ability System
 - Sensor Coverage
 - Battlefield Memory
-- Terrain
 - lint.mjs
 - Launch-Scope Ship-First Execution Policy
 - LS-14 Habitation, Vegetation, Transit, And Ambient Life
 - Last Rotation Transmission Alert Poster
-- voiceMedia.ts
+- Third-party asset credits
 - app.js
 - RenderAnchor
 - Player Observation Protocol
@@ -178,6 +183,7 @@
 - Compact Bulwark
 - Compact Engineer Unit
 - Compact Vanguard
+- .constructor
 - Choir Aegis
 - Cinematic Presentation Layer
 - Core Match Validation
@@ -213,7 +219,7 @@
 - Procedural Mech Locomotion
 - Ring Physics
 - play.spec.ts
-- Game
+- CampaignProfileValidationError
 - Ring Math Task
 - Verify Job
 - Quality Preset Framework
@@ -236,10 +242,10 @@
 2. `Faction` - 186 edges
 3. `Game` - 89 edges
 4. `deltaS()` - 84 edges
-5. `Terrain` - 70 edges
+5. `Terrain` - 72 edges
 6. `wrapS()` - 64 edges
-7. `RenderAnchor` - 58 edges
-8. `startSession()` - 57 edges
+7. `startSession()` - 62 edges
+8. `RenderAnchor` - 60 edges
 9. `surfaceDist()` - 53 edges
 10. `AiOpponent` - 41 edges
 
@@ -250,10 +256,10 @@
   game ideas plus.md → docs/publishable-game-roadmap.md
 - `Gravity Range Arcade Mode` --semantically_similar_to--> `Launch Scope`  [INFERRED] [semantically similar]
   game ideas.md → docs/publishable-game-roadmap.md
-- `startSession()` --indirect_call--> `frame()`  [INFERRED]
-  src/main.ts → tests/audio/audioEngine.test.ts
 - `Faction Asymmetry` --semantically_similar_to--> `Faction Modifiers`  [INFERRED] [semantically similar]
   .kiro/specs/phase-2-systems-depth/design.md → tasks/phase-2-systems-depth/design.md
+- `Axiom Choir` --conceptually_related_to--> `Wisp Unit`  [INFERRED]
+  CONTEXT.md → public/media/presentation/units/dossier.choir.wisp.webp
 
 ## Import Cycles
 - None detected.
@@ -314,36 +320,36 @@
 ## Communities (242 total, 50 thin omitted)
 
 ### Community 0 - "serialize.ts"
-Cohesion: 0.06
-Nodes (100): ArtilleryRevealTrackingState, FailedBallisticPlanState, MAX_BALLISTIC_PLAN_FAILURE_COUNT, MAX_BALLISTIC_PLAN_RETRY_TICKS, MAX_FAILED_BALLISTIC_PLANS, assertFactionPair(), assertGameSaveSize(), createGameSaveSnapshot() (+92 more)
+Cohesion: 0.09
+Nodes (62): AbilityDef, AbilityId, AbilityState, BaseAbilityDef, CloakDef, createAbilityState(), ShieldWallDef, SiegeModeDef (+54 more)
 
 ### Community 1 - "tactician.ts"
-Cohesion: 0.04
-Nodes (62): BTContext, BTNode, BTStatus, Cooldown, DIFFICULTY_RANK, DifficultyGate, finite(), Selector (+54 more)
+Cohesion: 0.07
+Nodes (29): BTStatus, issueAttack(), issueMove(), ActivateAbility, AlwaysSuccess, attackRange(), averageDistance(), centroid() (+21 more)
 
 ### Community 2 - "World"
 Cohesion: 0.07
-Nodes (15): GravityRangeStage, AudioFrame, surfaceDistSq(), createRuntimeScenarioWorld(), DAMAGE_TABLE, Faction, WeaponDef, angleDelta() (+7 more)
+Nodes (13): surfaceDistSq(), RingPoint, TrajectoryWork, WeaponDef, angleDelta(), clampAxial(), normalizeBallisticTarget(), snapshotPlayer() (+5 more)
 
 ### Community 3 - "vite.config.ts"
 Cohesion: 0.04
 Nodes (69): ls07CriterionReview(), ls07RunArtifacts(), alias, CLAIM_EVIDENCE_POLICY, ClaimEvidenceId, COMPLETE_DISPOSITIONS, evidenceDigestCache, GATE_STATES (+61 more)
 
-### Community 4 - "Hud"
+### Community 4 - "hud.ts"
 Cohesion: 0.06
-Nodes (32): ShadowTiming, FactionMatchResult, HeadlessStructureObservation, RuntimeScenarioStructure, RuntimeScenarioUnit, BUILDABLE, effectiveSalvageCost(), effectiveStructureStats() (+24 more)
+Nodes (25): CameraMode, directionalReachProfile, BUILDABLE, effectiveUnitStats(), FACTION_NAME, MissionDebriefModel, MissionHudModel, ABILITY_LABEL (+17 more)
 
 ### Community 5 - "runtimeScenario.ts"
-Cohesion: 0.08
-Nodes (49): GravityRangeController, GRAVITY_RANGE_PLAYER_FACTION, GRAVITY_RANGE_SCENARIO, GravityRangeBindings, requiredBinding(), resolveGravityRangeBindings(), arcPosition(), axialPosition() (+41 more)
+Cohesion: 0.16
+Nodes (37): arcPosition(), axialPosition(), boolean(), boundedArray(), difficulty(), faction(), factionLabel(), fail() (+29 more)
 
 ### Community 6 - "world.ts"
 Cohesion: 0.05
-Nodes (51): BallisticState, TrajectorySample, ArmorClass, BASE_ENERGY, COMMAND_PER_NODE, Cost, DamageType, DOMINANCE_PER_ALIGNED_PAIR_PER_SEC (+43 more)
+Nodes (45): ABILITIES, BallisticState, TrajectorySample, ArmorClass, BASE_ENERGY, COMMAND_PER_NODE, Cost, DAMAGE_TABLE (+37 more)
 
-### Community 7 - "terrain.ts"
-Cohesion: 0.05
-Nodes (36): ATMOSPHERE_HEIGHT, CORIOLIS_SCALE, MAX_FLIGHT_HEIGHT, RING_CIRCUMFERENCE, RING_PERIOD, RING_SURFACE_SPEED, RING_WIDTH, SIM_DT (+28 more)
+### Community 7 - "Terrain"
+Cohesion: 0.06
+Nodes (37): ATMOSPHERE_HEIGHT, CORIOLIS_SCALE, MAX_FLIGHT_HEIGHT, RING_CIRCUMFERENCE, RING_HALF_WIDTH, RING_PERIOD, RING_RADIUS, RING_SURFACE_SPEED (+29 more)
 
 ### Community 8 - "scenario.mjs"
 Cohesion: 0.09
@@ -363,39 +369,39 @@ Nodes (46): DOM, DOM.Iterable, e2e, ES2022, node, playwright.config.ts, src, ./s
 
 ### Community 12 - "Game"
 Cohesion: 0.09
-Nodes (3): clamp(), Game, wireCommands()
+Nodes (4): abilityName(), clamp(), Game, wireCommands()
 
-### Community 13 - "Terrain"
-Cohesion: 0.09
-Nodes (21): clamp01(), GRAD3, hash2(), smootherstep(), smoothstep(), worley2(), clampAxial(), deltaWrapped() (+13 more)
+### Community 13 - "smoothstep"
+Cohesion: 0.13
+Nodes (9): clamp01(), GRAD3, hash2(), Noise, smootherstep(), smoothstep(), worley2(), deltaWrapped() (+1 more)
 
 ### Community 14 - "scripts"
 Cohesion: 0.05
 Nodes (42): dependencies, three, description, devDependencies, playwright, @types/node, @types/three, typescript (+34 more)
 
 ### Community 15 - "coreMatch.ts"
-Cohesion: 0.07
-Nodes (39): Difficulty, CoreMatchFactionInactivity, CoreMatchFactionSample, CoreMatchFactionSummary, CoreMatchGateCheck, CoreMatchGateEvaluation, CoreMatchGatePolicy, CoreMatchManifestValidationError (+31 more)
+Cohesion: 0.05
+Nodes (64): collectCoreMatchTimeline(), CORE_MATCH_MANIFEST_SCHEMA, CORE_MATCH_MANIFEST_VERSION, CoreMatchFactionInactivity, CoreMatchFactionSample, CoreMatchFactionSummary, CoreMatchGateCheck, CoreMatchGateEvaluation (+56 more)
 
 ### Community 16 - "rww.test.ts"
-Cohesion: 0.11
-Nodes (38): cwd, receipt, reportPath, runDirectory, runId, runsRoot, startedAt, executePerf() (+30 more)
+Cohesion: 0.12
+Nodes (31): cwd, receipt, reportPath, runDirectory, runId, runsRoot, startedAt, canonicalJson() (+23 more)
 
-### Community 17 - "opponent.ts"
-Cohesion: 0.09
-Nodes (16): AiOpponent, artilleryTargetValue(), ballisticPlanKey(), clamp(), clearAiOrder(), createBallisticPlanState(), isReachable(), isScenarioKnownEnemyBastion() (+8 more)
+### Community 17 - "surfaceDist"
+Cohesion: 0.15
+Nodes (11): AiOpponent, ballisticPlanKey(), clamp(), clearAiOrder(), isReachable(), isScenarioKnownEnemyBastion(), samePoint(), surfaceDist() (+3 more)
 
 ### Community 18 - "campaignProfile.ts"
-Cohesion: 0.14
-Nodes (35): CAMPAIGN_PROFILE_KEY, CAMPAIGN_PROFILE_SCHEMA, CAMPAIGN_PROFILE_VERSION, CampaignActionError, CampaignProfileLoadResult, CampaignProfileStorage, CampaignProfileValidationError, completeCampaignMission() (+27 more)
+Cohesion: 0.16
+Nodes (35): CAMPAIGN_PROFILE_KEY, CAMPAIGN_PROFILE_SCHEMA, CAMPAIGN_PROFILE_VERSION, CampaignActionError, CampaignProfileLoadResult, CampaignProfileStorage, completeCampaignMission(), continueCampaign() (+27 more)
 
 ### Community 19 - "environment.ts"
-Cohesion: 0.10
-Nodes (30): DAY_LENGTH, clamp01(), distanceToPanelCenter(), normalizePanelAngle(), panelPhaseAt(), relativePanelAngle(), SHADOW_MAX_OCCLUSION, SHADOW_PANEL_HALF_SPAN (+22 more)
+Cohesion: 0.09
+Nodes (31): DAY_LENGTH, clamp01(), distanceToPanelCenter(), normalizePanelAngle(), panelPhaseAt(), relativePanelAngle(), SHADOW_MAX_OCCLUSION, SHADOW_PANEL_HALF_SPAN (+23 more)
 
 ### Community 20 - "districtPlan.ts"
-Cohesion: 0.09
-Nodes (28): array(), axialRange(), DISTRICT_LIFE_CUES, DISTRICT_PALETTES, DISTRICT_SILHOUETTE_STYLES, DistrictDefinition, DistrictExclusion, DistrictLayer (+20 more)
+Cohesion: 0.11
+Nodes (27): GeneratedDressingItem, array(), axialRange(), DistrictExclusion, DistrictLayer, DistrictLifeCue, DistrictPalette, DistrictScale (+19 more)
 
 ### Community 21 - "TitleScreen"
 Cohesion: 0.12
@@ -409,133 +415,133 @@ Nodes (35): Anchor Protocol, Axiom Choir, Last Rotation, Meridian Compact, Migra
 Cohesion: 0.06
 Nodes (34): Deterministic Simulation Boundary, Faction Asymmetry, Headless Sim Runner, Sim Snapshot, Phase 4 Performance and Hardening Goal, Phase 4C Renderer and GPU, Phase 4D Memory, Startup, and Recovery, Phase 4E Device and Browser Matrix (+26 more)
 
-### Community 24 - "game.ts"
-Cohesion: 0.08
-Nodes (22): _axial, _basis, _forward, _right, _tangent, _up, disposeObject(), AXIAL (+14 more)
+### Community 24 - "effects.ts"
+Cohesion: 0.12
+Nodes (11): AXIAL, DebrisShard, Scar, SmokeEmitter, TRACER_COLOR, Trail, WORLD_UP, combatPresentationKind (+3 more)
 
 ### Community 25 - "runner.ts"
-Cohesion: 0.10
-Nodes (31): ExpandedCoreMatch, averages(), controllerSeed(), countTotal(), createFactionResult(), createFactionResults(), EconomyResult, emptyFactionTotals() (+23 more)
+Cohesion: 0.11
+Nodes (29): averages(), controllerSeed(), countTotal(), createFactionResult(), createFactionResults(), EconomyResult, emptyFactionTotals(), emptyStructureCounts() (+21 more)
 
 ### Community 26 - "ballistics.ts"
-Cohesion: 0.13
-Nodes (29): RING_OMEGA, AimOptions, AimSolution, airDensityAt(), clamp(), directionalReachProfile, inertialToRing(), inertialToRingVelocity() (+21 more)
+Cohesion: 0.16
+Nodes (26): RING_OMEGA, AimOptions, AimSolution, airDensityAt(), clamp(), inertialToRing(), inertialToRingVelocity(), integrateTrajectory() (+18 more)
 
 ### Community 27 - "battlefieldDressing.ts"
 Cohesion: 0.09
-Nodes (26): hashSeed(), AXIAL, BattlefieldDressingDiagnostics, Candidate, cueSpeed(), DISTRICT_ANCHORS, emptyLifeCueCounts(), emptyPaletteCounts() (+18 more)
+Nodes (22): AXIAL, Candidate, cueId(), DISTRICT_ANCHORS, DressingLifeUniforms, emptyLifeCueCounts(), emptyPaletteCounts(), emptyScaleCounts() (+14 more)
 
 ### Community 28 - "models.ts"
-Cohesion: 0.11
-Nodes (23): addBlock(), addCylinder(), addGreebles(), BlockSpec, buildMech(), buildStructure(), _e1, _e2 (+15 more)
+Cohesion: 0.09
+Nodes (26): addBlock(), addCylinder(), addGreebles(), BlockSpec, buildMech(), buildStructure(), _e1, _e2 (+18 more)
 
 ### Community 29 - "main.ts"
-Cohesion: 0.12
-Nodes (21): CampaignTransition, continueCampaign(), CampaignRouteContext, CampaignRouteIntent, BASE_SEPARATION, boot, factionFromParams(), gravityRangeFromParams() (+13 more)
+Cohesion: 0.09
+Nodes (26): CampaignTransition, applyCampaignRouteContext(), CAMPAIGN_INTENT_PARAM, CAMPAIGN_MISSION_PARAM, campaignIntent(), CampaignRouteContext, campaignRouteContextFromParams(), CampaignRouteIntent (+18 more)
 
-### Community 30 - "mission.ts"
-Cohesion: 0.11
-Nodes (19): abilityName(), PlayerVoiceAction, SAVE_SLOT_KEY, SaveActionResult, BREAK_LINE_HOLD_TICKS, BREAK_LINE_OBJECTIVES, BreakLineBindings, CounterfireBindings (+11 more)
+### Community 30 - "game.ts"
+Cohesion: 0.08
+Nodes (18): GravityRangeController, GravityRangeStage, GRAVITY_RANGE_PLAYER_FACTION, GRAVITY_RANGE_SCENARIO, GravityRangeBindings, requiredBinding(), resolveGravityRangeBindings(), PlayerVoiceAction (+10 more)
 
 ### Community 31 - "commands.mjs"
 Cohesion: 0.19
-Nodes (26): normalizeCommand(), readJsonFile(), captureBrowserState(), describeArtifact(), executeCommand(), executeDoctor(), executePlay(), executeRun() (+18 more)
+Nodes (32): readJsonFile(), captureBrowserState(), describeArtifact(), executeBrowserPerf(), executeCommand(), executePerf(), executePlay(), executeRun() (+24 more)
 
 ### Community 32 - "QualityLevel"
-Cohesion: 0.10
-Nodes (14): DistrictQualification, DistrictSnapshot, LifeQualification, LifeSnapshot, DistrictQualification, DistrictSnapshot, BrowserScenario, CalibrationManifest (+6 more)
-
-### Community 33 - "Environment"
-Cohesion: 0.12
-Nodes (13): addPart(), addStandingLeg(), buildColorChart(), buildMaterialSwatches(), buildReferenceMech(), buildSweep(), COLOR, referenceBall() (+5 more)
+Cohesion: 0.11
+Nodes (10): PilotQualification, PilotSnapshot, DistrictQualification, DistrictSnapshot, LifeQualification, LifeSnapshot, DistrictQualification, DistrictSnapshot (+2 more)
 
 ### Community 34 - "requireNonEmptyString"
 Cohesion: 0.35
 Nodes (27): asArray(), isSafeRepositoryPath(), loadLS07RunArtifacts(), loadLS09RunArtifacts(), loadLS10RunArtifacts(), loadLS11RunArtifacts(), loadLS12RunArtifacts(), loadLS13RunArtifacts() (+19 more)
 
 ### Community 35 - "deltaS"
-Cohesion: 0.20
+Cohesion: 0.25
 Nodes (3): deltaS(), RenderAnchor, wrapLerp()
 
-### Community 36 - "headless/core-match.test.ts"
-Cohesion: 0.11
-Nodes (17): collectCoreMatchTimeline(), CORE_MATCH_MANIFEST_SCHEMA, CORE_MATCH_MANIFEST_VERSION, CoreMatchManifest, CoreMatchRecord, CoreMatchTimelineCollector, createExpandedMatch(), expandCoreMatchManifest() (+9 more)
+### Community 36 - "opponent.ts"
+Cohesion: 0.07
+Nodes (36): AiPoint, issueAttackMove(), issueBuild(), Difficulty, StrategicGoal, AiOpponentPersistenceState, ARTILLERY_REPOSITION_OFFSETS, ArtilleryRevealTrackingState (+28 more)
 
 ### Community 37 - "performance-profile.test.ts"
-Cohesion: 0.11
-Nodes (15): STRUCTURES, UNITS, BallisticAttempt, BallisticWorkSnapshot, config, flatTerrain, PROFILE_TICKS, profileBallisticCommands() (+7 more)
-
-### Community 38 - "CameraRig"
-Cohesion: 0.12
-Nodes (7): MatrixSession, Window, RwwWindow, clamp(), lerp(), CameraRig, shortestDelta()
-
-### Community 39 - "UnitKind"
 Cohesion: 0.13
-Nodes (9): StrategicState, STRATEGIST_CONFIG, wrapS(), effectiveUnitStats(), clampAxial(), BASE_STATE, disconnectedWorld(), createWorld() (+1 more)
+Nodes (13): BallisticAttempt, BallisticWorkSnapshot, config, flatTerrain, PROFILE_TICKS, profileBallisticCommands(), profileNearbyCache(), recordTiming() (+5 more)
 
-### Community 40 - "startSession"
-Cohesion: 0.13
-Nodes (7): CleanupStack, CommandWiring, navigateToGravityRange(), navigateToMainMenu(), startSession(), Renderer, snapRatio()
+### Community 38 - "wrapS"
+Cohesion: 0.09
+Nodes (10): MatrixSession, Window, wrapS(), clamp(), lerp(), CameraRig, shortestDelta(), ZOOM_MAX (+2 more)
+
+### Community 39 - "StructureKind"
+Cohesion: 0.17
+Nodes (9): StructureKind, PlayerState, artilleryWorld(), mechScene(), emptyWorld(), node(), battlefield(), createWorld() (+1 more)
 
 ### Community 41 - "Effects"
-Cohesion: 0.15
+Cohesion: 0.13
 Nodes (3): distanceAttenuation(), Effects, hashUnit()
+
+### Community 42 - "cameraController.ts"
+Cohesion: 0.08
+Nodes (11): CameraCapabilities, CameraControlSurface, CameraModeRequestResult, CameraUpdateContext, DIRECT_CAPABILITIES, TACTICAL_CAPABILITIES, WHOLE_RING_CAPABILITIES, InputController (+3 more)
 
 ### Community 44 - "Ring World War Briefing Slide 3"
 Cohesion: 0.14
 Nodes (23): Ring World War Briefing Slide 3, Anchor Protocol, Axiom Choir, Civil governments, Dismantle sectors, Distributed machine-integrated communities, Durable mechs, Evacuate to another star (+15 more)
 
-### Community 45 - "scenario.test.ts"
-Cohesion: 0.17
-Nodes (13): applyBrowserScenario(), applyScenarioHealth(), benchmarkScenario(), captureScenarioFrame(), captureScenarioState(), captureScenarioStateHash(), installUploadProfiler(), requiredRww() (+5 more)
+### Community 45 - "scenario-driver.ts"
+Cohesion: 0.15
+Nodes (15): applyBrowserScenario(), applyScenarioHealth(), benchmarkScenario(), BrowserScenario, captureScenarioFrame(), captureScenarioState(), captureScenarioStateHash(), installUploadProfiler() (+7 more)
 
 ### Community 46 - "strategicAnnulus.ts"
-Cohesion: 0.16
-Nodes (13): SHADOW_SQUARE_COUNT, CATEGORIES, countRenderables(), createAnnulusGeometry(), createMarkerGeometries(), createOutline(), markerPool(), projectSurfaceToAnnulus() (+5 more)
+Cohesion: 0.21
+Nodes (11): CATEGORIES, countRenderables(), createAnnulusGeometry(), createMarkerGeometries(), createOutline(), markerPool(), projectSurfaceToAnnulus(), StrategicAnnulus (+3 more)
 
-### Community 47 - ".constructor"
-Cohesion: 0.18
-Nodes (5): clamp01(), Settings, field(), KEYBINDINGS, SettingsMenu
+### Community 47 - "wireKeys"
+Cohesion: 0.13
+Nodes (7): wireKeys(), clamp01(), Settings, DebugOverlay, field(), KEYBINDINGS, SettingsMenu
 
 ### Community 48 - "mission.ts"
-Cohesion: 0.15
-Nodes (20): BreakLineMilestones, breakLineObjectiveMet(), emptyBreakLineMilestones(), COUNTERFIRE_OBJECTIVES, CounterfireMilestones, counterfireObjectiveMet(), emptyCounterfireMilestones(), bool() (+12 more)
+Cohesion: 0.06
+Nodes (67): RestoredGameSave, BREAK_LINE_HOLD_TICKS, BREAK_LINE_OBJECTIVES, BreakLineBindings, BreakLineMilestones, breakLineObjectiveMet(), emptyBreakLineMilestones(), COUNTERFIRE_OBJECTIVES (+59 more)
 
-### Community 49 - "wrapS"
-Cohesion: 0.12
-Nodes (7): SURFACE_GRAVITY, renderToRing(), ringToRender(), tangentAt(), TAU, upAt(), Vec3Out
+### Community 49 - "ringMath.ts"
+Cohesion: 0.09
+Nodes (14): SURFACE_GRAVITY, renderToRing(), ringToRender(), tangentAt(), TAU, upAt(), Vec3Out, _axial (+6 more)
 
 ### Community 50 - "settings.ts"
-Cohesion: 0.14
-Nodes (13): QUALITY, browserSearch(), browserStorage(), DEFAULT_VOICE_VOLUME, DEFAULT_VOLUME, isQualityLevel(), isRecord(), isVolume() (+5 more)
+Cohesion: 0.23
+Nodes (10): browserSearch(), browserStorage(), DEFAULT_VOICE_VOLUME, DEFAULT_VOLUME, isQualityLevel(), isRecord(), isVolume(), PersistedSettings (+2 more)
 
 ### Community 51 - "args.mjs"
-Cohesion: 0.22
-Nodes (18): boundedNonNegativeInteger(), boundedPositiveInteger(), nonNegativeInteger(), normalizePath(), optionValue(), parseBrowserPerf(), parseCliArgs(), parseDoctor() (+10 more)
+Cohesion: 0.21
+Nodes (19): boundedNonNegativeInteger(), boundedPositiveInteger(), nonNegativeInteger(), normalizeCommand(), normalizePath(), optionValue(), parseBrowserPerf(), parseCliArgs() (+11 more)
 
 ### Community 52 - "entityRenderer.ts"
-Cohesion: 0.14
-Nodes (18): MechClass, StructureModel, angleLerp(), angleWrap(), clampN(), FootState, _local, markInstanceUpdates() (+10 more)
+Cohesion: 0.15
+Nodes (17): MechClass, angleLerp(), angleWrap(), clampN(), FootState, _local, markInstanceUpdates(), MECH_CLASSES (+9 more)
 
-### Community 53 - "mission.ts"
-Cohesion: 0.28
-Nodes (20): array(), countRecord(), fail(), finiteNumber(), idArray(), integer(), narrativeBeats(), parseJson() (+12 more)
+### Community 53 - "gameSave.ts"
+Cohesion: 0.13
+Nodes (28): assertFactionPair(), assertGameSaveSize(), createGameSaveSnapshot(), deserializeGameSave(), faction(), fail(), GAME_SAVE_SCHEMA, GAME_SAVE_VERSION (+20 more)
 
 ### Community 54 - "WebAudioBackend"
-Cohesion: 0.19
-Nodes (3): createNoiseBuffer(), stopQuietly(), WebAudioBackend
+Cohesion: 0.20
+Nodes (4): preloadRank(), stopQuietly(), WebAudioBackend, clip()
 
 ### Community 55 - "titleScreen.ts"
 Cohesion: 0.17
 Nodes (15): CampaignProfile, CampaignResult, CampaignMissionId, PRESENTATION_MEDIA, PresentationMedia, UnitDossierMedia, REVIEWED_VOICE_CLIPS, campaignMissionAction() (+7 more)
 
-### Community 57 - "Hud"
-Cohesion: 0.25
-Nodes (3): spinalNodePriority(), BallisticFireResult, Structure
+### Community 56 - "BTNode"
+Cohesion: 0.13
+Nodes (9): BTContext, BTNode, Cooldown, DIFFICULTY_RANK, DifficultyGate, finite(), Selector, Sequence (+1 more)
 
-### Community 58 - "mission.ts"
-Cohesion: 0.14
-Nodes (7): observeCounterfireAction(), formatMissionClock(), MissionController, missionObjectives(), missionTitle(), objectiveMet(), terrain
+### Community 57 - ".isEntityVisible"
+Cohesion: 0.17
+Nodes (7): collectStrategicState(), spinalMainForceBonus(), spinalNodePriority(), isPresentationEventVisible(), BallisticFireResult, clamp(), Structure
+
+### Community 58 - "session.ts"
+Cohesion: 0.34
+Nodes (20): fail(), isRecord(), MATCH_SESSION_VERSION, MatchSession, parseJson(), parseMatchSessionSnapshot(), readArray(), readArtilleryRevealTracking() (+12 more)
 
 ### Community 59 - "Launch Scope"
 Cohesion: 0.12
@@ -549,17 +555,17 @@ Nodes (15): Acceptance Criteria, Bounded Contract, Deliberate Exclusions, Strate
 Cohesion: 0.15
 Nodes (16): Capturing Spinal Nodes, Compact Longbow, Coriolis Drift & Ballistics, Crew 3, Directional Advantage, Dominance Flow Active, Elevation Bonus, Heavy Artillery Walker (+8 more)
 
-### Community 62 - "voiceDirector.ts"
-Cohesion: 0.17
-Nodes (7): isUnitKind(), VoiceDirector, VoicePlayback, VoicePlaybackSink, VoiceUnitRef, clip(), CLIPS
+### Community 62 - "Faction"
+Cohesion: 0.06
+Nodes (41): armAudioUnlock(), AudioBackendFactory, AudioCueKind, AudioFrame, AudioState, clamp(), cue(), cueForEvent() (+33 more)
 
-### Community 63 - "constants.ts"
-Cohesion: 0.26
-Nodes (7): RING_HALF_WIDTH, RING_RADIUS, makeLowTerrainMaterial(), makeTerrainMaterial(), TerrainUniforms, buildRingGeometry(), RingMesh
+### Community 63 - "ringMesh.ts"
+Cohesion: 0.22
+Nodes (12): RIM_WALL_HEIGHT, albedoFragment(), makeLowTerrainMaterial(), makeTerrainMaterial(), noiseGlsl(), TerrainDetailTier, terrainProgramCacheKey(), TerrainUniforms (+4 more)
 
 ### Community 64 - "missionRegistry.ts"
-Cohesion: 0.16
-Nodes (12): CampaignLaunch, CAMPAIGN_MISSIONS, CampaignMissionAvailability, CampaignMissionStatus, CampaignRuntimeScenarioId, DEFINITIONS, fail(), MISSION_BY_ID (+4 more)
+Cohesion: 0.19
+Nodes (10): CAMPAIGN_MISSIONS, CampaignMissionAvailability, CampaignMissionStatus, DEFINITIONS, fail(), MISSION_BY_ID, MissionRegistryValidationError, validateMissionRegistry() (+2 more)
 
 ### Community 65 - "browser-scenario.mjs"
 Cohesion: 0.25
@@ -573,29 +579,25 @@ Nodes (14): Canonical Ring Space, Complete Procedural Ring Mesh, Coriolis Accele
 Cohesion: 0.14
 Nodes (13): Acceptance Criteria, Bounded Contract, Deliberate Exclusions, Deterministic Bounded Scatter, Renderer-Owned District Plan, Presentation-Only District Scatter, Four Fixed Instanced Render Buckets, Overhead Tactical Micro Scatter Layers (+5 more)
 
-### Community 71 - "EntityRenderer"
-Cohesion: 0.15
-Nodes (3): EntityRenderer, withInstanceDamage(), mechScene()
+### Community 69 - "startSession"
+Cohesion: 0.08
+Nodes (7): navigateToGravityRange(), navigateToMainMenu(), savedPlayerFaction(), startSession(), CameraController, WholeRingModeController, frame()
 
 ### Community 72 - "LS-13 Production Low 2026-08-09 Screenshot"
 Cohesion: 0.14
 Nodes (14): Align Objective, Armored Vehicle, Command Capacity, Engineer, Foundry, LS-13 Production Low 2026-08-09 Screenshot, No Selection, Penumbra Day (+6 more)
 
-### Community 73 - "audioEngine.test.ts"
-Cohesion: 0.18
-Nodes (4): armAudioUnlock(), AudioCue, frame(), RecordingBackend
+### Community 75 - "authoredBuildingPilot.ts"
+Cohesion: 0.13
+Nodes (7): ASSETS, AuthoredBuildingAsset, AuthoredBuildingPilot, AuthoredBuildingPilotDiagnostics, AuthoredBuildingPlacement, PLACEMENTS, disposeObject()
 
-### Community 75 - "missionRegistry.ts"
-Cohesion: 0.29
-Nodes (10): recordCampaignFailure(), applyCampaignRouteContext(), CAMPAIGN_INTENT_PARAM, CAMPAIGN_MISSION_PARAM, campaignIntent(), campaignRouteContextFromParams(), CampaignRouteValidationError, routeFail() (+2 more)
+### Community 76 - "renderer.ts"
+Cohesion: 0.16
+Nodes (8): BASE_EXPOSURE, ORDER, QUALITY, QualitySettings, ShaderPrewarmMetrics, SETTINGS_STORAGE_KEY, StorageAdapter, MemoryStorage
 
-### Community 76 - "abilities.ts"
-Cohesion: 0.22
-Nodes (10): ABILITIES, AbilityDef, AbilityId, AbilityState, BaseAbilityDef, CloakDef, createAbilityState(), ShieldWallDef (+2 more)
-
-### Community 77 - "mission.ts"
-Cohesion: 0.24
-Nodes (11): SimEvent, updateBreakLineMilestones(), breakLineBindings(), counterfireBindings(), firstContactBindings(), milestoneMet(), signalBindings(), validateBreakLineWorldBindings() (+3 more)
+### Community 77 - ".structureById"
+Cohesion: 0.15
+Nodes (13): createRuntimeScenarioWorld(), requiredId(), validateSpinalPairId(), updateBreakLineMilestones(), updateCounterfireMilestones(), breakLineBindings(), counterfireBindings(), signalBindings() (+5 more)
 
 ### Community 78 - "visual-signature.mjs"
 Cohesion: 0.29
@@ -617,17 +619,17 @@ Nodes (12): Headless 40m Qualification, Pinned Headless Runner, Canonical Headle
 Cohesion: 0.21
 Nodes (11): LS-13 Palette Dependency, Acceptance Criteria, Bounded Contract, Deliberate Exclusions, Two Districts per Palette, Reusable Environmental District Palettes, Four Stable Palette IDs, Palette-Owned Silhouette Sets (+3 more)
 
-### Community 84 - "parseCoreMatchManifest"
-Cohesion: 0.41
-Nodes (12): fail(), parseCoreMatchManifest(), readArray(), readDifficulty(), readFinite(), readGates(), readInteger(), readNonEmptyString() (+4 more)
+### Community 84 - "runtimeScenario.test.ts"
+Cohesion: 0.27
+Nodes (8): CampaignLaunch, CampaignRuntimeScenarioId, FIRST_CONTACT_RUNTIME_SCENARIO, requiredBinding(), resolveFirstContactMissionBindings(), runtimeScenarioById(), runtimeScenarioFromParams(), terrain
 
 ### Community 85 - "scenario.test.ts"
-Cohesion: 0.30
-Nodes (9): scenario, distribution(), evaluateBrowserBudget(), percentile(), summarizeDistributions(), summarizeFrameMetrics(), executeBrowserPerf(), printBrowserPerf() (+1 more)
+Cohesion: 0.42
+Nodes (6): scenario, distribution(), evaluateBrowserBudget(), percentile(), summarizeDistributions(), summarizeFrameMetrics()
 
 ### Community 86 - "doctor.mjs"
-Cohesion: 0.30
-Nodes (11): loadTarget(), buildDoctorReport(), check(), evaluateTarget(), parseTarget(), TARGET_SCHEMA, TARGET_VERSION, thresholdCheck() (+3 more)
+Cohesion: 0.24
+Nodes (14): executeDoctor(), loadTarget(), printDoctor(), buildDoctorReport(), check(), evaluateTarget(), parseTarget(), probeSystem() (+6 more)
 
 ### Community 87 - "LS-11 Gravity Range"
 Cohesion: 0.20
@@ -638,12 +640,16 @@ Cohesion: 0.29
 Nodes (11): Central Solar Filament Destabilization, Centrifugal Gravity: 6 m/s², Circumference: 22.6 km, Failing Megastructure, Far Side Distance: 7.2 km Overhead, Habitat-Scale Correction, Ring World War Briefing Slide 2, Radius: 3.6 km (+3 more)
 
 ### Community 89 - "webAudioBackend.ts"
-Cohesion: 0.24
-Nodes (8): createWebAudioBackend(), noiseRate(), oscillatorType(), pitchDrop(), preloadRank(), SpeechRecord, usesNoise(), VoiceRecord
+Cohesion: 0.27
+Nodes (7): createWebAudioBackend(), noiseRate(), oscillatorType(), pitchDrop(), SpeechRecord, usesNoise(), VoiceRecord
 
-### Community 91 - "mission.ts"
-Cohesion: 0.24
-Nodes (8): acknowledgeNarrative(), NarrativeBeat, NarrativeHudModel, SIGNAL_HOLD_TICKS, SIGNAL_NARRATIVE, SIGNAL_OBJECTIVES, updateSignalMilestones(), terrain
+### Community 90 - "BattlefieldDressing"
+Cohesion: 0.18
+Nodes (5): hashSeed(), attachDressingLifeShader(), BattlefieldDressing, withLifeAttributes(), DistrictPlan
+
+### Community 91 - "calibration.ts"
+Cohesion: 0.29
+Nodes (11): addPart(), addStandingLeg(), buildColorChart(), buildMaterialSwatches(), buildReferenceMech(), buildSweep(), CalibrationManifest, COLOR (+3 more)
 
 ### Community 92 - "write-delivery-receipt.mjs"
 Cohesion: 0.18
@@ -657,9 +663,13 @@ Nodes (10): Counter-Battery Flash, Silo, Chord Shot, Authoritative Projectile ID
 Cohesion: 0.20
 Nodes (10): Anchor Protocol: Lock rotation, seal failing sections, preserve existing cities, Axiom Choir, Durable mechs and fortified artillery, Meridian Compact, Migration Protocol: Dismantle sectors, launch archive and evacuate to another star, Mobile society and distributed machine-integrated communities, Permanent arc-cities and civil governments, Ring World War Briefing Slide 3 (+2 more)
 
-### Community 95 - "audioEngine.ts"
-Cohesion: 0.31
-Nodes (8): AudioBackendFactory, AudioCueKind, AudioState, clamp(), cue(), cueForEvent(), cuePriority(), hashUnit()
+### Community 95 - "dressingModels.ts"
+Cohesion: 0.44
+Nodes (7): buildDressingDebris(), buildDressingGeometry(), buildDressingPipe(), buildDressingSlab(), buildDressingTower(), DressingBuilder, DressingShape
+
+### Community 96 - "battlefieldDressing.test.ts"
+Cohesion: 0.28
+Nodes (4): DISTRICT_LIFE_CUES, DISTRICT_PALETTES, ENVIRONMENT_DISTRICT_PLAN, MAX_DISTRICT_SCATTER_ITEMS
 
 ### Community 97 - "shot.mjs"
 Cohesion: 0.20
@@ -720,10 +730,6 @@ Nodes (6): Acceptance Criteria, Bounded Contract, Deliberate Exclusions, LS-14 H
 ### Community 112 - "Last Rotation Transmission Alert Poster"
 Cohesion: 0.38
 Nodes (7): AES-256 Encryption Malfunction, Degraded Signal, Industrial Communications Site, Terminal 04-B, Last Rotation Transmission Alert Poster, Unknown Source, Urgent Transmission
-
-### Community 113 - "voiceMedia.ts"
-Cohesion: 0.33
-Nodes (6): VoiceTrigger, factionClips(), GROUP_TRIGGERS, priority(), UNIT_TRIGGERS, UNITS
 
 ### Community 115 - "RenderAnchor"
 Cohesion: 0.33
@@ -1004,7 +1010,7 @@ Nodes (3): ls11CriterionReview(), ls11RunArtifacts(), ls11SourceSnapshotSha256()
   docs/launch-scope/ls-11-gravity-range.md · relation: semantically_similar_to
 
 ## Knowledge Gaps
-- **800 isolated node(s):** `scenarioBytes`, `scenario`, `scenarioSha256`, `POST_MISSION_VISUAL_PROFILE`, `scenario` (+795 more)
+- **810 isolated node(s):** `PilotSnapshot`, `scenarioBytes`, `scenario`, `scenarioSha256`, `POST_MISSION_VISUAL_PROFILE` (+805 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **50 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -1015,13 +1021,13 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
 - **What is the exact relationship between `Custom Rotating-Frame Kinematics` and `Inertial-Frame Ballistic Authority`?**
   _Edge tagged AMBIGUOUS (relation: semantically_similar_to) - confidence is low._
-- **Why does `Faction` connect `World` to `serialize.ts`, `tactician.ts`, `Hud`, `runtimeScenario.ts`, `world.ts`, `terrain.ts`, `Game`, `world.ts`, `coreMatch.ts`, `opponent.ts`, `game.ts`, `runner.ts`, `main.ts`, `mission.ts`, `deltaS`, `headless/core-match.test.ts`, `performance-profile.test.ts`, `UnitKind`, `Effects`, `anchor.ts`, `scenario.test.ts`, `strategicAnnulus.ts`, `mission.ts`, `entityRenderer.ts`, `titleScreen.ts`, `Hud`, `mission.ts`, `voiceDirector.ts`, `missionRegistry.ts`, `EntityRenderer`, `audioEngine.test.ts`, `AudioBackend`, `missionRegistry.ts`, `abilities.ts`, `mission.ts`, `webAudioBackend.ts`, `mission.ts`, `audioEngine.ts`, `voiceMedia.ts`?**
-  _High betweenness centrality (0.057) - this node is a cross-community bridge._
-- **Why does `World` connect `World` to `serialize.ts`, `tactician.ts`, `Hud`, `runtimeScenario.ts`, `world.ts`, `terrain.ts`, `Game`, `Terrain`, `world.ts`, `opponent.ts`, `game.ts`, `runner.ts`, `ballistics.ts`, `main.ts`, `mission.ts`, `deltaS`, `performance-profile.test.ts`, `UnitKind`, `Effects`, `anchor.ts`, `SurfaceNav`, `strategicAnnulus.ts`, `mission.ts`, `entityRenderer.ts`, `Hud`, `mission.ts`, `voiceDirector.ts`, `EntityRenderer`, `audioEngine.test.ts`, `abilities.ts`, `mission.ts`, `Rng`, `mission.ts`, `audioEngine.ts`?**
-  _High betweenness centrality (0.053) - this node is a cross-community bridge._
-- **Why does `Terrain` connect `Terrain` to `serialize.ts`, `World`, `runtimeScenario.ts`, `world.ts`, `terrain.ts`, `Game`, `world.ts`, `coreMatch.ts`, `opponent.ts`, `districtPlan.ts`, `game.ts`, `runner.ts`, `battlefieldDressing.ts`, `main.ts`, `mission.ts`, `deltaS`, `performance-profile.test.ts`, `CameraRig`, `UnitKind`, `SurfaceNav`, `strategicAnnulus.ts`, `mission.ts`, `constants.ts`, `EntityRenderer`, `abilities.ts`, `mission.ts`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **What connects `scenarioBytes`, `scenario`, `scenarioSha256` to the rest of the system?**
-  _800 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `Faction` connect `Faction` to `serialize.ts`, `tactician.ts`, `World`, `hud.ts`, `runtimeScenario.ts`, `world.ts`, `Terrain`, `Game`, `world.ts`, `coreMatch.ts`, `surfaceDist`, `campaignProfile.ts`, `effects.ts`, `runner.ts`, `main.ts`, `game.ts`, `deltaS`, `opponent.ts`, `performance-profile.test.ts`, `StructureKind`, `Effects`, `scenario-driver.ts`, `strategicAnnulus.ts`, `mission.ts`, `entityRenderer.ts`, `gameSave.ts`, `titleScreen.ts`, `.isEntityVisible`, `session.ts`, `missionRegistry.ts`, `.structureById`, `runtimeScenario.test.ts`, `webAudioBackend.ts`?**
+  _High betweenness centrality (0.055) - this node is a cross-community bridge._
+- **Why does `World` connect `World` to `serialize.ts`, `tactician.ts`, `hud.ts`, `world.ts`, `Terrain`, `Game`, `world.ts`, `coreMatch.ts`, `surfaceDist`, `effects.ts`, `runner.ts`, `game.ts`, `deltaS`, `opponent.ts`, `performance-profile.test.ts`, `StructureKind`, `Effects`, `SurfaceNav`, `strategicAnnulus.ts`, `mission.ts`, `entityRenderer.ts`, `gameSave.ts`, `.isEntityVisible`, `session.ts`, `Faction`, `EntityRenderer`, `.structureById`, `Rng`, `runtimeScenario.test.ts`?**
+  _High betweenness centrality (0.052) - this node is a cross-community bridge._
+- **Why does `Game` connect `Game` to `World`, `hud.ts`, `world.ts`, `Terrain`, `surfaceDist`, `main.ts`, `game.ts`, `Environment`, `opponent.ts`, `wrapS`, `Effects`, `scenario-driver.ts`, `wireKeys`, `mission.ts`, `.isEntityVisible`, `Faction`, `startSession`, `EntityRenderer`, `lifecycle.spec.ts`, `GravityRangePanel`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **What connects `PilotSnapshot`, `scenarioBytes`, `scenario` to the rest of the system?**
+  _810 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `serialize.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.0612668743509865 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09324009324009325 - nodes in this community are weakly interconnected._
