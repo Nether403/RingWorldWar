@@ -33,10 +33,13 @@ import { AuthoredBuildingPilot } from '@render/authoredBuildingPilot';
 import { Environment } from '@render/environment';
 import { applyTerrainQuality, makeTerrainMaterial, type TerrainQuality } from '@render/materials/terrainMaterial';
 import { BASE_EXPOSURE, Renderer, type QualityLevel } from '@render/renderer';
+import { RingMesh } from '@render/ringMesh';
 import { isQualityLevel } from '@render/settings';
+import { createTerrain } from '@gen/terrain';
 
 const CALIBRATION_TIME = 66;
 const CALIBRATION_SEED = 0x3bca1;
+const CALIBRATION_TERRAIN_SEED = 4242;
 
 /** Faction accents, duplicated locally so the dev page never imports sim data. */
 const COMPACT_AMBER = 0xf0821e;
@@ -57,6 +60,7 @@ const CHOIR_COMPARISON_KINDS: readonly StructureKind[] = ['bastion', 'mechFoundr
 
 export const CALIBRATION_SHEETS = [
   'calibration', 'mechs', 'structures', 'terrain', 'authored', 'all',
+  'detailUnits', 'detailTerrain',
 ] as const;
 
 export type CalibrationSheet = (typeof CALIBRATION_SHEETS)[number];
@@ -132,7 +136,29 @@ const FRAMING: Record<CalibrationSheet, SheetFraming> = {
   // Ten placements rather than the original five, so the row is much wider.
   authored: { cameraPosition: [0, 128, 268], cameraTarget: [0, 16, 0], floor: [420, 420] },
   all: { cameraPosition: [0, 340, 330], cameraTarget: [0, 0, -150], floor: [620, 920] },
+
+  // THE CLOSE-RANGE REVIEW SHEETS. See the note above buildDetailUnitsSheet for
+  // why these exist and what the wide sheets could not do.
+  //
+  // Both cameras stay offset toward +x and above the subject for the reason given
+  // above: the key light has no z component, so a low camera on the +z axis
+  // photographs nothing but shade. Close does not mean level.
+  detailUnits: { cameraPosition: [17, 12, 27], cameraTarget: [0, 5.5, 0], floor: [90, 70] },
+  detailTerrain: { cameraPosition: [58, 34, 92], cameraTarget: [0, 6, -30], floor: [0, 0] },
 };
+
+/**
+ * Ring coordinates the close-range terrain sheet is parked over.
+ *
+ * Not an arbitrary pick. Chosen by scanning the generated terrain for a spot that
+ * carries all three things this sheet has to show: about 100 m of relief inside a
+ * 300 m window so the frame has silhouette in it, a drainage network running
+ * through it so the flow-driven material bands are visible, and a local slope
+ * gentle enough to stand a camera on. Hardcoded rather than re-scanned at load,
+ * because the scan costs a second and the answer is fixed for a fixed seed.
+ */
+const DETAIL_TERRAIN_S = 10_432;
+const DETAIL_TERRAIN_Z = 464;
 
 /**
  * Depth slot for each band on the combined sheet.
@@ -229,6 +255,31 @@ export async function startCalibration(container: HTMLElement): Promise<void> {
     const group = buildTerrainSheet(quality, !showAll, showAll ? ALL_SHEET_BAND.terrain : 0);
     contents.terrainPatches = showAll ? TERRAIN_PATCHES.length : TERRAIN_PATCHES.length + 1;
     renderer.scene.add(group);
+  }
+
+  if (sheet === 'detailUnits') {
+    const group = buildDetailUnitsSheet();
+    contents.mechs = 2;
+    contents.structures = 1;
+    renderer.scene.add(group);
+  }
+
+  if (sheet === 'detailTerrain') {
+    // The real heightfield and the real ring mesh, not a synthetic patch. Costs
+    // about two and a half seconds of generation, which is why it is confined to
+    // this one sheet.
+    const terrain = createTerrain(CALIBRATION_TERRAIN_SEED);
+    const ring = new RingMesh(terrain, quality);
+    applyTerrainQuality(ring.uniforms, renderer.currentSettings);
+    // Park the shadow squares off the framed ground, for the same reason the
+    // material sheet does: inside a band everything reads as deep shade.
+    ring.uniforms.uPanelPhase.value = Math.PI / SHADOW_SQUARE_COUNT;
+    // Anchoring at the chosen spot puts that piece of ring at the render origin,
+    // so the framing above is expressed in plain metres from the subject.
+    anchor.set(DETAIL_TERRAIN_S, DETAIL_TERRAIN_Z);
+    ring.syncToAnchor(anchor);
+    contents.terrainPatches = 1;
+    renderer.scene.add(ring.object);
   }
 
   if (sheet === 'authored' || showAll) {
@@ -367,6 +418,8 @@ function sheetTitle(sheet: CalibrationSheet): string {
     case 'terrain': return 'TERRAIN MATERIAL SHEET';
     case 'authored': return 'AUTHORED BUILDING SHEET';
     case 'all': return 'FULL CONTACT SHEET';
+    case 'detailUnits': return 'CLOSE-RANGE UNITS REVIEW';
+    case 'detailTerrain': return 'CLOSE-RANGE TERRAIN REVIEW';
   }
 }
 
@@ -539,6 +592,129 @@ function buildMechSheet(bandZ: number): THREE.Group {
     }
   }
   return group;
+}
+
+// ---------------------------------------------------------------------------
+// Close-range review sheets
+// ---------------------------------------------------------------------------
+
+/**
+ * Four subjects, framed large enough that geometry and material actually resolve.
+ *
+ * WHY THIS EXISTS. The wide contact sheets are review surfaces for coverage: they
+ * answer "does every class still render, and does the palette still hold". They
+ * cannot answer "did that change do anything", and during the overhaul that
+ * repeatedly mattered. The mech sheet stages twelve mechs across 1100 px, so each
+ * is around 100 px tall, and the snapshot comparison allows a `maxDiffPixelRatio`
+ * of 0.004 -- about 2,800 pixels. Task 11 added four hydraulic actuators, real
+ * inset channels, and a routed conduit to every mech, and removed six greebles,
+ * and the mech sheet passed BYTE-IDENTICAL. Every visual check in Tasks 8 through
+ * 13 had to be done with a throwaway spec driving the camera by hand.
+ *
+ * At this framing a mech is roughly 300 px tall, so a channel is a channel and an
+ * actuator is an actuator. Which means the baseline is sensitive to exactly the
+ * changes the wide sheets are blind to, and the tolerance can be tightened.
+ *
+ * The wreck is here deliberately: it is the one subject assembled by the renderer
+ * rather than by the model generator, so nothing else on any sheet would catch a
+ * regression in its collapsed pose.
+ */
+function buildDetailUnitsSheet(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'calibration:detail-units-sheet';
+
+  const compact = makeHullMaterial(COMPACT_AMBER, -1).material;
+  const choir = makeHullMaterial(CHOIR_CYAN, 1).material;
+  const spacing = 15;
+
+  // One heavy and one light, one per faction, so both palettes and both ends of
+  // the proportion range are on the sheet.
+  const subjects: Array<{ cls: MechClass; style: FactionStyle; material: THREE.Material }> = [
+    { cls: 'bulwark', style: 'compact', material: compact },
+    { cls: 'needle', style: 'choir', material: choir },
+  ];
+  for (const [index, subject] of subjects.entries()) {
+    const rig = buildMech(subject.cls, CALIBRATION_SEED + subject.cls.length * 7919, subject.style);
+    const mech = new THREE.Group();
+    mech.name = `calibration:detail:mech:${subject.cls}:${subject.style}`;
+    addStandingMech(mech, rig, subject.material);
+    mech.position.set(-spacing * 1.5 + index * spacing, 0, 0);
+    mech.rotation.y = SHEET_YAW;
+    group.add(mech);
+  }
+
+  // A wreck, in the same collapsed stance the renderer builds, on the same hull
+  // material. Damage is a per-instance channel and these are plain meshes, so the
+  // sheet shows the geometry and the pose rather than the damage shading.
+  const wreckRig = buildMech('vanguard', CALIBRATION_SEED + 'vanguard'.length * 7919, 'compact');
+  const wreck = new THREE.Group();
+  wreck.name = 'calibration:detail:wreck:vanguard';
+  addCollapsedMech(wreck, wreckRig, compact);
+  wreck.position.set(-spacing * 1.5 + 2 * spacing, 0, 0);
+  wreck.rotation.y = SHEET_YAW + 0.6;
+  group.add(wreck);
+
+  // One structure, framed at the same range, which is the surface Task 14's
+  // detail-parity work will be judged on.
+  const model = buildStructure('extractor', CALIBRATION_SEED + 'extractor'.length * 104729, 'compact');
+  const structure = new THREE.Mesh(model.geometry, compact);
+  structure.name = 'calibration:detail:structure:extractor';
+  structure.position.set(-spacing * 1.5 + 3 * spacing + 4, 0, -6);
+  structure.rotation.y = SHEET_YAW;
+  structure.castShadow = true;
+  structure.receiveShadow = true;
+  group.add(structure);
+
+  return group;
+}
+
+/**
+ * The renderer's collapsed wreck stance, as static geometry.
+ *
+ * Kept in step with `EntityRenderer.drawWrecks` by hand. The proportions come from
+ * the rig, so a class collapses in proportion to itself, but the angles are
+ * duplicated rather than shared: the renderer builds instance matrices against a
+ * ring basis and this builds a plain object tree, and forcing one code path to
+ * serve both would tangle the render hot loop with the dev page.
+ */
+function addCollapsedMech(parent: THREE.Group, rig: MechRig, material: THREE.Material): void {
+  const hipY = rig.hipHeight * 0.34;
+  const add = (geometry: THREE.BufferGeometry, name: string): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = name;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+
+  const pelvis = add(rig.parts.pelvis, 'pelvis');
+  pelvis.position.y = hipY;
+
+  const torso = add(rig.parts.torso, 'torso');
+  torso.position.set(0, hipY + rig.height * 0.02, -rig.height * 0.01);
+  torso.rotation.x = -0.34;
+
+  for (const side of [-1, 1]) {
+    const hipX = side * rig.hipOffset;
+    const fold = 1.15 + side * 0.18;
+
+    const upper = add(rig.parts.upperLeg, `upperLeg:${side}`);
+    upper.position.set(hipX, hipY, 0);
+    upper.rotation.x = -fold;
+
+    const kneeY = hipY - Math.cos(fold) * rig.legUpper;
+    const kneeZ = Math.sin(fold) * rig.legUpper;
+    const lower = add(rig.parts.lowerLeg, `lowerLeg:${side}`);
+    lower.position.set(hipX, kneeY, kneeZ);
+    lower.rotation.x = -(fold - 2.05);
+
+    const ankleY = kneeY - Math.cos(fold - 2.05) * rig.legLower;
+    const ankleZ = kneeZ + Math.sin(fold - 2.05) * rig.legLower;
+    const foot = add(rig.parts.foot, `foot:${side}`);
+    foot.position.set(hipX, Math.max(ankleY, 0.05), ankleZ);
+    foot.rotation.x = 0.5;
+  }
 }
 
 // ---------------------------------------------------------------------------
