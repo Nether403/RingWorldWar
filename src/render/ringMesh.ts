@@ -23,7 +23,7 @@ import {
   RING_HALF_WIDTH,
   RING_RADIUS,
 } from '@core/constants';
-import type { Terrain } from '@gen/terrain';
+import type { SurfaceFields, Terrain } from '@gen/terrain';
 import { RIM_WALL_HEIGHT } from '@gen/terrain';
 import type { RenderAnchor } from './anchor';
 import { makeLowTerrainMaterial, makeTerrainMaterial, type TerrainUniforms } from './materials/terrainMaterial';
@@ -53,6 +53,7 @@ export class RingMesh {
       terrain,
       detail === 'low' ? LOW_SEG_S : SEG_S,
       detail === 'low' ? LOW_SEG_Z : SEG_Z,
+      detail !== 'low',
     );
     this.geometries.set(detail, geometry);
     const { material: fullMaterial, uniforms } = makeTerrainMaterial();
@@ -77,6 +78,7 @@ export class RingMesh {
         this.terrain,
         detail === 'low' ? LOW_SEG_S : SEG_S,
         detail === 'low' ? LOW_SEG_Z : SEG_Z,
+        detail !== 'low',
       );
       this.geometries.set(detail, geometry);
     }
@@ -122,7 +124,12 @@ export class RingMesh {
  * genuinely closes into a torus-section: walk far enough spinward and you
  * arrive back where you started, upside down relative to where you began.
  */
-function buildRingGeometry(terrain: Terrain, cols: number, rows: number): THREE.BufferGeometry {
+function buildRingGeometry(
+  terrain: Terrain,
+  cols: number,
+  rows: number,
+  bakeFields: boolean,
+): THREE.BufferGeometry {
   const vertCount = cols * (rows + 1);
 
   const positions = new Float32Array(vertCount * 3);
@@ -131,6 +138,20 @@ function buildRingGeometry(terrain: Terrain, cols: number, rows: number): THREE.
   // Surface coordinates travel with the vertex so the shader can do stable,
   // wrap-correct procedural texturing without deriving it from world position.
   const surface = new Float32Array(vertCount * 2);
+
+  // Terrain's own answer for what material goes where, and how occluded each
+  // vertex is, resolved once at build time and interpolated by the hardware.
+  //
+  // QUANTISED, not float32. Splat weights are a partition of unity and AO is a
+  // 0..1 multiplier, so a 1/255 step is far below anything visible, and curvature
+  // only ever drives the strength of a wear effect. At float32 these three
+  // attributes are 24 bytes a vertex, about 4.0 MB on the full ring; quantised
+  // they are 6 bytes, about 1.0 MB. On the integrated GPU this has to run on,
+  // that 3 MB is worth more than precision nobody can see.
+  const splat = bakeFields ? new Uint8Array(vertCount * 4) : null;
+  const curvature = bakeFields ? new Int8Array(vertCount) : null;
+  const ambient = bakeFields ? new Uint8Array(vertCount) : null;
+  const fields: SurfaceFields = { dust: 0, rock: 0, deck: 0, rim: 0, curvature: 0, skyView: 0 };
 
   const n = { x: 0, y: 0, z: 0 };
 
@@ -162,6 +183,18 @@ function buildRingGeometry(terrain: Terrain, cols: number, rows: number): THREE.
       uvs[idx * 2 + 1] = z / 512;
       surface[idx * 2] = s;
       surface[idx * 2 + 1] = z;
+
+      if (splat && curvature && ambient) {
+        terrain.surfaceFieldsAt(s, z, fields);
+        splat[idx * 4] = Math.round(fields.dust * 255);
+        splat[idx * 4 + 1] = Math.round(fields.rock * 255);
+        splat[idx * 4 + 2] = Math.round(fields.deck * 255);
+        splat[idx * 4 + 3] = Math.round(fields.rim * 255);
+        // Int8 normalised: -127..127 maps to -1..1, so clamp to 127 rather than
+        // 128, or a full bowl wraps around to a crest.
+        curvature[idx] = Math.max(-127, Math.min(127, Math.round(fields.curvature * 127)));
+        ambient[idx] = Math.round(fields.skyView * 255);
+      }
     }
   }
 
@@ -190,6 +223,11 @@ function buildRingGeometry(terrain: Terrain, cols: number, rows: number): THREE.
   geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geo.setAttribute('aSurface', new THREE.BufferAttribute(surface, 2));
+  if (splat && curvature && ambient) {
+    geo.setAttribute('aSplat', new THREE.BufferAttribute(splat, 4, true));
+    geo.setAttribute('aCurvature', new THREE.BufferAttribute(curvature, 1, true));
+    geo.setAttribute('aAO', new THREE.BufferAttribute(ambient, 1, true));
+  }
   geo.setIndex(new THREE.BufferAttribute(indices, 1));
   // Bounding sphere must be set manually since we never frustum-cull this.
   geo.boundingSphere = new THREE.Sphere(
@@ -198,3 +236,5 @@ function buildRingGeometry(terrain: Terrain, cols: number, rows: number): THREE.
   );
   return geo;
 }
+
+

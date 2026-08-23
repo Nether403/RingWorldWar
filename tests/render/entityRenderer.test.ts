@@ -29,14 +29,99 @@ describe('EntityRenderer quality materials', () => {
     expect(qualityValues()).toEqual([0, 0]);
   });
 
-  it('creates Needle cloak and both exclusive-unit wreck buckets', () => {
+  it('creates Needle cloak buckets and sizes leg buckets for two legs a mech', () => {
     const renderer = new EntityRenderer(19) as unknown as {
       cloakMeshes: Map<string, THREE.InstancedMesh>;
-      wreckMeshes: Map<string, THREE.InstancedMesh>;
+      mechMeshes: Map<string, THREE.InstancedMesh>;
     };
     expect(renderer.cloakMeshes.has('needle|torso|1')).toBe(true);
-    expect(renderer.wreckMeshes.has('bulwark')).toBe(true);
-    expect(renderer.wreckMeshes.has('needle')).toBe(true);
+
+    // Wrecks no longer have buckets of their own: they are drawn as collapsed
+    // mechs into the faction hull buckets, which is what gives them faction
+    // identity, panel lines, and legs for no extra draw call.
+    expect([...renderer.mechMeshes.keys()].some((key) => key.startsWith('wreck'))).toBe(false);
+
+    // Legs and feet are pushed twice a mech, so their buckets must be twice as
+    // deep. Sized equally, they filled at half the mech count and the extra pushes
+    // were dropped, leaving a torso hovering over nothing.
+    const torso = renderer.mechMeshes.get('vanguard|torso|0')!;
+    for (const part of ['upperLeg', 'lowerLeg', 'foot']) {
+      const bucket = renderer.mechMeshes.get(`vanguard|${part}|0`)!;
+      expect(bucket.instanceMatrix.count, `${part} capacity`).toBe(torso.instanceMatrix.count * 2);
+    }
+    expect(renderer.mechMeshes.get('vanguard|pelvis|0')!.instanceMatrix.count)
+      .toBe(torso.instanceMatrix.count);
+  });
+
+  it('draws a wreck as a whole collapsed mech, not a lone torso', () => {
+    const terrain = {
+      heightAt: () => 0,
+      slopeAt: () => 0,
+      isBuildable: () => true,
+    } as unknown as Terrain;
+    const world = new World(terrain, 61);
+    const unit = world.spawnUnit(Faction.Compact, 'vanguard', 0, 0);
+    world.applyDamage(unit.id, 100_000, 'explosive', Faction.Choir);
+    expect(world.wreckages).toHaveLength(1);
+
+    const renderer = new EntityRenderer(61);
+    const anchor = new RenderAnchor();
+    anchor.set(0, 0);
+    renderer.update(world, anchor, 0, Faction.Compact, 1);
+
+    const exact = renderer as unknown as { mechMeshes: Map<string, THREE.InstancedMesh> };
+    // Every part of the machine is present, both legs included.
+    expect(exact.mechMeshes.get('vanguard|pelvis|0')!.count).toBe(1);
+    expect(exact.mechMeshes.get('vanguard|torso|0')!.count).toBe(1);
+    for (const part of ['upperLeg', 'lowerLeg', 'foot']) {
+      expect(exact.mechMeshes.get(`vanguard|${part}|0`)!.count, part).toBe(2);
+    }
+
+    // And it carries full per-instance damage, which is what lights the internals
+    // and darkens the plating through the path the live mechs already use.
+    const damage = exact.mechMeshes.get('vanguard|torso|0')!.geometry
+      .getAttribute('instanceDamage') as THREE.InstancedBufferAttribute;
+    expect(damage.getX(0)).toBeCloseTo(1, 6);
+  });
+
+  it('never draws a partial mech when a bucket saturates', () => {
+    // 128 mechs of one class and faction is the bucket depth, so this run pushes
+    // right up to the limit and past it.
+    //
+    // The failure this guards against is specific and was real: the pushes used to
+    // be checked one at a time, and because the legs are pushed last and consume
+    // two slots each, the mech that happened to straddle the limit rendered as a
+    // torso and pelvis hovering over nothing. Whatever the cap is, the invariant is
+    // that every part count stays consistent with a whole number of mechs.
+    const terrain = {
+      heightAt: () => 0,
+      slopeAt: () => 0,
+      isBuildable: () => true,
+    } as unknown as Terrain;
+    const world = new World(terrain, 73);
+    for (let index = 0; index < 200; index++) {
+      world.spawnUnit(Faction.Compact, 'vanguard', index * 12, ((index % 7) - 3) * 20);
+    }
+    const renderer = new EntityRenderer(73);
+    const anchor = new RenderAnchor();
+    anchor.set(0, 0);
+    renderer.update(world, anchor, 0, Faction.Compact, 1);
+
+    const exact = renderer as unknown as { mechMeshes: Map<string, THREE.InstancedMesh> };
+    const pelvis = exact.mechMeshes.get('vanguard|pelvis|0')!;
+    const torso = exact.mechMeshes.get('vanguard|torso|0')!;
+    const drawn = pelvis.count;
+
+    // Enough units to actually reach the cap, or the test proves nothing.
+    expect(drawn).toBeGreaterThan(100);
+    expect(torso.count).toBe(drawn);
+    for (const part of ['upperLeg', 'lowerLeg', 'foot']) {
+      expect(exact.mechMeshes.get(`vanguard|${part}|0`)!.count, part).toBe(drawn * 2);
+    }
+    // And nothing overran its buffer.
+    for (const [key, mesh] of exact.mechMeshes) {
+      expect(mesh.count, key).toBeLessThanOrEqual(mesh.instanceMatrix.count);
+    }
   });
 
   it('adds render-only recoil to the torso without moving the pelvis', () => {
@@ -181,7 +266,7 @@ describe('EntityRenderer quality materials', () => {
       .toBeCloseTo(0, 6);
     expect((compactTorso.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(1))
       .toBeCloseTo(0.7, 6);
-    const compactPhase = compactTorso.geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute;
+    const compactPhase = compactTorso.geometry.getAttribute('instanceVariation') as THREE.InstancedBufferAttribute;
     expect(compactPhase.getX(0)).not.toBeCloseTo(compactPhase.getX(1), 6);
     expect(exact.mats[Faction.Compact]!.uniforms.uTime.value).toBe(2);
     expect((choirTorso.geometry.getAttribute('instanceDamage') as THREE.InstancedBufferAttribute).getX(0))
@@ -242,8 +327,11 @@ describe('EntityRenderer quality materials', () => {
     world.applyDamage(unit.id, 100_000, 'explosive', Faction.Choir);
     const wreck = world.wreckages[0]!;
     const renderer = new EntityRenderer(57);
-    const exact = renderer as unknown as { wreckMeshes: Map<string, THREE.InstancedMesh> };
-    const mesh = exact.wreckMeshes.get('vanguard')!;
+    const exact = renderer as unknown as { mechMeshes: Map<string, THREE.InstancedMesh> };
+    // The pelvis, because it is the one part placed with an identity local rotation,
+    // so what this reads is purely the terrain normal and the topple. The torso now
+    // carries a deliberate collapse pitch of its own, which would confound it.
+    const mesh = exact.mechMeshes.get('vanguard|pelvis|0')!;
     const anchor = new RenderAnchor();
     const upright = new THREE.Matrix4();
     const fallen = new THREE.Matrix4();

@@ -20,6 +20,7 @@
 
 import * as THREE from 'three';
 import { Rng } from '@core/rng';
+import { SURFACE_GLSL } from '@render/materials/surface.glsl';
 
 export const MASK_HULL = 0;
 export const MASK_EMISSIVE = 1;
@@ -112,9 +113,261 @@ class MeshBuilder {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute('aMask', new THREE.Float32BufferAttribute(this.mask, 1));
     g.setIndex(this.idx);
+    // Convexity and occlusion travel as ONE vec2 rather than two float attributes.
+    // Every attribute is a vertex fetch and every varying an interpolator slot, and
+    // the hull shader is already carrying fifteen floats of varyings; see the note
+    // on the frame budget in makeHullMaterial.
+    const { curvature, occlusion } = this.weldedSurfaceFields();
+    const field = new Float32Array(curvature.length * 2);
+    for (let vertex = 0; vertex < curvature.length; vertex++) {
+      field[vertex * 2] = curvature[vertex]!;
+      field[vertex * 2 + 1] = occlusion[vertex]!;
+    }
+    g.setAttribute('aSurfaceField', new THREE.Float32BufferAttribute(field, 2));
     g.computeBoundingSphere();
     return g;
   }
+
+  /**
+   * Per-vertex convexity and ambient occlusion, derived by welding on position.
+   *
+   * WHY THIS EXISTS. `quad` pushes four fresh vertices per quad so that every face
+   * can carry its own flat normal, which is what gives the chamfers their hard
+   * highlight. The cost is that nothing in the mesh knows where an edge is, or
+   * which side of one it is on. So edge wear was faked as
+   * `smoothstep(0.55, 1.0, grain)` on a noise field -- bright metal wherever the
+   * noise happened to peak, which is not where a machine actually wears.
+   *
+   * WELDED FOR DATA ONLY, NOT FOR GEOMETRY. Vertices are never merged and normals
+   * are never averaged: doing either would round off the chamfers and lose the
+   * hard-surface read that `docs/art-direction.md` section 7 depends on. The weld
+   * exists purely to answer two questions per position, which are then written back
+   * to every vertex sharing it.
+   */
+  private weldedSurfaceFields(): { curvature: number[]; occlusion: number[] } {
+    const vertexCount = this.pos.length / 3;
+
+    // Positions are keyed as ONE PACKED NUMBER, not as a formatted string.
+    //
+    // The obvious version builds a `${x},${y},${z}` key per vertex, and measured on
+    // the full roster -- twelve mechs across two factions plus twenty-four
+    // structures, about 150k vertices -- that cost 104 ms of a 142 ms build. It is
+    // the same allocation fault as the boxed sort in Task 8, in a different costume.
+    //
+    // Quantising to a millimetre over a +/-64 m range is 17 bits an axis and 51
+    // bits for the three, which a float64 holds exactly. A millimetre is far below
+    // any feature on this geometry, where the smallest greeble is around 0.1 m, and
+    // the positions that need to match are usually bit-identical anyway because
+    // they were computed by the same expression.
+    const quantum = 1_000;
+    const bias = 64 * quantum;
+    const axisSpan = bias * 2;
+    const keyOf = (vertex: number): number => {
+      const x = Math.round(this.pos[vertex * 3]! * quantum) + bias;
+      const y = Math.round(this.pos[vertex * 3 + 1]! * quantum) + bias;
+      const z = Math.round(this.pos[vertex * 3 + 2]! * quantum) + bias;
+      return (x * axisSpan + y) * axisSpan + z;
+    };
+
+    // Position groups, their summed face normal, and their neighbours.
+    const groupOf = new Int32Array(vertexCount);
+    const groups = new Map<number, number>();
+    const normalSum: number[] = [];
+    const groupVertex: number[] = [];
+    for (let vertex = 0; vertex < vertexCount; vertex++) {
+      const key = keyOf(vertex);
+      let group = groups.get(key);
+      if (group === undefined) {
+        group = groupVertex.length;
+        groups.set(key, group);
+        groupVertex.push(vertex);
+        normalSum.push(0, 0, 0);
+      }
+      groupOf[vertex] = group;
+      normalSum[group * 3] = normalSum[group * 3]! + this.nrm[vertex * 3]!;
+      normalSum[group * 3 + 1] = normalSum[group * 3 + 1]! + this.nrm[vertex * 3 + 1]!;
+      normalSum[group * 3 + 2] = normalSum[group * 3 + 2]! + this.nrm[vertex * 3 + 2]!;
+    }
+
+    const groupCount = groupVertex.length;
+    // Adjacency in compressed-row form: a count pass, a prefix sum, then a fill.
+    // Not deduplicated, and not by accident -- a neighbour shared by two triangles
+    // is listed twice, which weights the curvature mean by incident area rather
+    // than by neighbour count. It is also the reason this can be flat typed arrays
+    // instead of a Set per group, which is where this pass used to spend its time.
+    const degree = new Int32Array(groupCount + 1);
+    const triangleGroups = new Int32Array(this.idx.length);
+    for (let at = 0; at < this.idx.length; at++) triangleGroups[at] = groupOf[this.idx[at]!]!;
+    for (let triangle = 0; triangle < triangleGroups.length; triangle += 3) {
+      degree[triangleGroups[triangle]!]! += 2;
+      degree[triangleGroups[triangle + 1]!]! += 2;
+      degree[triangleGroups[triangle + 2]!]! += 2;
+    }
+    const start = new Int32Array(groupCount + 1);
+    for (let group = 0; group < groupCount; group++) start[group + 1] = start[group]! + degree[group]!;
+    const cursor = start.slice();
+    const adjacency = new Int32Array(start[groupCount]!);
+    for (let triangle = 0; triangle < triangleGroups.length; triangle += 3) {
+      const a = triangleGroups[triangle]!;
+      const b = triangleGroups[triangle + 1]!;
+      const c = triangleGroups[triangle + 2]!;
+      adjacency[cursor[a]!++] = b; adjacency[cursor[a]!++] = c;
+      adjacency[cursor[b]!++] = a; adjacency[cursor[b]!++] = c;
+      adjacency[cursor[c]!++] = a; adjacency[cursor[c]!++] = b;
+    }
+
+    // Convexity: the mean, over the ring of neighbours, of how far this position
+    // stands out along its own averaged normal. A chamfer corner sticks out past
+    // its neighbours and comes out positive; the floor of a panel channel is set
+    // back behind them and comes out negative.
+    const groupCurvature = new Float32Array(groupCount);
+    for (let group = 0; group < groupCount; group++) {
+      const vertex = groupVertex[group]!;
+      let nx = normalSum[group * 3]!;
+      let ny = normalSum[group * 3 + 1]!;
+      let nz = normalSum[group * 3 + 2]!;
+      const length = Math.hypot(nx, ny, nz);
+      if (length < 1e-6) continue;
+      nx /= length; ny /= length; nz /= length;
+
+      const px = this.pos[vertex * 3]!;
+      const py = this.pos[vertex * 3 + 1]!;
+      const pz = this.pos[vertex * 3 + 2]!;
+      let sum = 0;
+      let count = 0;
+      for (let slot = start[group]!; slot < start[group + 1]!; slot++) {
+        const at = groupVertex[adjacency[slot]!]!;
+        const dx = px - this.pos[at * 3]!;
+        const dy = py - this.pos[at * 3 + 1]!;
+        const dz = pz - this.pos[at * 3 + 2]!;
+        const span = Math.hypot(dx, dy, dz);
+        if (span < 1e-6) continue;
+        sum += (dx * nx + dy * ny + dz * nz) / span;
+        count++;
+      }
+      // Scaled up because a chamfer band is shallow: raw values on real hull
+      // geometry sit around a tenth, and the shader wants a 0..1 signal.
+      if (count > 0) groupCurvature[group] = clampNumber((sum / count) * 3.2, -1, 1);
+    }
+
+    const groupOcclusion = this.groupOcclusion(groupVertex);
+
+    const curvature = new Array<number>(vertexCount);
+    const occlusion = new Array<number>(vertexCount);
+    for (let vertex = 0; vertex < vertexCount; vertex++) {
+      const group = groupOf[vertex]!;
+      curvature[vertex] = groupCurvature[group]!;
+      occlusion[vertex] = groupOcclusion[group]!;
+    }
+    return { curvature, occlusion };
+  }
+
+  /**
+   * Ambient occlusion per position, from a coarse occupancy grid.
+   *
+   * CURVATURE WOULD NOT HAVE ANSWERED THIS. Convexity is local to the surface, so
+   * it knows a channel floor is recessed but has no idea that a greeble box is
+   * sitting on the plate next to it, or that a ram runs down the outside of a
+   * thigh. Those are the contacts that actually read as assembled hardware, and
+   * they need to know about geometry that is nearby rather than adjacent.
+   *
+   * Triangle centroids are dropped into a 24-cube grid over the part's bounds, and
+   * each position then probes a short distance along its own normal and around it.
+   * A ray cast against every triangle would be exact and is not affordable at load
+   * for six mech classes and twelve structures; an occupancy probe is a few
+   * thousand integer lookups a part and lands the shading in the same places.
+   */
+  private groupOcclusion(groupVertex: number[]): Float32Array {
+    const groupCount = groupVertex.length;
+    const occlusion = new Float32Array(groupCount).fill(1);
+    if (this.idx.length === 0) return occlusion;
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (let vertex = 0; vertex < this.pos.length; vertex += 3) {
+      const x = this.pos[vertex]!, y = this.pos[vertex + 1]!, z = this.pos[vertex + 2]!;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    const resolution = 24;
+    const spanX = Math.max(maxX - minX, 1e-3);
+    const spanY = Math.max(maxY - minY, 1e-3);
+    const spanZ = Math.max(maxZ - minZ, 1e-3);
+    const cell = Math.max(spanX, spanY, spanZ) / resolution;
+
+    const occupied = new Uint8Array(resolution * resolution * resolution);
+    const cellIndex = (x: number, y: number, z: number): number => {
+      const i = Math.min(resolution - 1, Math.max(0, Math.floor((x - minX) / spanX * (resolution - 1))));
+      const j = Math.min(resolution - 1, Math.max(0, Math.floor((y - minY) / spanY * (resolution - 1))));
+      const k = Math.min(resolution - 1, Math.max(0, Math.floor((z - minZ) / spanZ * (resolution - 1))));
+      return (k * resolution + j) * resolution + i;
+    };
+    for (let triangle = 0; triangle < this.idx.length; triangle += 3) {
+      let cx = 0, cy = 0, cz = 0;
+      for (let corner = 0; corner < 3; corner++) {
+        const at = this.idx[triangle + corner]!;
+        cx += this.pos[at * 3]!; cy += this.pos[at * 3 + 1]!; cz += this.pos[at * 3 + 2]!;
+      }
+      occupied[cellIndex(cx / 3, cy / 3, cz / 3)] = 1;
+    }
+
+    // Probe directions in the upper hemisphere of the vertex normal, plus the
+    // normal itself. Few enough to be cheap, spread enough to notice a neighbour.
+    const probes: Array<[number, number, number]> = [
+      [0, 1, 0], [0.82, 0.57, 0], [-0.82, 0.57, 0], [0, 0.57, 0.82], [0, 0.57, -0.82],
+      [0.58, 0.58, 0.58], [-0.58, 0.58, 0.58], [0.58, 0.58, -0.58], [-0.58, 0.58, -0.58],
+    ];
+    const reach = cell * 2.2;
+
+    for (let group = 0; group < groupCount; group++) {
+      const vertex = groupVertex[group]!;
+      const px = this.pos[vertex * 3]!;
+      const py = this.pos[vertex * 3 + 1]!;
+      const pz = this.pos[vertex * 3 + 2]!;
+      let nx = this.nrm[vertex * 3]!;
+      let ny = this.nrm[vertex * 3 + 1]!;
+      let nz = this.nrm[vertex * 3 + 2]!;
+      const length = Math.hypot(nx, ny, nz);
+      if (length < 1e-6) continue;
+      nx /= length; ny /= length; nz /= length;
+
+      // Rotate the probe set so its pole follows the normal.
+      let tx: number, ty: number, tz: number;
+      if (Math.abs(ny) < 0.99) { tx = -nz; ty = 0; tz = nx; } else { tx = 1; ty = 0; tz = 0; }
+      const tLength = Math.hypot(tx, ty, tz) || 1;
+      tx /= tLength; ty /= tLength; tz /= tLength;
+      const bx = ny * tz - nz * ty;
+      const by = nz * tx - nx * tz;
+      const bz = nx * ty - ny * tx;
+
+      let blocked = 0;
+      for (const [ax, ay, az] of probes) {
+        const dx = tx * ax + nx * ay + bx * az;
+        const dy = ty * ax + ny * ay + by * az;
+        const dz = tz * ax + nz * ay + bz * az;
+        // Two steps out, so a surface one cell away registers and the vertex's own
+        // cell does not count against it.
+        let hit = false;
+        for (let step = 1; step <= 2; step++) {
+          const distance = reach * step * 0.5;
+          if (occupied[cellIndex(px + dx * distance, py + dy * distance, pz + dz * distance)] === 1) {
+            hit = true;
+            break;
+          }
+        }
+        if (hit) blocked++;
+      }
+      // Never fully dark: this is a contact shading term, not a light block.
+      occlusion[group] = 1 - (blocked / probes.length) * 0.55;
+    }
+
+    return occlusion;
+  }
+}
+
+function clampNumber(value: number, low: number, high: number): number {
+  return value < low ? low : value > high ? high : value;
 }
 
 const _v = new THREE.Vector3();
@@ -134,8 +387,14 @@ export interface BlockSpec {
   /** Skew the top face along x/z, for leaning forms. */
   lean?: [number, number];
   mask?: number;
-  /** Inset panel divisions on the four side faces. */
+  /** Horizontal inset channels ringing the four side faces. */
   panels?: number;
+  /**
+   * Per-plate offset jitter, 0..1, so the divisions do not read as a regular
+   * grid. Needs `panelSeed` to be deterministic.
+   */
+  panelVariation?: number;
+  panelSeed?: number;
 }
 
 /**
@@ -184,84 +443,279 @@ function addBlock(mb: MeshBuilder, spec: BlockSpec): void {
   mb.quad(r0[3]!, r0[2]!, r0[1]!, r0[0]!, mask);
   mb.quad(r3[0]!, r3[1]!, r3[2]!, r3[3]!, mask);
 
-  // Side bands: lower chamfer, main wall, upper chamfer.
+  // Chamfer bands, top and bottom. The main wall between them is emitted by
+  // addPanelledWall, which subdivides it around any inset channels.
   for (let i = 0; i < 4; i++) {
     const j = (i + 1) % 4;
     mb.quad(r0[i]!, r0[j]!, r1[j]!, r1[i]!, mask);
-    mb.quad(r1[i]!, r1[j]!, r2[j]!, r2[i]!, mask);
     mb.quad(r2[i]!, r2[j]!, r3[j]!, r3[i]!, mask);
   }
 
-  // Inset panel lines on the main wall: a recessed strip that catches shadow.
-  const panels = spec.panels ?? 0;
-  if (panels > 0) {
-    const d = Math.min(sx, sz) * 0.035;
-    for (let i = 0; i < 4; i++) {
-      const j = (i + 1) % 4;
-      for (let p = 1; p <= panels; p++) {
-        const t = p / (panels + 1);
-        const y0 = b + (sy - 2 * b) * t - d * 0.5;
-        const y1 = y0 + d;
-        const a0 = lerpV(r1[i]!, r2[i]!, (y0 - b) / Math.max(sy - 2 * b, 1e-4));
-        const a1 = lerpV(r1[j]!, r2[j]!, (y0 - b) / Math.max(sy - 2 * b, 1e-4));
-        const a2 = lerpV(r1[j]!, r2[j]!, (y1 - b) / Math.max(sy - 2 * b, 1e-4));
-        const a3 = lerpV(r1[i]!, r2[i]!, (y1 - b) / Math.max(sy - 2 * b, 1e-4));
-        // Pull the strip inward so it reads as a groove.
-        const cx = px + lx * 0.5;
-        const cz = pz + lz * 0.5;
-        for (const v of [a0, a1, a2, a3]) {
-          v.x += (cx - v.x) * 0.045;
-          v.z += (cz - v.z) * 0.045;
-        }
-        mb.quad(a0, a1, a2, a3, MASK_RECESS);
-      }
-    }
+  const centre = new THREE.Vector3(px + lx * 0.5, 0, pz + lz * 0.5);
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    addPanelledWall(mb, r1[i]!, r1[j]!, r2[j]!, r2[i]!, centre, mask, spec);
   }
 }
 
-function lerpV(a: THREE.Vector3, b: THREE.Vector3, t: number): THREE.Vector3 {
-  return new THREE.Vector3().lerpVectors(a, b, t);
+/**
+ * One side wall of a block, subdivided around its inset channels.
+ *
+ * WHY THIS REPLACED A FLOATING STRIP. The previous version emitted the wall as a
+ * single quad and then a second quad pulled slightly inward across it. That is
+ * not a channel: the wall still spans the full height, so the strip sits behind
+ * solid geometry, and the two coplanar-ish surfaces have no side walls between
+ * them. It read as a faint tone change rather than as a groove, and having no
+ * concave geometry it could not catch the occlusion Task 4 and Task 10 added.
+ *
+ * A real channel needs the wall broken into bands with gaps where the channels
+ * go, and each channel closed with two lips and a floor. That is three quads a
+ * channel plus one a band, so a wall with N horizontal channels is 5N+1 quads
+ * against the 2 it used to be. The cost is real and is paid for out of the
+ * greeble budget in PROFILES, which is a good exchange: a channel reads as
+ * machined surface, a scattered box reads as noise.
+ */
+function addPanelledWall(
+  mb: MeshBuilder,
+  bottomLeft: THREE.Vector3,
+  bottomRight: THREE.Vector3,
+  topRight: THREE.Vector3,
+  topLeft: THREE.Vector3,
+  centre: THREE.Vector3,
+  mask: number,
+  spec: BlockSpec,
+): void {
+  // HORIZONTAL CHANNELS ONLY, and identical on every face.
+  //
+  // Vertical divisions were attempted and withdrawn. The reason is structural
+  // rather than a matter of taste, so it is recorded here.
+  //
+  // A horizontal channel closes cleanly. It splits the wall into bands whose side
+  // edges run up the block's corners, where they meet the neighbouring face's
+  // bands exactly, and whose top and bottom edges span the full face width, where
+  // they meet the single-quad chamfer bands exactly.
+  //
+  // A vertical channel does neither. Its bands are split across the width, so the
+  // wall's boundary at the chamfer is subdivided while the chamfer quad is not --
+  // a T-junction, which is a hole. Closing it means subdividing the chamfer bands
+  // to match, and cutting both axes into one face additionally means matching
+  // every lip to its neighbour's subdivision in both axes, per band. That is a
+  // genuine 2D subdivision of the whole block rather than a small addition, and
+  // the read it buys is modest next to the horizontal channels, because plate
+  // joins on armour are dominated by the horizontal run. Left out rather than
+  // shipped leaking.
+  const channelCount = Math.max(0, Math.floor(spec.panels ?? 0));
+  if (channelCount === 0) {
+    mb.quad(bottomLeft, bottomRight, topRight, topLeft, mask);
+    return;
+  }
+
+  const [sx, , sz] = spec.size;
+  // Channel width as a fraction of the wall, and depth in metres. Depth is
+  // clamped so a channel in a thin plate cannot punch through the far side.
+  const span = Math.min(sx, sz);
+  const halfWidth = 0.055;
+  const depth = Math.min(span * 0.06, span * 0.24);
+  const jitter = Math.min(Math.max(spec.panelVariation ?? 0, 0), 1);
+  // PER BLOCK, NOT PER FACE. Seeding this with the face index was the other hole
+  // the watertightness test found: each face then put its channel at a slightly
+  // different height, so the band edges meeting at a corner spanned different
+  // ranges and nothing paired. It was also wrong to look at -- a channel machined
+  // into a housing continues around the corner, it does not step at every edge.
+  const seed = spec.panelSeed ?? 0;
+
+  // Deterministic per-plate offset, so a run of plates is irregular but repeats
+  // exactly for a given seed.
+  const offsetAt = (index: number): number => {
+    if (jitter <= 0) return 0;
+    const hashed = Math.sin((seed + index * 31.7) * 12.9898) * 43758.5453;
+    return (hashed - Math.floor(hashed) - 0.5) * jitter * 0.16;
+  };
+
+  // Bilinear point on the wall: u across, v up.
+  const at = (u: number, v: number): THREE.Vector3 => {
+    const bottom = new THREE.Vector3().lerpVectors(bottomLeft, bottomRight, u);
+    const top = new THREE.Vector3().lerpVectors(topLeft, topRight, u);
+    return bottom.lerp(top, v);
+  };
+  const sunk = (u: number, v: number): THREE.Vector3 => {
+    const point = at(u, v);
+    // Inward along the horizontal direction to the block's axis, so the floor of
+    // the channel stays parallel to the wall it is cut into.
+    const inward = new THREE.Vector3(centre.x - point.x, 0, centre.z - point.z);
+    const length = Math.hypot(inward.x, inward.z);
+    if (length > 1e-5) point.addScaledVector(inward.multiplyScalar(1 / length), depth);
+    return point;
+  };
+
+  const centres: number[] = [];
+  for (let c = 1; c <= channelCount; c++) centres.push(c / (channelCount + 1) + offsetAt(c));
+
+  // Flat bands between the channels, each spanning the full face width so its top
+  // and bottom edges pair with the chamfer quads and its side edges pair with the
+  // neighbouring face.
+  let cursor = 0;
+  for (const centre of centres) {
+    const low = Math.max(cursor, centre - halfWidth);
+    if (low > cursor) mb.quad(at(0, cursor), at(1, cursor), at(1, low), at(0, low), mask);
+    cursor = Math.min(1, centre + halfWidth);
+  }
+  if (cursor < 1) mb.quad(at(0, cursor), at(1, cursor), at(1, 1), at(0, 1), mask);
+
+  // The channels themselves: a recessed floor and the two lips that make it a
+  // channel rather than a plate. No end caps needed, because the channel runs the
+  // full width of the face and continues into the neighbouring face's channel at
+  // the same height, closing around the block.
+  for (const centre of centres) {
+    const low = Math.max(0, centre - halfWidth);
+    const high = Math.min(1, centre + halfWidth);
+    if (high - low < 1e-4) continue;
+    mb.quad(sunk(0, low), sunk(1, low), sunk(1, high), sunk(0, high), MASK_RECESS);
+    mb.quad(at(0, low), at(1, low), sunk(1, low), sunk(0, low), MASK_RECESS);
+    mb.quad(sunk(0, high), sunk(1, high), at(1, high), at(0, high), MASK_RECESS);
+  }
 }
 
-/** Scatter small boxes over the top and sides of a volume. */
+
+
+/**
+ * Detail tier for greeble passes.
+ *
+ * `full` is what a mech in front of the camera gets. `reduced` drops the smallest
+ * forms and thins the count, and `silhouette` keeps only what changes the outline.
+ * Task 11 introduces the parameter and every caller asks for `full`; Task 13 is
+ * what will select between them per LOD. Adding it here rather than there keeps
+ * the LOD work from having to reshape this function while also building a mesh
+ * cache around it.
+ */
+export type GreebleTier = 'full' | 'reduced' | 'silhouette';
+
+export interface GreebleOptions {
+  /**
+   * Where detail is worth spending. Greebles cluster toward these heights as
+   * fractions of the volume, which is what puts hardware at joints and vents
+   * instead of scattering it evenly over a flat plate. An even scatter is the
+   * thing that reads as noise.
+   */
+  clusters?: number[];
+  tier?: GreebleTier;
+  /** Fraction that come out as cylinders or pipes rather than boxes. */
+  roundFraction?: number;
+}
+
+/** Scatter small hardware over the top and sides of a volume. */
 function addGreebles(
   mb: MeshBuilder,
   bounds: [number, number, number],
   origin: [number, number, number],
   count: number,
   rng: Rng,
+  options: GreebleOptions = {},
 ): void {
   const [sx, sy, sz] = bounds;
-  for (let i = 0; i < count; i++) {
-    const w = rng.range(0.08, 0.26) * Math.min(sx, sz);
+  const tier = options.tier ?? 'full';
+  const clusters = options.clusters ?? [];
+  const roundFraction = options.roundFraction ?? 0.28;
+
+  const effective = tier === 'full' ? count : tier === 'reduced' ? Math.ceil(count * 0.5) : Math.ceil(count * 0.2);
+  // Below this fraction of the volume a greeble is smaller than a pixel at
+  // tactical range, so at reduced tiers it is cost with no read.
+  const minimumScale = tier === 'full' ? 0.08 : 0.16;
+
+  for (let i = 0; i < effective; i++) {
+    const w = rng.range(minimumScale, 0.26) * Math.min(sx, sz);
     const h = rng.range(0.04, 0.16) * sy;
-    const onTop = rng.chance(0.45);
-    if (onTop) {
-      addBlock(mb, {
-        size: [w, h, w * rng.range(0.6, 1.6)],
-        pos: [
-          origin[0] + rng.signed() * sx * 0.34,
-          origin[1] + sy,
-          origin[2] + rng.signed() * sz * 0.34,
-        ],
-        bevel: 0.2,
-        mask: rng.chance(0.16) ? MASK_EMISSIVE : MASK_METAL,
-      });
-    } else {
-      const side = rng.int(0, 1);
-      const off = rng.chance(0.5) ? 1 : -1;
-      addBlock(mb, {
-        size: side === 0 ? [w * 0.4, h, w] : [w, h, w * 0.4],
-        pos: [
-          origin[0] + (side === 0 ? off * sx * 0.5 : rng.signed() * sx * 0.32),
-          origin[1] + rng.range(0.15, 0.8) * sy,
-          origin[2] + (side === 1 ? off * sz * 0.5 : rng.signed() * sz * 0.32),
-        ],
-        bevel: 0.22,
-        mask: rng.chance(0.2) ? MASK_EMISSIVE : MASK_METAL,
-      });
+
+    // Pull the height toward a cluster when there is one, leaving some scatter so
+    // the result does not read as a row of identical fittings.
+    let heightFraction = rng.range(0.15, 0.8);
+    if (clusters.length > 0 && rng.chance(0.72)) {
+      const target = clusters[rng.int(0, clusters.length - 1)]!;
+      heightFraction = Math.min(1, Math.max(0, target + rng.signed() * 0.09));
     }
+
+    const round = rng.chance(roundFraction);
+    const onTop = rng.chance(0.45);
+
+    if (onTop) {
+      const pos: [number, number, number] = [
+        origin[0] + rng.signed() * sx * 0.34,
+        origin[1] + sy,
+        origin[2] + rng.signed() * sz * 0.34,
+      ];
+      if (round) {
+        // A short stack reads as a vent or a capped port.
+        addCylinder(mb, w * 0.5, h * 1.4, pos, tier === 'full' ? 8 : 6, MASK_METAL, w * 0.42);
+        if (rng.chance(0.4)) {
+          addCylinder(mb, w * 0.56, h * 0.3, [pos[0], pos[1] + h * 1.4, pos[2]], 6, MASK_EMISSIVE);
+        }
+      } else {
+        addBlock(mb, {
+          size: [w, h, w * rng.range(0.6, 1.6)],
+          pos,
+          bevel: 0.2,
+          mask: rng.chance(0.16) ? MASK_EMISSIVE : MASK_METAL,
+        });
+      }
+      continue;
+    }
+
+    const side = rng.int(0, 1);
+    const off = rng.chance(0.5) ? 1 : -1;
+    const pos: [number, number, number] = [
+      origin[0] + (side === 0 ? off * sx * 0.5 : rng.signed() * sx * 0.32),
+      origin[1] + heightFraction * sy,
+      origin[2] + (side === 1 ? off * sz * 0.5 : rng.signed() * sz * 0.32),
+    ];
+
+    if (round) {
+      // A pipe run down the flank, following the surface rather than sitting on it.
+      const length = rng.range(0.16, 0.42) * sy;
+      const from = new THREE.Vector3(pos[0], pos[1], pos[2]);
+      const to = new THREE.Vector3(pos[0], pos[1] - length, pos[2]);
+      addTube(mb, [from, to], w * 0.24, tier === 'full' ? 6 : 5, MASK_METAL);
+      continue;
+    }
+
+    addBlock(mb, {
+      size: side === 0 ? [w * 0.4, h, w] : [w, h, w * 0.4],
+      pos,
+      bevel: 0.22,
+      mask: rng.chance(0.2) ? MASK_EMISSIVE : MASK_METAL,
+    });
   }
+}
+
+/**
+ * A hydraulic ram: a cylinder body with a narrower rod emerging from it.
+ *
+ * Actuators are the single clearest "this is a machine that moves" cue on a walker,
+ * and there was exactly one on the whole mech, alongside the thigh. Joints without
+ * visible hardware read as if the limbs are simply glued together.
+ */
+function addRam(
+  mb: MeshBuilder,
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  radius: number,
+  segments = 5,
+): void {
+  const axis = new THREE.Vector3().subVectors(to, from);
+  const length = axis.length();
+  if (length < 1e-4) return;
+  axis.multiplyScalar(1 / length);
+
+  // Body over the lower 62%, rod over the rest, so the joint reads as extended.
+  //
+  // Two tubes, not three. An earlier version added a collar ring where the rod
+  // leaves the body, which is the detail that would catch a highlight -- but a ram
+  // on an 11 m mech is a few pixels across at tactical range, the collar was never
+  // going to resolve, and the third tube took the frozen Low frame budget from a
+  // 16.8 ms p95 to 33.3 ms. The step change in mask between body and rod does the
+  // same job for nothing.
+  const bodyEnd = new THREE.Vector3().copy(from).addScaledVector(axis, length * 0.62);
+  addTube(mb, [from, bodyEnd], radius, segments, MASK_METAL);
+  addTube(mb, [bodyEnd, to], radius * 0.52, segments, MASK_HULL);
 }
 
 /** A cylinder, for pistons, barrels and masts. */
@@ -289,13 +743,89 @@ function addCylinder(
       new THREE.Vector3(px + c0 * topRadius, py + height, pz + s0 * topRadius),
       mask,
     );
-    // Caps.
+    // Caps, both ends. The bottom one used to be missing, which left every
+    // cylinder in the game open: a piston seen from below, or any of the ones
+    // mounted clear of a hull, showed its inside face and read as a hole. It also
+    // meant no cylinder was watertight, so the geometry could not be checked.
     mb.triangle(
       new THREE.Vector3(px, py + height, pz),
       new THREE.Vector3(px + c0 * topRadius, py + height, pz + s0 * topRadius),
       new THREE.Vector3(px + c1 * topRadius, py + height, pz + s1 * topRadius),
       mask,
     );
+    mb.triangle(
+      new THREE.Vector3(px, py, pz),
+      new THREE.Vector3(px + c1 * radius, py, pz + s1 * radius),
+      new THREE.Vector3(px + c0 * radius, py, pz + s0 * radius),
+      mask,
+    );
+  }
+}
+
+/**
+ * A tube swept along a polyline, for trim and piping.
+ *
+ * Each segment gets its own ring, oriented by the segment direction, and rings
+ * are joined by quads. Corners are mitred by averaging the two adjacent segment
+ * directions, which keeps a bend from pinching.
+ *
+ * Piping is worth its triangles because it does something no box can: it crosses
+ * between parts and follows the chassis, which is what reads as a machine that was
+ * assembled rather than a pile of blocks. `docs/art-direction.md` section 7 wants
+ * silhouette first, so these are routed along edges where they break the outline.
+ */
+function addTube(
+  mb: MeshBuilder,
+  path: THREE.Vector3[],
+  radius: number,
+  segments: number,
+  mask: number,
+): void {
+  if (path.length < 2 || segments < 3) return;
+
+  // Per-node frame. A reference axis that is never parallel to the direction keeps
+  // the basis stable through a bend.
+  const rings: THREE.Vector3[][] = [];
+  for (let index = 0; index < path.length; index++) {
+    const previous = path[Math.max(0, index - 1)]!;
+    const next = path[Math.min(path.length - 1, index + 1)]!;
+    const direction = new THREE.Vector3().subVectors(next, previous);
+    if (direction.lengthSq() < 1e-10) direction.set(0, 1, 0);
+    direction.normalize();
+
+    const reference = Math.abs(direction.y) < 0.95
+      ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(1, 0, 0);
+    const tangent = new THREE.Vector3().crossVectors(direction, reference).normalize();
+    const bitangent = new THREE.Vector3().crossVectors(direction, tangent).normalize();
+
+    const ring: THREE.Vector3[] = [];
+    for (let step = 0; step < segments; step++) {
+      const angle = (step / segments) * Math.PI * 2;
+      ring.push(new THREE.Vector3()
+        .copy(path[index]!)
+        .addScaledVector(tangent, Math.cos(angle) * radius)
+        .addScaledVector(bitangent, Math.sin(angle) * radius));
+    }
+    rings.push(ring);
+  }
+
+  for (let index = 0; index < rings.length - 1; index++) {
+    const a = rings[index]!;
+    const b = rings[index + 1]!;
+    for (let step = 0; step < segments; step++) {
+      const next = (step + 1) % segments;
+      mb.quad(a[step]!, a[next]!, b[next]!, b[step]!, mask);
+    }
+  }
+
+  // Close both ends, so a tube is watertight like every other primitive.
+  const first = rings[0]!;
+  const last = rings[rings.length - 1]!;
+  for (let step = 0; step < segments; step++) {
+    const next = (step + 1) % segments;
+    mb.triangle(path[0]!, first[next]!, first[step]!, mask);
+    mb.triangle(path[path.length - 1]!, last[step]!, last[next]!, mask);
   }
 }
 
@@ -353,25 +883,63 @@ export function makeHullMaterial(factionColor: number, factionStyle = 0): {
         '#include <common>',
         `#include <common>
          attribute float aMask;
+         // Welded per-vertex convexity (x) and contact occlusion (y). See
+         // MeshBuilder.weldedSurfaceFields.
+         attribute vec2 aSurfaceField;
          #ifdef USE_INSTANCING
          attribute float instanceDamage;
-         attribute float instancePhase;
+         // x is animation phase, y is weathering. Packed into one attribute
+         // because every instanced attribute costs a buffer upload per frame; see
+         // withInstanceDamage in entityRenderer.ts.
+         attribute vec2 instanceVariation;
          #endif
          varying float vMask;
+         // Convexity, contact occlusion, per-unit weathering. One varying, for the
+         // same reason the attribute is one: interpolator slots are not free on the
+         // hardware the Low budget is frozen against.
+         varying vec3 vWear;
          varying vec3 vObjPos;
+         varying vec3 vObjNormal;
+         varying vec3 vViewTangent;
+         varying vec3 vViewBitangent;
          varying float vInstanceDamage;
-         varying float vInstancePhase;`,
+         varying float vInstancePhase;
+         // Deterministic tangent basis from a normal alone. Recomputed identically
+         // in the fragment stage, which is what lets an object-space gradient be
+         // rotated into view space without a tangent attribute.
+         void rww_basis(vec3 n, out vec3 t, out vec3 b) {
+           vec3 reference = abs(n.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+           t = normalize(cross(n, reference));
+           b = cross(n, t);
+         }`,
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
          vMask = aMask;
          vObjPos = position;
+         // Object-space normal, carried so the fragment stage can project surface
+         // detail triplanar without needing UVs or tangents. Generated hull parts
+         // have neither.
+         vObjNormal = normal;
+         {
+           // normalMatrix exists only in the vertex prefix, so the object basis is
+           // rotated to view space here and interpolated.
+           vec3 basisT;
+           vec3 basisB;
+           rww_basis(normalize(normal), basisT, basisB);
+           vViewTangent = normalize(normalMatrix * basisT);
+           vViewBitangent = normalize(normalMatrix * basisB);
+         }
          vInstanceDamage = 0.0;
          vInstancePhase = 0.0;
+         // A mid weathering value, so a non-instanced mech on the contact sheet is
+         // weathered like an average one rather than like a factory-fresh one.
+         vWear = vec3(aSurfaceField, 0.5);
          #ifdef USE_INSTANCING
          vInstanceDamage = instanceDamage;
-         vInstancePhase = instancePhase;
+         vInstancePhase = instanceVariation.x;
+         vWear.z = instanceVariation.y;
          #endif`,
       );
 
@@ -387,22 +955,44 @@ export function makeHullMaterial(factionColor: number, factionStyle = 0): {
          uniform float uLowQuality;
          varying float vMask;
          varying vec3 vObjPos;
+         varying vec3 vObjNormal;
+         varying vec3 vViewTangent;
+         varying vec3 vViewBitangent;
          varying float vInstanceDamage;
          varying float vInstancePhase;
-         float rww_damage() { return max(uDamage, vInstanceDamage); }
-         float hs_hash(vec3 p) {
-           p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
-           p *= 17.0;
-           return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+         varying vec3 vWear;
+         void rww_basis(vec3 n, out vec3 t, out vec3 b) {
+           vec3 reference = abs(n.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+           t = normalize(cross(n, reference));
+           b = cross(n, t);
          }
-         float hs_noise(vec3 p) {
-           vec3 i = floor(p), f = fract(p);
-           f = f * f * (3.0 - 2.0 * f);
-           return mix(
-             mix(mix(hs_hash(i), hs_hash(i + vec3(1,0,0)), f.x),
-                 mix(hs_hash(i + vec3(0,1,0)), hs_hash(i + vec3(1,1,0)), f.x), f.y),
-             mix(mix(hs_hash(i + vec3(0,0,1)), hs_hash(i + vec3(1,0,1)), f.x),
-                 mix(hs_hash(i + vec3(0,1,1)), hs_hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+         float rww_damage() { return max(uDamage, vInstanceDamage); }
+         // Noise, projection and wear come from the shared surface library, so a
+         // hull scratch and a terrain crack are built from the same vocabulary.
+         // The former hs_hash and hs_noise are rww_hash31 and rww_vnoise3, moved
+         // verbatim. See src/render/materials/surface.glsl.ts.
+         ${SURFACE_GLSL}
+
+         /**
+          * Height field for hull surface relief: recessed panel channels plus a
+          * fine cast grain. Sampled four times per fragment to build a gradient,
+          * so it is deliberately cheap.
+          *
+          * Two panel scales, matching the terrain's structural-bay and deck-plate
+          * pair, so a mech standing on the deck shares its surface rhythm.
+          */
+         float rww_hullSurfaceField(vec3 position, vec3 objectNormal) {
+           // Frequencies are deliberately low. A first pass used a 1.15 plate scale
+           // and 5.5 grain, which put features around 0.2 m on a mech roughly 100
+           // pixels tall at tactical zoom: sub-pixel, so it aliased into speckle and
+           // read as crust rather than as machining. docs/art-direction.md section 7
+           // is explicit that at RTS zoom the player sees shapes, not normal maps.
+           // At these scales a bay band is about 2.9 m and a plate about 1.4 m, so
+           // both survive to screen.
+           float bay = rww_triplanarPanels(position, objectNormal, 0.34, 0.030, 4.0);
+           float plate = rww_triplanarPanels(position, objectNormal, 0.70, 0.040, 4.0);
+           float grain = rww_triplanarFbm(position, objectNormal, 2.0, 2, 4.0);
+           return bay * 0.68 + plate * 0.32 + grain * 0.04;
          }`,
       )
       .replace(
@@ -426,19 +1016,46 @@ export function makeHullMaterial(factionColor: number, factionStyle = 0): {
           base = mix(base, base * vec3(0.42, 0.38, 0.36), rww_damage() * 0.75);
         } else {
           // Fine cast-metal grain, plus larger blotches of discoloration.
-          float grain = hs_noise(vObjPos * 26.0);
-          float blotch = hs_noise(vObjPos * 2.4);
+          float grain = rww_vnoise3(vObjPos * 26.0);
+          float blotch = rww_vnoise3(vObjPos * 2.4);
           base *= 0.82 + 0.36 * grain;
 
           // Grime collects on upward faces and streaks down vertical ones.
           float up = clamp(vNormal.y, 0.0, 1.0);
           base = mix(base, base * vec3(0.72, 0.70, 0.66), up * 0.35 * (0.4 + blotch));
-          float streak = hs_noise(vec3(vObjPos.x * 30.0, vObjPos.y * 2.5, vObjPos.z * 30.0));
+          float streak = rww_vnoise3(vec3(vObjPos.x * 30.0, vObjPos.y * 2.5, vObjPos.z * 30.0));
           base *= 1.0 - (1.0 - up) * streak * 0.22;
 
-          // Edge wear: bright bare metal where the chamfers face the light.
-          float wear = smoothstep(0.55, 1.0, grain) * 0.35;
+          // Edge wear, from real convexity rather than from a noise threshold.
+          //
+          // This used to be smoothstep(0.55, 1.0, grain): bare metal wherever the
+          // cast-grain noise happened to peak, which put bright scuffing in the
+          // middle of flat plates and left the chamfers -- the only places a machine
+          // actually rubs -- exactly as painted as everything else.
+          //
+          // aCurvature comes from the weld pass and is positive on convex edges, so
+          // the wear now lands on the chamfers by construction. Broken up by the
+          // grain so it does not read as a uniform outline, and scaled per instance
+          // so a lance of the same class is not a row of clones.
+          float wearAmount = 0.22 + 0.30 * vWear.z;
+          float wear = rww_edgeWear(vWear.x, grain, wearAmount);
           base = mix(base, vec3(0.52, 0.50, 0.47), wear);
+
+          // Grime and shading in the concave half, which is the same field read the
+          // other way. Recesses collect dirt; that is the pairing
+          // docs/procedural-assets.md section 2 calls out.
+          base *= 1.0 - rww_cavityGrime(vWear.x, 0.34 + 0.2 * blotch);
+
+          // Contact occlusion from the weld pass: where a greeble sits on a plate or
+          // a ram runs down a thigh, the crease between them darkens. Curvature
+          // cannot see this, because those surfaces are near each other without
+          // being adjacent.
+          base *= mix(1.0, vWear.y, 0.85);
+
+          // Cavity darkening in the panel channels, from the same field that
+          // drives the normal perturbation, so shading and relief agree.
+          float channel = rww_triplanarPanels(vObjPos, normalize(vObjNormal), 0.34, 0.030, 4.0);
+          base *= 1.0 - channel * 0.26;
           base = mix(base, base * vec3(0.42, 0.38, 0.36), rww_damage() * (0.35 + 0.25 * blotch));
         }
 
@@ -451,34 +1068,85 @@ export function makeHullMaterial(factionColor: number, factionStyle = 0): {
          {
             if (uLowQuality > 0.5) roughnessFactor = 0.68 + rww_damage() * 0.2;
             else {
-              float g = hs_noise(vObjPos * 18.0);
+              float g = rww_vnoise3(vObjPos * 18.0);
               roughnessFactor = clamp(roughness - g * 0.22 + rww_damage() * 0.25, 0.16, 1.0);
             }
             roughnessFactor += max(-uFactionStyle, 0.0) * 0.07 - max(uFactionStyle, 0.0) * 0.05;
            if (vMask > 1.5 && vMask < 2.5) roughnessFactor = 0.9;
          }`,
       )
+      // ---- Panel-line and grain normals -----------------------------------
+      // makeHullMaterial has never injected this slot, so until now a bare hull
+      // face was geometrically flat no matter how close the camera got: all of the
+      // machined character came from albedo alone. docs/procedural-assets.md
+      // section 2 asks for a procedural panel-line normal and AO pattern applied
+      // triplanar, which is what this is.
+      //
+      // The perturbation is built in object space and rotated into view space at
+      // the end, rather than working in tangent space. Generated hull geometry has
+      // no UVs and no tangents, so a tangent-space bump has no frame to live in.
+      .replace(
+        '#include <normal_fragment_maps>',
+        `{
+           if (uLowQuality < 0.5) {
+             vec3 objectNormal2 = normalize(vObjNormal);
+             // Grooves plus fine cast grain in one field, so one gradient serves
+             // both. Panels dominate; grain only breaks up the flats.
+             float e = 0.035;
+             float f0 = rww_hullSurfaceField(vObjPos, objectNormal2);
+             float fx = rww_hullSurfaceField(vObjPos + vec3(e, 0.0, 0.0), objectNormal2);
+             float fy = rww_hullSurfaceField(vObjPos + vec3(0.0, e, 0.0), objectNormal2);
+             float fz = rww_hullSurfaceField(vObjPos + vec3(0.0, 0.0, e), objectNormal2);
+             vec3 gradient = vec3(fx - f0, fy - f0, fz - f0) / e;
+             // Strip the component along the normal: only the tangential part of
+             // the gradient tilts the surface. Without this, flats get a spurious
+             // inflation or deflation.
+             gradient -= objectNormal2 * dot(gradient, objectNormal2);
+             // Resolve the object-space gradient onto the same basis the vertex
+             // stage rotated into view space, then perturb. Doing it this way
+             // avoids needing normalMatrix here, which the fragment prefix does
+             // not declare.
+             vec3 basisT;
+             vec3 basisB;
+             rww_basis(objectNormal2, basisT, basisB);
+             float alongT = dot(gradient, basisT);
+             float alongB = dot(gradient, basisB);
+             vec3 viewGradient = vViewTangent * alongT + vViewBitangent * alongB;
+             if (length(viewGradient) > 1e-5) {
+               normal = normalize(normal - normalize(viewGradient) * 0.22);
+             }
+           }
+         }`,
+      )
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
          {
-           // Faction strips. Pushed well above 1.0 so bloom picks them up --
-           // this is the cheapest way to make a unit read as powered.
+           // Faction strips, pushed above 1.0 so the post stage's bright pass
+           // finds them. This is the cheapest way to make a unit read as powered.
+           //
+           // The multiplier was 5.0 while no bloom pass existed, which was a
+           // reasonable way to fake glow through ACES alone. With real bloom that
+           // value blows the strip cores to white, which costs the faction hue at
+           // exactly the pixels carrying it and swells a halo over the silhouette.
+           // Both violate docs/art-direction.md sections 2 and 7. 2.2 stays clear
+           // of the bright-pass threshold while keeping amber and cyan readable as
+           // amber and cyan.
            float isEm = step(0.5, vMask) * step(vMask, 1.5);
-             float flickerNoise = hs_noise(vObjPos * 9.0 + vec3(vInstancePhase * 13.0, uTime * 2.7, 0.0));
+             float flickerNoise = rww_vnoise3(vObjPos * 9.0 + vec3(vInstancePhase * 13.0, uTime * 2.7, 0.0));
              float flickerPulse = 0.72 + 0.28 * sin(uTime * 17.0 + vInstancePhase * 6.2831853);
              float flicker = uLowQuality > 0.5
                ? 1.0 - rww_damage() * 0.25
                : 1.0 - rww_damage() * 0.48 * step(0.55, flickerNoise) * flickerPulse;
-            totalEmissiveRadiance += uFaction * isEm * uEmissive * 5.0 * flicker;
+            totalEmissiveRadiance += uFaction * isEm * uEmissive * 2.2 * flicker;
             // Exposed internals glow hot as damage rises.
-             float internalGlow = uLowQuality > 0.5 ? 0.18 : step(0.82, hs_noise(vObjPos * 7.0));
+             float internalGlow = uLowQuality > 0.5 ? 0.18 : step(0.82, rww_vnoise3(vObjPos * 7.0));
              totalEmissiveRadiance += vec3(1.0, 0.28, 0.06) * rww_damage() * rww_damage() * 0.24 * internalGlow;
          }`,
       );
   };
 
-  material.customProgramCacheKey = () => 'rww-hull-v2';
+  material.customProgramCacheKey = () => 'rww-hull-v5';
   return { material, uniforms };
 }
 
@@ -543,7 +1211,7 @@ const PROFILES: Record<MechClass, MechProfile> = {
     torso: [0.30, 0.26, 0.30],
     legThick: 0.105,
     hipFrac: 0.5,
-    greebles: 16,
+    greebles: 10,
     shoulderSpan: 0.15,
     barrel: 0.21,
     barrelRadius: 0.024,
@@ -554,7 +1222,7 @@ const PROFILES: Record<MechClass, MechProfile> = {
     torso: [0.24, 0.28, 0.26],
     legThick: 0.080,
     hipFrac: 0.56,
-    greebles: 12,
+    greebles: 8,
     shoulderSpan: 0.10,
     barrel: 0.16,
     barrelRadius: 0.020,
@@ -566,7 +1234,7 @@ const PROFILES: Record<MechClass, MechProfile> = {
     torso: [0.20, 0.26, 0.22],
     legThick: 0.058,
     hipFrac: 0.60,
-    greebles: 7,
+    greebles: 5,
     shoulderSpan: 0.085,
     barrel: 0.17,
     barrelRadius: 0.015,
@@ -577,7 +1245,7 @@ const PROFILES: Record<MechClass, MechProfile> = {
     torso: [0.29, 0.27, 0.27],
     legThick: 0.098,
     hipFrac: 0.48,
-    greebles: 13,
+    greebles: 9,
     shoulderSpan: 0.13,
     barrel: 0.15,
     barrelRadius: 0.021,
@@ -589,7 +1257,7 @@ const PROFILES: Record<MechClass, MechProfile> = {
     torso: [0.36, 0.31, 0.31],
     legThick: 0.125,
     hipFrac: 0.48,
-    greebles: 20,
+    greebles: 12,
     shoulderSpan: 0.19,
     barrel: 0.18,
     barrelRadius: 0.028,
@@ -600,7 +1268,7 @@ const PROFILES: Record<MechClass, MechProfile> = {
     torso: [0.16, 0.32, 0.20],
     legThick: 0.05,
     hipFrac: 0.64,
-    greebles: 5,
+    greebles: 4,
     shoulderSpan: 0.055,
     barrel: 0.25,
     barrelRadius: 0.012,
@@ -627,8 +1295,22 @@ export function buildMech(cls: MechClass, seed: number, style: FactionStyle = 'n
     pos: [0, -H * 0.05, 0],
     bevel: 0.22,
     panels: 1,
+    panelVariation: 0.5,
+    panelSeed: seed + 5,
   });
-  addGreebles(pelvisMb, [pw, H * 0.10, H * 0.16], [0, -H * 0.05, 0], 4, rng);
+  // Waist actuators, one either side, tying the pelvis to the torso above it.
+  for (const side of [-1, 1]) {
+    addRam(
+      pelvisMb,
+      new THREE.Vector3(side * pw * 0.34, -H * 0.03, -H * p.torso[1] * 0.24),
+      new THREE.Vector3(side * pw * 0.28, H * 0.055, -H * p.torso[1] * 0.16),
+      H * 0.013,
+    );
+  }
+  addGreebles(pelvisMb, [pw, H * 0.10, H * 0.16], [0, -H * 0.05, 0], 3, rng, {
+    clusters: [0.5],
+    roundFraction: 0.35,
+  });
 
   // ---- Torso --------------------------------------------------------------
   const torsoMb = new MeshBuilder();
@@ -643,7 +1325,17 @@ export function buildMech(cls: MechClass, seed: number, style: FactionStyle = 'n
     taper: 0.88,
     lean: [0, cls === 'wisp' || cls === 'needle' ? td * 0.10 : 0],
     panels: 2,
+    panelVariation: 0.55,
+    panelSeed: seed + 41,
   });
+  // Conduit run down the back of the torso, over the panel divisions rather than
+  // between them, so it reads as routed on the outside of the armour.
+  addTube(torsoMb, [
+    new THREE.Vector3(-tw * 0.16, th * 0.62, -td * 0.5),
+    new THREE.Vector3(-tw * 0.2, th * 0.3, -td * 0.54),
+    new THREE.Vector3(-tw * 0.14, -th * 0.02, -td * 0.5),
+  ], Math.min(tw, td) * 0.045, 6, MASK_METAL);
+
   // Chest emissive band -- the strongest faction read on the silhouette.
   addBlock(torsoMb, {
     size: [tw * 0.42, th * 0.14, td * 1.03],
@@ -757,7 +1449,12 @@ export function buildMech(cls: MechClass, seed: number, style: FactionStyle = 'n
       mask: MASK_EMISSIVE,
     });
   }
-  addGreebles(torsoMb, [tw, th, td], [0, 0, 0], p.greebles, rng);
+  // Clustered at the shoulder line and the waist, which is where hardware belongs
+  // on a walker, instead of evenly over the chest plate.
+  addGreebles(torsoMb, [tw, th, td], [0, 0, 0], p.greebles, rng, {
+    clusters: [0.12, 0.78],
+    roundFraction: 0.32,
+  });
 
   // ---- Legs ---------------------------------------------------------------
   const lt = H * p.legThick;
@@ -768,11 +1465,23 @@ export function buildMech(cls: MechClass, seed: number, style: FactionStyle = 'n
     pos: [0, -legUpper, 0],
     bevel: 0.22,
     taper: 0.86,
-    panels: 1,
   });
-  // Hydraulic actuator alongside the thigh.
-  addCylinder(upperMb, lt * 0.18, legUpper * 0.8, [lt * 0.55, -legUpper * 0.9, 0], 6, MASK_METAL);
-  addGreebles(upperMb, [lt, legUpper, lt], [0, -legUpper, 0], 3, rng);
+  // NO INSET CHANNELS ON THE LIMBS. A thigh on an 11 m mech is under a metre
+  // across, so at tactical range a channel in it is sub-pixel: it costs triangles
+  // and returns aliasing, which is the same mistake Task 6 corrected on the hull
+  // shader frequencies. Channels go on the torso and pelvis, where the plate is
+  // broad enough to carry them. The actuator stays, because it changes the
+  // silhouette and a silhouette survives any distance.
+  addRam(
+    upperMb,
+    new THREE.Vector3(lt * 0.52, -legUpper * 0.08, lt * 0.1),
+    new THREE.Vector3(lt * 0.42, -legUpper * 0.86, -lt * 0.1),
+    lt * 0.15,
+  );
+  addGreebles(upperMb, [lt, legUpper, lt], [0, -legUpper, 0], 3, rng, {
+    clusters: [0.06, 0.92],
+    roundFraction: 0.4,
+  });
 
   const lowerMb = new MeshBuilder();
   addBlock(lowerMb, {
@@ -780,7 +1489,6 @@ export function buildMech(cls: MechClass, seed: number, style: FactionStyle = 'n
     pos: [0, -legLower, 0],
     bevel: 0.24,
     taper: 1.14,
-    panels: 1,
   });
   addBlock(lowerMb, {
     size: [lt * 0.3, legLower * 0.5, lt * 0.16],
@@ -788,7 +1496,17 @@ export function buildMech(cls: MechClass, seed: number, style: FactionStyle = 'n
     bevel: 0.3,
     mask: MASK_EMISSIVE,
   });
-  addGreebles(lowerMb, [lt, legLower, lt], [0, -legLower, 0], 2, rng);
+  // Ankle actuator, behind the shin.
+  addRam(
+    lowerMb,
+    new THREE.Vector3(0, -legLower * 0.24, -lt * 0.46),
+    new THREE.Vector3(0, -legLower * 0.94, -lt * 0.3),
+    lt * 0.12,
+  );
+  addGreebles(lowerMb, [lt, legLower, lt], [0, -legLower, 0], 2, rng, {
+    clusters: [0.08, 0.9],
+    roundFraction: 0.45,
+  });
 
   const footMb = new MeshBuilder();
   addBlock(footMb, {

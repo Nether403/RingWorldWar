@@ -1,5 +1,22 @@
 import { expect, test } from 'playwright/test';
 
+/**
+ * Resource budgets for the calibration scene, split by quality tier.
+ *
+ * Low is the frozen path: it renders direct to the default framebuffer and its
+ * numbers must not move. Task 2 of `docs/procedural-graphics-overhaul.md` adds an
+ * HDR colour target and a depth texture on Medium and above, so the higher tiers
+ * get their own entry rather than sharing Low's.
+ */
+const CALIBRATION_BUDGET = {
+  // Frozen: direct to the default framebuffer, no post stage, no extra textures.
+  low: { calls: 60, textures: 4 },
+  // Medium and above add the post stage: an HDR colour target, its depth
+  // texture, five bloom mips, two occlusion buffers, two grade tables, and twelve
+  // passes.
+  high: { calls: 74, textures: 16 },
+} as const;
+
 test('production PBR calibration renders every generated reference without errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
@@ -62,7 +79,32 @@ test('production PBR calibration renders every generated reference without error
   expect(result.referenceParts).toBe(8);
   expect(result.mean).toBeGreaterThan(4);
   expect(result.variance).toBeGreaterThan(20);
-  expect(result.resources.calls).toBeLessThanOrEqual(60);
-  expect(result.resources.textures).toBeLessThanOrEqual(4);
+  expect(result.resources.calls).toBeLessThanOrEqual(CALIBRATION_BUDGET.high.calls);
+  expect(result.resources.textures).toBeLessThanOrEqual(CALIBRATION_BUDGET.high.textures);
+  expect(errors).toEqual([]);
+});
+
+test('the frozen Low calibration path keeps its render budget', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/dev/calibration?quality=low');
+  await page.waitForFunction(() => Boolean((window as unknown as { RWWCalibration?: { ready?: boolean } }).RWWCalibration?.ready));
+
+  const result = await page.evaluate(() => {
+    const calibration = (window as unknown as { RWWCalibration: any }).RWWCalibration;
+    calibration.renderFrame();
+    return {
+      quality: calibration.manifest.quality,
+      resources: {
+        calls: calibration.renderer.gl.info.render.calls,
+        textures: calibration.renderer.gl.info.memory.textures,
+      },
+    };
+  });
+
+  expect(result.quality).toBe('low');
+  expect(result.resources.calls).toBeLessThanOrEqual(CALIBRATION_BUDGET.low.calls);
+  expect(result.resources.textures).toBeLessThanOrEqual(CALIBRATION_BUDGET.low.textures);
   expect(errors).toEqual([]);
 });

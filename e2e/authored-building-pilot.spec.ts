@@ -42,6 +42,13 @@ test('loads the bounded authored-building pilot without touching simulation stat
     return { initial, ultra, restored };
   });
 
+  // The flat-albedo contract this used to assert is gone. It pinned
+  // materialColors to a single '#927456', which was exactly the forced sandstone
+  // that made these models read as untextured clay beside the procedural
+  // structures. They now wear the shared procedural habitation material, whose
+  // base colour is white because the shader supplies the tint, so the meaningful
+  // assertions are the catalogue, the placements, and the non-metallic masonry
+  // response. See Task 7 in docs/procedural-graphics-overhaul.md.
   expect(result.initial.authoredBuildings).toEqual({
     loaded: true,
     assetIds: [
@@ -50,20 +57,35 @@ test('loads the bounded authored-building pilot without touching simulation stat
       'settlement-large-broad-a',
       'settlement-large-narrow-a',
       'settlement-large-square-a',
+      'settlement-small-a',
+      'settlement-dual-a',
+      'settlement-dual-small-a',
+      'settlement-cluster-small-a',
+      'settlement-cluster-tower-a',
     ],
     placementIds: [
       'compact-pilot-tower',
       'compact-pilot-square',
       'compact-pilot-broad',
+      'compact-pilot-small',
+      'compact-pilot-dual',
+      'compact-pilot-cluster',
       'choir-pilot-large',
       'choir-pilot-narrow',
+      'choir-pilot-dual-small',
+      'choir-pilot-cluster-tower',
     ],
-    meshCount: 5,
-    materialColors: ['#927456'],
-    minRoughness: 0.9,
+    meshCount: expect.any(Number),
+    materialColors: ['#ffffff'],
+    minRoughness: expect.any(Number),
     maxMetalness: expect.any(Number),
   });
+  // Masonry and plaster: rough and non-metallic. Still asserted, because it is a
+  // real property of the surface rather than a symptom of the flat treatment.
+  expect(result.initial.authoredBuildings.minRoughness).toBeGreaterThanOrEqual(0.8);
   expect(result.initial.authoredBuildings.maxMetalness).toBeLessThanOrEqual(0.08);
+  // One mesh per placement at minimum; some catalogue entries are multi-part.
+  expect(result.initial.authoredBuildings.meshCount).toBeGreaterThanOrEqual(10);
   expect(result.ultra.authoredBuildings).toEqual(result.initial.authoredBuildings);
   expect(result.restored.authoredBuildings).toEqual(result.initial.authoredBuildings);
   expect(result.restored.worldHash).toBe(result.initial.worldHash);

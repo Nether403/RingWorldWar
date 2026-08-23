@@ -70,3 +70,33 @@ The visual command reports `baseline-created` because `signature-lance.json` doe
 ## Post-UX Confirmation
 
 The requested 5-second `heavy-combat` rerun passed the same `720p-low-hard-candidate` gate: 16.7 ms median, 33.3 ms p95, 39.542 ms p99, one frame over 100 ms, 63 draw calls, 114,736 triangles, no context losses, and no black frame. The tracked report is `validation/evidence/t480s-heavy-combat-5s.json`; its ignored source receipt remains reproducible from the command recorded there.
+
+## Post-Processing Omissions On Low
+
+Added by the procedural graphics overhaul, `docs/procedural-graphics-overhaul.md`
+Phase 1. Low renders direct to the default framebuffer and has no full-screen
+pass, so every item below is unavailable to it by construction rather than by
+preference. Medium and above route through the owned post stage.
+
+Low omits: bloom, depth-derived ambient occlusion, day/night colour grading,
+vignette, and film grain.
+
+Colour grading is the one that departs from `docs/art-direction.md` section 5,
+which states Low should keep grading even when it drops other post items. Keeping
+it would require adding a full-screen pass and at least one texture to the frozen
+path, which would break the measured budget this document exists to protect. The
+tradeoff was taken deliberately in favour of the frame-time gate.
+
+Two changes from the same phase do reach Low, because they live in shared code
+rather than in the post stage, and both are free:
+
+- faction emissive strips were retuned from 5.0 to 2.2, which stopped them
+  clipping to white and measurably improved faction readability on Low
+  (mech chromatic pixel fraction rose from 0.00126 to 0.00248, structures from
+  0.00232 to 0.00601);
+- the key light's `shadow.normalBias` fell from 0.9 to 0.05 and its cascade
+  tightened from plus or minus 700 m to plus or minus 500 m, which moves contact
+  shadows back to where geometry meets ground.
+
+Low's draw calls, triangle counts, texture count of 2, and program counts are
+unchanged by all of the above.

@@ -14,6 +14,7 @@ import { Environment } from '@render/environment';
 import { InputController } from '@render/input';
 import { BASE_EXPOSURE, QUALITY, Renderer, type QualityLevel } from '@render/renderer';
 import { Settings } from '@render/settings';
+import { applyTerrainQuality } from '@render/materials/terrainMaterial';
 import { RingMesh } from '@render/ringMesh';
 import { BattlefieldDressing } from '@render/battlefieldDressing';
 import { AuthoredBuildingPilot } from '@render/authoredBuildingPilot';
@@ -303,7 +304,7 @@ async function startSession(
       environment.keyLight.shadow.map?.dispose();
       environment.keyLight.shadow.map = null;
     }
-    ringMesh.uniforms.uDetailFade.value = quality.detailFade;
+    applyTerrainQuality(ringMesh.uniforms, quality);
     ringMesh.setQuality(renderer.quality);
     game.effects.setParticleCap(quality.particleCap);
     game.effects.setLightCap(quality.effectLightCap);
@@ -335,7 +336,7 @@ async function startSession(
   // of air at more world, so haze does most of the depth cueing.
   const fog = new THREE.FogExp2(environment.fogColor.getHex(), environment.fogDensity);
   renderer.scene.fog = fog;
-  ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
+  applyTerrainQuality(ringMesh.uniforms, renderer.currentSettings);
 
   await boot.step(0.94, 'prewarming combat shaders');
   const prewarmViews = async (asyncCompile = true): Promise<number> => {
@@ -443,11 +444,15 @@ async function startSession(
     ringMesh.uniforms.uTime.value = visualTime;
     ringMesh.uniforms.uPanelPhase.value = environment.cycle.filamentAngle;
     ringMesh.uniforms.uAmbientTint.value.copy(environment.cycle.hazeColor);
-    ringMesh.uniforms.uDetailFade.value = renderer.currentSettings.detailFade;
+    applyTerrainQuality(ringMesh.uniforms, renderer.currentSettings);
     fog.color.copy(environment.fogColor);
     fog.density = environment.fogDensity;
     (renderer.scene.background as THREE.Color).copy(environment.spaceColor);
 
+    // Grade follows the shadow-square cycle, so the terminator sweeping across the
+    // map shifts the whole image's colour rather than only its brightness.
+    renderer.setGrade(1 - environment.cycle.daylight, game.world.time);
+    authoredBuildings.setNightGlow(1 - environment.cycle.daylight);
     renderer.gl.toneMappingExposure = BASE_EXPOSURE + Math.min(0.38, game.effects.flash * 0.22);
     renderer.render(dt);
     overlay.update(dt, renderer, game, rig, cameraController, environment);
@@ -519,6 +524,7 @@ async function startSession(
     loopStopped = true;
     cancelAnimationFrame(animationFrame);
     environment.handleContextLoss();
+    renderer.handleContextLoss();
     input.setEnabled(false);
     showRecovery();
     clearRecoveryTimer();
@@ -632,7 +638,7 @@ async function startSession(
           renderer.gl.shadowMap.enabled = false;
           environment.keyLight.castShadow = false;
         } else if (variant === 'low-terrain') {
-          ringMesh.uniforms.uDetailFade.value = QUALITY.low.detailFade;
+          applyTerrainQuality(ringMesh.uniforms, QUALITY.low);
           ringMesh.setQuality('low');
         } else if (variant === 'no-terrain-shadows') {
           ringMesh.mesh.receiveShadow = false;
