@@ -23,13 +23,53 @@
 
 import * as THREE from 'three';
 import { RING_HALF_WIDTH, RING_RADIUS, SHADOW_SQUARE_COUNT } from '@core/constants';
+import { SURFACE_NOISE_GLSL } from './surface.glsl';
 
 export interface TerrainUniforms {
   uTime: { value: number };
   uPanelPhase: { value: number };
   uPanelSpan: { value: number };
   uAmbientTint: { value: THREE.Color };
+  /** Detail-normal strength, faded out with distance. */
   uDetailFade: { value: number };
+  /**
+   * Per-feature tier controls.
+   *
+   * One uniform per feature rather than more meanings piled onto `uDetailFade`,
+   * so that what a tier turns off is legible at the call site instead of encoded
+   * in a single number. All of them are branched on in uniform control flow: every
+   * fragment of a draw takes the same path, so the GPU genuinely skips the work
+   * rather than executing both sides and discarding one.
+   */
+  uFineOctaves: { value: number };
+  uTriplanarRim: { value: number };
+  uDustDrift: { value: number };
+  uMicroDetail: { value: number };
+}
+
+/** The subset of a quality tier that the terrain material cares about. */
+export interface TerrainQuality {
+  detailFade: number;
+  terrainFineOctaves: number;
+  terrainTriplanarRim: boolean;
+  terrainDustDrift: number;
+  terrainMicroDetail: number;
+}
+
+/**
+ * Push a quality tier into the terrain uniforms.
+ *
+ * One function rather than five assignments at each of the four call sites that
+ * change tier, so a new terrain feature is wired once and cannot be missed at one
+ * of them. Structurally typed rather than importing `QualitySettings`, to keep the
+ * material from depending on the renderer.
+ */
+export function applyTerrainQuality(uniforms: TerrainUniforms, quality: TerrainQuality): void {
+  uniforms.uDetailFade.value = quality.detailFade;
+  uniforms.uFineOctaves.value = quality.terrainFineOctaves;
+  uniforms.uTriplanarRim.value = quality.terrainTriplanarRim ? 1 : 0;
+  uniforms.uDustDrift.value = quality.terrainDustDrift;
+  uniforms.uMicroDetail.value = quality.terrainMicroDetail;
 }
 
 export function makeLowTerrainMaterial(uniforms: TerrainUniforms): THREE.ShaderMaterial {
@@ -114,68 +154,12 @@ export function makeLowTerrainMaterial(uniforms: TerrainUniforms): THREE.ShaderM
   });
 }
 
-/** Shared GLSL: cheap value noise. Simplex is nicer but this is 3x faster and
- *  at these frequencies the difference is invisible under a PBR response. */
-const NOISE_GLSL = /* glsl */ `
-  float rww_hash21(vec2 p) {
-    p = fract(p * vec2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return fract(p.x * p.y);
-  }
-  float rww_vnoise(vec2 p) {
-    vec2 i = floor(p), f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    float a = rww_hash21(i);
-    float b = rww_hash21(i + vec2(1.0, 0.0));
-    float c = rww_hash21(i + vec2(0.0, 1.0));
-    float d = rww_hash21(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-  }
-  float rww_fbm(vec2 p, int oct) {
-    float s = 0.0, a = 0.5, n = 0.0;
-    for (int i = 0; i < 6; i++) {
-      if (i >= oct) break;
-      s += a * rww_vnoise(p);
-      n += a;
-      p *= 2.03;
-      a *= 0.5;
-    }
-    return s / max(n, 1e-4);
-  }
-  // Worley-ish cell borders, used for cracked plating.
-  float rww_cells(vec2 p) {
-    vec2 i = floor(p), f = fract(p);
-    float f1 = 8.0, f2 = 8.0;
-    for (int y = -1; y <= 1; y++) {
-      for (int x = -1; x <= 1; x++) {
-        vec2 g = vec2(float(x), float(y));
-        vec2 o = vec2(rww_hash21(i + g), rww_hash21(i + g + 17.3));
-        float d = length(g + o - f);
-        if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) { f2 = d; }
-      }
-    }
-    return f2 - f1;
-  }
-  // Distance to the nearest line of a grid, in cell units.
-  float rww_grid(vec2 p, float width) {
-    vec2 g = abs(fract(p) - 0.5);
-    float d = 0.5 - max(g.x, g.y);
-    return 1.0 - smoothstep(0.0, width, d);
-  }
-  /**
-   * Height-based blend. Given two layers with weights and heights, pick the one
-   * that "stands proud". This is what gives splat transitions a real edge.
-   */
-  float rww_hblend(float wa, float ha, float wb, float hb, float sharpness) {
-    float a = wa + ha * sharpness;
-    float b = wb + hb * sharpness;
-    float m = max(a, b) - 0.12;
-    float ca = max(a - m, 0.0);
-    float cb = max(b - m, 0.0);
-    return cb / max(ca + cb, 1e-5);
-  }
-`;
-
+/**
+ * Noise and blending now come from the shared surface library so that a terrain
+ * crack and a hull scratch are built from the same vocabulary. The bodies moved
+ * verbatim; see src/render/materials/surface.glsl.ts.
+ */
+const NOISE_GLSL = SURFACE_NOISE_GLSL;
 export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
   material: THREE.MeshStandardMaterial;
   uniforms: TerrainUniforms;
@@ -186,6 +170,10 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
     uPanelSpan: { value: 0.19 },
     uAmbientTint: { value: new THREE.Color('#8ea6bd') },
     uDetailFade: { value: 1 },
+    uFineOctaves: { value: 3 },
+    uTriplanarRim: { value: 1 },
+    uDustDrift: { value: 1 },
+    uMicroDetail: { value: 0 },
   };
 
   const material = new THREE.MeshStandardMaterial({
@@ -208,12 +196,21 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         /* glsl */ `
         #include <common>
         attribute vec2 aSurface;
+        // Baked by buildRingGeometry from terrain's own fields. See Task 9.
+        attribute vec4 aSplat;
+        attribute float aCurvature;
+        attribute float aAO;
         varying vec2 vSurface;
         varying float vHeight;
         varying float vTheta;
         varying vec3 vLocalUp;
         varying vec3 vLocalAxial;
         varying vec3 vViewPos;
+        varying vec4 vSplat;
+        varying float vCurvature;
+        varying float vAO;
+        varying vec2 vRegion;
+        ${NOISE_GLSL}
         `,
       )
       .replace(
@@ -229,6 +226,22 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         vLocalUp = normalize(normalMatrix * normalize(vec3(-fromAxis, 0.0)));
         vLocalAxial = normalize(normalMatrix * vec3(0.0, 0.0, 1.0));
         vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
+
+        vSplat = aSplat;
+        vCurvature = aCurvature;
+        vAO = aAO;
+
+        // District character, evaluated PER VERTEX rather than per pixel.
+        //
+        // These two fields have periods of about 2.4 km and 3.2 km. Vertices are
+        // 22 m apart, so interpolating them across a triangle is exact to well
+        // inside a colour step, and it moves six fbm octaves off a shader that
+        // runs on most of the screen onto one that runs 165k times. This is the
+        // cheapest six octaves in the file to give up.
+        vRegion = vec2(
+          rww_fbm(aSurface * 0.00042 + 3.1, 3),
+          rww_fbm(aSurface * 0.00031 + 71.9, 3)
+        );
         `,
       );
 
@@ -245,12 +258,20 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         uniform float uHalfWidth;
         uniform vec3 uAmbientTint;
         uniform float uDetailFade;
+        uniform int uFineOctaves;
+        uniform float uTriplanarRim;
+        uniform float uDustDrift;
+        uniform float uMicroDetail;
         varying vec2 vSurface;
         varying float vHeight;
         varying float vTheta;
         varying vec3 vLocalUp;
         varying vec3 vLocalAxial;
         varying vec3 vViewPos;
+        varying vec4 vSplat;
+        varying float vCurvature;
+        varying float vAO;
+        varying vec2 vRegion;
         ${NOISE_GLSL}
 
         // Fraction of direct light reaching this point past the shadow squares.
@@ -259,6 +280,31 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
           float d = min(rel, uPanelSpacing - rel);
           float occ = 1.0 - smoothstep(uPanelSpan * 0.5, uPanelSpan, d);
           return 1.0 - occ * 0.72;
+        }
+
+        /**
+         * Projection weights in the RING's own frame: up, axial, spinward.
+         *
+         * This is the fix for the stretched rim walls that Task 6 deferred. A
+         * near-vertical wall textured from (arc length, axial) alone gets the
+         * floor projection smeared up its face, because the face barely moves in
+         * those two coordinates while climbing 260 m.
+         *
+         * WHY NOT THE SHARED rww_triplanarWeights ON OBJECT-SPACE POSITION: on a
+         * ring, object space is not aligned with local up. At theta = 0 up is +y
+         * and at theta = 90 degrees up is +x, so a world-axis triplanar would
+         * hand the three projections different roles depending on where you stand,
+         * and the wall material would change character around the circumference.
+         * The ring frame does not have that problem, and it reduces to blending
+         * three 2D projections that all use coordinates already to hand:
+         * (arc, axial) for the floor, (arc, height) and (axial, height) for walls.
+         */
+        vec3 rww_ringProjection(vec3 nrm, vec3 localUp, vec3 localAxial, float sharpness) {
+          float up = abs(dot(nrm, localUp));
+          float axial = abs(dot(nrm, localAxial));
+          float spinward = sqrt(max(0.0, 1.0 - up * up - axial * axial));
+          vec3 w = pow(vec3(up, axial, spinward), vec3(sharpness));
+          return w / max(w.x + w.y + w.z, 1e-5);
         }
         `,
       )
@@ -269,37 +315,45 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         vec2 su = vSurface;
 
         // Slope: how far the surface normal has tipped away from local up.
-        float slope = 1.0 - clamp(dot(normalize(vNormal), normalize(vLocalUp)), 0.0, 1.0);
-        float rimT = smoothstep(0.80, 0.97, abs(su.y) / uHalfWidth);
+        vec3 rwwUp = normalize(vLocalUp);
+        vec3 rwwNormal = normalize(vNormal);
+        float slope = 1.0 - clamp(dot(rwwNormal, rwwUp), 0.0, 1.0);
 
-         // --- Per-layer detail heights -------------------------------------
-        float nBig    = rww_fbm(su * 0.0026, 4);
-        float nMid    = rww_fbm(su * 0.021, 4);
-        float nFine   = rww_fbm(su * 0.15, 3);
-        float nGrit   = rww_vnoise(su * 1.1);
+        // --- Where each material goes: decided by the terrain, not by noise ---
+        //
+        // This is the change the whole terrain half of the overhaul was for. What
+        // used to happen here was that the shader invented its own regions from
+        // noise fields -- nBig, deckRegion, regA, regB -- that had nothing to do
+        // with the landform being drawn. Dust could sit on a ridge crest; bared
+        // deck could appear on a slope no water had ever run down. Material never
+        // corresponded to shape because nothing connected the two.
+        //
+        // Terrain now answers the question itself, from erosion: dust where
+        // sediment settled and the grade is gentle, rock where it is steep or flow
+        // has stripped the cover, bared deck in the channels carrying the most
+        // water, and the rim wall where the containment structure is. The weights
+        // are a partition of unity, so they blend directly.
+        vec4 rwwSplat = clamp(vSplat, 0.0, 1.0);
+
+        // --- Per-pixel detail, and only what genuinely has to be per-pixel ----
+        // Everything with a period longer than a couple of vertex spacings is
+        // either baked or interpolated now.
+        float nMid  = rww_fbm(su * 0.021, 3);
+        float nFine = rww_fbm(su * 0.15, uFineOctaves);
+        float nGrit = rww_vnoise(su * 1.1);
+
         // Large structural plates, not mud cracks. Small cells here read as a
-        // dried-lakebed texture stretched over the whole world, which is the
-        // most common way procedural ground gives itself away.
-        float cracks  = rww_cells(su * 0.0075);
+        // dried-lakebed texture stretched over the whole world, which is the most
+        // common way procedural ground gives itself away.
+        //
+        // Skipped outright where no deck is exposed. Worley is the most expensive
+        // single field in this shader and most of the ring is under regolith.
+        float cracks = 1.0;
+        if (rwwSplat.z > 0.015) cracks = rww_cells(su * 0.0075);
 
         float hDust  = nMid * 0.6 + nFine * 0.4;
         float hRock  = nFine * 0.7 + nGrit * 0.3;
         float hPlate = 1.0 - smoothstep(0.04, 0.30, cracks);
-
-        // --- Layer weights --------------------------------------------------
-        // Dust collects on flats; rock shows on slopes; the megastructure deck
-        // shows through where the regolith has been scoured away.
-        float wDust  = (1.0 - slope * 2.4) * (0.55 + nBig * 0.9);
-        float wRock  = slope * 2.2 + nBig * 0.35;
-        // Exposed deck is a regional feature, not a global one. Gated hard so
-        // the cell pattern appears in a few scoured districts instead of
-        // tiling the entire 22 km of world, which is what makes procedural
-        // ground look procedural.
-        float deckRegion = smoothstep(0.60, 0.80, rww_fbm(su * 0.00036 + 41.3, 3));
-        float wPlate = smoothstep(0.70, 0.97, nBig) * (1.0 - slope * 1.6) * deckRegion;
-        wDust  = max(wDust, 0.0);
-        wRock  = max(wRock, 0.0);
-        wPlate = max(wPlate, 0.0);
 
         // --- Palette --------------------------------------------------------
         vec3 cDust  = mix(vec3(0.212, 0.190, 0.152), vec3(0.303, 0.272, 0.216), nFine);
@@ -309,30 +363,66 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
 
         // Oxidised copper staining in the low, damp places. A single warm hue
         // against all this grey is what keeps the palette from going dead.
-        float ox = smoothstep(0.55, 0.95, rww_fbm(su * 0.0075 + 13.7, 3)) * (1.0 - slope * 1.4);
-        cDust = mix(cDust, vec3(0.212, 0.117, 0.062), ox * 0.6);
+        //
+        // Driven by curvature and dust cover instead of its own noise field:
+        // positive curvature is a bowl, and dust cover means sediment settled
+        // there, so the two together are exactly "low and damp". Cheaper than the
+        // three octaves it replaces, and it lands where the landform says it
+        // should rather than wherever an unrelated field happened to peak.
+        float damp = clamp(vCurvature * 1.7, 0.0, 1.0) * rwwSplat.x;
+        cDust = mix(cDust, vec3(0.212, 0.117, 0.062), damp * 0.55);
 
-        // Blend by height, not by alpha.
-        float m1 = rww_hblend(wDust, hDust, wRock, hRock, 0.9);
+        // Blend by height, not by alpha. Height blending is what gives transitions
+        // interlocking, gritty edges instead of soft gradients.
+        float m1 = rww_hblend(rwwSplat.x, hDust, rwwSplat.y, hRock, 0.9);
         vec3 albedo = mix(cDust, cRock, m1);
-        float m2 = rww_hblend(1.0 - wPlate, 0.5, wPlate, hPlate, 0.8) * deckRegion;
-        albedo = mix(albedo, cPlate, m2 * 0.7);
-        albedo = mix(albedo, cRim, rimT);
+        float m2 = rww_hblend(rwwSplat.x + rwwSplat.y, 0.5, rwwSplat.z, hPlate, 0.8);
+        albedo = mix(albedo, cPlate, m2 * 0.8);
+
+        // --- Rim walls, in the ring's own projection --------------------------
+        if (uTriplanarRim > 0.5 && rwwSplat.w > 0.015) {
+          vec3 w = rww_ringProjection(rwwNormal, rwwUp, normalize(vLocalAxial), 4.0);
+          // Floor projection is the one already in hand; the two wall projections
+          // swap an in-plane axis for height, which is what stops the material
+          // being smeared vertically up a 260 m face.
+          float wallScale = 0.055;
+          float grain =
+              rww_fbm(su * wallScale, 3) * w.x
+            + rww_fbm(vec2(su.x, vHeight) * wallScale, 3) * w.y
+            + rww_fbm(vec2(su.y, vHeight) * wallScale, 3) * w.z;
+          float seams =
+              rww_grid(su / 18.0, 0.02) * w.x
+            + rww_grid(vec2(su.x, vHeight) / 18.0, 0.02) * w.y
+            + rww_grid(vec2(su.y, vHeight) / 18.0, 0.02) * w.z;
+          vec3 cWall = mix(vec3(0.132, 0.131, 0.127), vec3(0.246, 0.238, 0.221), grain);
+          cWall *= 1.0 - seams * 0.34;
+          albedo = mix(albedo, cWall, rwwSplat.w);
+        } else {
+          albedo = mix(albedo, cRim, rwwSplat.w);
+        }
 
         // --- Regional character ---------------------------------------------
-        // Kilometre-scale zones so the ring reads as a place with districts
-        // rather than one tone stretched 22 km. Without this the world is
-        // uniform grey however good the close-up detail is, because at RTS
-        // range only the large scales survive.
-        float regA = rww_fbm(su * 0.00042 + 3.1, 3);
-        float regB = rww_fbm(su * 0.00031 + 71.9, 3);
-        // Pale ash flats.
+        // Kilometre-scale zones so the ring reads as a place with districts rather
+        // than one tone stretched 22 km. Without this the world is uniform grey
+        // however good the close-up detail is, because at RTS range only the large
+        // scales survive. Interpolated from the vertex stage now.
+        float regA = vRegion.x;
+        float regB = vRegion.y;
         albedo = mix(albedo, albedo * vec3(1.34, 1.28, 1.15), smoothstep(0.56, 0.86, regA));
-        // Dark burnt scrith.
         albedo = mix(albedo, albedo * vec3(0.55, 0.58, 0.66), smoothstep(0.58, 0.88, regB));
-        // Deep rust belts, where the two overlap.
         float rust = smoothstep(0.62, 0.9, regA * regB * 2.2);
         albedo = mix(albedo, vec3(0.176, 0.088, 0.049), rust * 0.5);
+
+        // --- Strata on exposed rock faces -------------------------------------
+        // vHeight is metres above the ring floor and was plumbed through the vertex
+        // stage without ever being read. Bedding planes are horizontal, so height
+        // is exactly the right coordinate, and it is the cue that makes a steep
+        // face read as cut rock rather than as tilted ground.
+        float strata = rwwSplat.y * smoothstep(0.22, 0.58, slope);
+        if (strata > 0.002) {
+          float layer = 0.5 + 0.5 * sin(vHeight * 0.24 + nMid * 2.4);
+          albedo *= mix(1.0, 0.84 + 0.32 * layer, strata);
+        }
 
         // --- Panel lines ----------------------------------------------------
         // Two scales: structural bays and deck plates. Both darken slightly and
@@ -343,10 +433,24 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         albedo *= 1.0 - lines * 0.30;
 
         // Cavity darkening along the plate joins, only where deck is exposed.
-        albedo *= 1.0 - (1.0 - smoothstep(0.0, 0.05, cracks)) * 0.20 * deckRegion;
+        albedo *= 1.0 - (1.0 - smoothstep(0.0, 0.05, cracks)) * 0.22 * rwwSplat.z;
+
+        // --- Drifting dust ----------------------------------------------------
+        // uTime was bound and never read. This is deliberately near the threshold
+        // of noticing: dust creeping over the ground is a living-world cue, and
+        // anything strong enough to see as motion would read as a bug.
+        if (uDustDrift > 0.0) {
+          float drift = rww_vnoise(su * 0.055 + vec2(uTime * 0.011, uTime * 0.004));
+          albedo = mix(albedo, cDust * 1.07, rwwSplat.x * drift * 0.11 * uDustDrift);
+        }
 
         // Fine grit variation so nothing is ever a flat colour.
         albedo *= 0.90 + 0.20 * nGrit;
+
+        // Micro-grain, Ultra only.
+        if (uMicroDetail > 0.0) {
+          albedo *= 1.0 - uMicroDetail * 0.09 * rww_vnoise(su * 5.3);
+        }
 
         diffuseColor.rgb *= albedo;
         `,
@@ -357,11 +461,13 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         /* glsl */ `
         float roughnessFactor = roughness;
         {
-          float slope2 = 1.0 - clamp(dot(normalize(vNormal), normalize(vLocalUp)), 0.0, 1.0);
-          float nR = rww_fbm(vSurface * 0.045, 3);
-          // Dust is very rough; exposed deck plating is smoother and wetter.
-          float deck = smoothstep(0.62, 0.95, rww_fbm(vSurface * 0.0026, 4));
-          roughnessFactor = mix(0.97, 0.62, deck) - nR * 0.10 + slope2 * 0.05;
+          // Dust is very rough; exposed deck plating is smoother and wetter. The
+          // deck mask is the baked splat channel rather than a fourth evaluation of
+          // the same noise field the albedo used, and the variation term reuses
+          // nMid instead of computing a fresh three-octave fbm at a similar scale.
+          roughnessFactor = mix(0.97, 0.60, rwwSplat.z) - nMid * 0.10 + slope * 0.05;
+          // Rim walls are structure, not sediment: harder and a little polished.
+          roughnessFactor = mix(roughnessFactor, 0.55, rwwSplat.w * 0.6);
           roughnessFactor = clamp(roughnessFactor, 0.28, 1.0);
         }
         `,
@@ -372,9 +478,9 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         /* glsl */ `
         float metalnessFactor = metalness;
         {
-          float deck = smoothstep(0.66, 0.98, rww_fbm(vSurface * 0.0026, 4));
-          float rimT2 = smoothstep(0.80, 0.97, abs(vSurface.y) / uHalfWidth);
-          metalnessFactor = clamp(deck * 0.55 + rimT2 * 0.45, 0.0, 0.85);
+          // Both masks are baked, so this costs two multiplies where it used to
+          // cost a four-octave fbm and a smoothstep over the axial coordinate.
+          metalnessFactor = clamp(rwwSplat.z * 0.55 + rwwSplat.w * 0.45, 0.0, 0.85);
         }
         `,
       )
@@ -390,9 +496,9 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
           float fade = uDetailFade * (1.0 - smoothstep(220.0, 900.0, dist));
           if (fade > 0.001) {
             vec2 e = vec2(0.35, 0.0);
-            float c0 = rww_fbm(vSurface * 0.22, 3) + rww_vnoise(vSurface * 1.6) * 0.35;
-            float cx = rww_fbm((vSurface + e.xy) * 0.22, 3) + rww_vnoise((vSurface + e.xy) * 1.6) * 0.35;
-            float cy = rww_fbm((vSurface + e.yx) * 0.22, 3) + rww_vnoise((vSurface + e.yx) * 1.6) * 0.35;
+            float c0 = rww_fbm(vSurface * 0.22, uFineOctaves) + rww_vnoise(vSurface * 1.6) * 0.35;
+            float cx = rww_fbm((vSurface + e.xy) * 0.22, uFineOctaves) + rww_vnoise((vSurface + e.xy) * 1.6) * 0.35;
+            float cy = rww_fbm((vSurface + e.yx) * 0.22, uFineOctaves) + rww_vnoise((vSurface + e.yx) * 1.6) * 0.35;
             vec3 bump = normalize(vec3((c0 - cx) * 9.0 * fade, 1.0, (c0 - cy) * 9.0 * fade));
             // Rotate the tangent-space bump into the local surface frame.
             vec3 up = normalize(vLocalUp);
@@ -409,19 +515,38 @@ export function makeTerrainMaterial(sharedUniforms?: TerrainUniforms): {
         /* glsl */ `
         #include <lights_fragment_end>
         {
+          // Baked sky occlusion, applied to INDIRECT light only.
+          //
+          // This is the placement Task 4 wanted and could not have. That pass works
+          // from the depth buffer and had to be applied to the composite with a
+          // luminance-protection window, because by then the direct and indirect
+          // terms are already summed and there is nothing left to separate. Here
+          // the occlusion arrives as a vertex attribute inside the lighting model,
+          // while the two terms are still apart, so it can multiply the one it
+          // physically belongs to and leave direct sunlight alone. Sunlit ground
+          // stays sunlit; what darkens is the sky contribution into places that
+          // cannot see much sky.
+          float ao = mix(1.0, clamp(vAO, 0.0, 1.0), 0.9);
+          reflectedLight.indirectDiffuse *= ao;
+          reflectedLight.indirectSpecular *= ao;
+
           float band = rww_shadowBand(vTheta);
           reflectedLight.directDiffuse *= band;
           reflectedLight.directSpecular *= band;
           // A touch of cool bounce fills the shadow so it reads as shade rather
-          // than as a hole in the world.
-          reflectedLight.indirectDiffuse += uAmbientTint * (1.0 - band) * 0.055;
+          // than as a hole in the world. Occluded too: it is sky light, and a
+          // valley floor sees less of the sky than the ridge above it.
+          reflectedLight.indirectDiffuse += uAmbientTint * (1.0 - band) * 0.055 * ao;
         }
         `,
       );
   };
 
   // Changing onBeforeCompile requires a fresh program key.
-  material.customProgramCacheKey = () => 'rww-terrain-v2';
+  // Changing onBeforeCompile requires a fresh program key. Tier differences are
+  // uniform branches inside this one program rather than separate compilations, so
+  // switching quality cannot grow the program set.
+  material.customProgramCacheKey = () => 'rww-terrain-v3';
 
   return { material, uniforms };
 }

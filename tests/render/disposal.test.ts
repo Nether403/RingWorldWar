@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import type { Terrain } from '@gen/terrain';
+import type { SurfaceFields, Terrain } from '@gen/terrain';
 import { EntityRenderer } from '@render/entityRenderer';
 import { Environment } from '@render/environment';
 import { Markers } from '@render/markers';
@@ -102,6 +102,17 @@ function flatTerrain(): Terrain {
       out.y = 1;
       out.z = 0;
       return out;
+    },
+    // The full-detail ring bakes terrain's material, curvature, and occlusion
+    // fields into vertex attributes, so this stub has to answer those too. A
+    // featureless surface is all dust, flat, and fully open to the sky.
+    surfaceFieldsAt: (_s: number, _z: number, out: SurfaceFields) => {
+      out.dust = 1;
+      out.rock = 0;
+      out.deck = 0;
+      out.rim = 0;
+      out.curvature = 0;
+      out.skyView = 1;
     },
   } as unknown as Terrain;
 }

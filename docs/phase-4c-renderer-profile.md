@@ -37,6 +37,38 @@ recovers only about 4.7 ms, while replacing the terrain path recovers about 41 m
 Replacing High/Ultra terrain with the Low material would be a substantial visual
 downgrade, so the diagnostic override is not retained as product behavior.
 
+### Superseded: the terrain cliff was addressed
+
+The numbers above are the measurements that motivated Task 10 of
+`docs/procedural-graphics-overhaul.md`, and the terrain figures no longer describe
+the renderer. The terrain fragment shader used to recompute several
+kilometre-scale noise fields per pixel to decide where each material went; those
+regions are now baked into vertex attributes by the terrain generator, and the
+district fields moved to the vertex stage.
+
+Re-measured with the same isolation method:
+
+| Medium diagnostic | GPU median | Calls | Triangles |
+| --- | ---: | ---: | ---: |
+| Default | 40.170 ms | 122 | 429,656 |
+| Low terrain path, shadows retained | 19.150 ms | 122 | 167,512 |
+| Terrain path attribution | 21.020 ms | | |
+
+The terrain path costs 21.0 to 23.6 ms across two same-session pairs, against
+41.05 ms here: a 43 to 49% reduction.
+
+Two things make the rows above non-comparable to the rows in this section, and only
+the attribution should be compared across them. Medium now routes through the owned
+post stage added in Phase 1, which is ten extra fullscreen passes and lifts the
+low-terrain floor from 8.136 ms to about 19 ms. And Medium, High, and Ultra now
+differ in the terrain shader itself rather than only in pixel ratio and shadow map
+size. Whole-tier medians are 45.103, 54.287, and 58.256 ms, all lower than the
+table above despite carrying the extra passes.
+
+Receipts:
+`validation/evidence/procedural-graphics/t480s-medium-default-task10.json` and
+`t480s-medium-low-terrain-task10.json`.
+
 ## Other Findings
 
 - The timer-query extension is available and now produces non-blocking GPU-time

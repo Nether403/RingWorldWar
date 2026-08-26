@@ -187,13 +187,24 @@ export class Environment {
     this.keyLight.shadow.mapSize.set(2048, 2048);
     this.keyLight.shadow.camera.near = 1;
     this.keyLight.shadow.camera.far = 4000;
-    this.keyLight.shadow.bias = -0.0006;
-    this.keyLight.shadow.normalBias = 0.9;
+    // Shadow bias, retuned in Task 4 of docs/procedural-graphics-overhaul.md.
+    //
+    // `normalBias` offsets the shadow lookup along the surface normal, in world
+    // units. It was 0.9, which is nearly a metre: on a mech seven to twelve metres
+    // tall that pushes the contact point most of a foot-length away from where
+    // geometry actually meets ground, and it is the main reason units read as
+    // hovering. 0.05 is enough to suppress acne at this cascade resolution while
+    // keeping the contact where it belongs.
+    this.keyLight.shadow.bias = -0.00018;
+    this.keyLight.shadow.normalBias = 0.05;
     const sc = this.keyLight.shadow.camera;
-    sc.left = -700;
-    sc.right = 700;
-    sc.top = 700;
-    sc.bottom = -700;
+    // Tightened from 700 to 500. A single cascade has to cover the tactical view,
+    // so this trades far-field shadowing for texel density where the player is
+    // looking: at 2048 the change takes a shadow texel from 0.68 m to 0.49 m.
+    sc.left = -500;
+    sc.right = 500;
+    sc.top = 500;
+    sc.bottom = -500;
     this.group.add(this.keyLight, this.keyLight.target);
 
     // Bounce from the ring's own surfaces. On a ring this is not a cheat --

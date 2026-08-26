@@ -1,0 +1,238 @@
+{
+  "schema": "rww.browser-performance",
+  "version": 1,
+  "status": "diagnostic",
+  "scenario": {
+    "id": "heavy-combat",
+    "revision": 1,
+    "schema": "rww.browser-scenario",
+    "version": 1,
+    "path": "validation/scenarios/heavy-combat.json",
+    "sha256": "fc28d6ea84b4c4c6a5c435514d517d4aedc542e54bb97e882221a58ff2a86025"
+  },
+  "target": {
+    "id": "t480s-low-candidate",
+    "path": "validation/hardware/t480s-low.json",
+    "sha256": "9fb8e1ef5b80d111ee39bde2cae85f779984347cba4461c705a5e7e16b9eea1c",
+    "budget": "720p-medium-characterization"
+  },
+  "scenarioDeclaredQuality": "low",
+  "quality": "medium",
+  "variant": "low-terrain",
+  "viewport": {
+    "width": 1280,
+    "height": 720,
+    "deviceScaleFactor": 1
+  },
+  "warmupSeconds": 3,
+  "sampleSeconds": 5,
+  "metrics": {
+    "samples": 230,
+    "sampleSeconds": 5,
+    "medianFrameMilliseconds": 16.7,
+    "p95FrameMilliseconds": 33.4,
+    "p99FrameMilliseconds": 33.4,
+    "over100MillisecondsCount": 0,
+    "over100MillisecondsPerMinute": 0,
+    "renderMilliseconds": {
+      "median": 5.6,
+      "p95": 7.8,
+      "p99": 9.071
+    },
+    "simulationMilliseconds": {
+      "median": 0.6,
+      "p95": 1.6,
+      "p99": 2.5
+    },
+    "fullFrameMilliseconds": {
+      "median": 9.05,
+      "p95": 11.955,
+      "p99": 17.689
+    },
+    "gpuMilliseconds": {
+      "median": 19.15,
+      "p95": 20.652,
+      "p99": 21.864
+    },
+    "gpuSamples": 230
+  },
+  "cpuPhases": {
+    "presentation": {
+      "median": 2.5,
+      "p95": 4.255,
+      "p99": 5.371
+    },
+    "entities": {
+      "median": 0.7,
+      "p95": 1.8,
+      "p99": 2.571
+    },
+    "effects": {
+      "median": 0.5,
+      "p95": 0.9,
+      "p99": 1.3
+    },
+    "markers": {
+      "median": 0.1,
+      "p95": 0.3,
+      "p99": 0.5
+    },
+    "hud": {
+      "median": 0.9,
+      "p95": 2.055,
+      "p99": 2.471
+    },
+    "hudMinimap": {
+      "median": 0.8,
+      "p95": 1.6,
+      "p99": 2
+    },
+    "hudSelection": {
+      "median": 0,
+      "p95": 0.1,
+      "p99": 0.1
+    }
+  },
+  "uploads": {
+    "supported": true,
+    "bufferDataCalls": 0,
+    "bufferDataBytes": 0,
+    "bufferSubDataCalls": 38448,
+    "bufferSubDataBytes": 290727872,
+    "unknownByteCalls": 0,
+    "totalBytes": 290727872,
+    "measuredFrames": 230,
+    "bytesPerFrame": {
+      "median": 1254048,
+      "p95": 1339040,
+      "p99": 1339040
+    },
+    "bytesPerSecond": 58145574.4
+  },
+  "resources": {
+    "drawCalls": 122,
+    "triangles": 167512,
+    "lines": 3600,
+    "points": 2941,
+    "geometries": 155,
+    "textures": 15,
+    "programs": 82
+  },
+  "gpuTimer": {
+    "supported": true,
+    "samples": 230,
+    "complete": true,
+    "queryStats": {
+      "started": 354,
+      "measuredStarted": 230,
+      "measuredResolved": 230,
+      "measuredSkipped": 0,
+      "measuredDisjoint": 0,
+      "measuredDrainTimeout": 0
+    }
+  },
+  "shaderPrograms": {
+    "startupPrewarm": {
+      "durationMilliseconds": 2748.599999964237,
+      "parallelCompileSupported": true,
+      "programsBefore": 49,
+      "programsAfterForwardWarm": 71,
+      "programsAfterShadowWarm": 75
+    },
+    "benchmarkPrewarm": {
+      "durationMilliseconds": 529.4000000357628,
+      "parallelCompileSupported": true,
+      "programsBefore": 79,
+      "programsAfterForwardWarm": 81,
+      "programsAfterShadowWarm": 82
+    },
+    "startupMissedPrograms": 7,
+    "programsAtStart": 82,
+    "maximumPrograms": 82,
+    "programsAtEnd": 82,
+    "latePrograms": 0
+  },
+  "contextLosses": 0,
+  "blackFrame": false,
+  "invariants": [
+    {
+      "id": "frame-luminance",
+      "actual": 69.193343,
+      "minimum": 4,
+      "status": "pass"
+    },
+    {
+      "id": "frame-variance",
+      "actual": 1158.616739,
+      "minimum": 20,
+      "status": "pass"
+    },
+    {
+      "id": "live-units",
+      "actual": 30,
+      "minimum": 28,
+      "status": "pass"
+    },
+    {
+      "id": "live-structures",
+      "actual": 16,
+      "minimum": 10,
+      "status": "pass"
+    },
+    {
+      "id": "context-losses",
+      "actual": 0,
+      "maximum": 0,
+      "status": "pass"
+    },
+    {
+      "id": "adaptive-quality-disabled",
+      "actual": false,
+      "expected": false,
+      "status": "pass"
+    },
+    {
+      "id": "quality-selected",
+      "actual": "medium",
+      "expected": "medium",
+      "status": "pass"
+    },
+    {
+      "id": "shader-program-growth",
+      "actual": 0,
+      "maximum": 0,
+      "status": "pass"
+    },
+    {
+      "id": "sample-window-complete",
+      "actual": false,
+      "expected": false,
+      "status": "pass"
+    }
+  ],
+  "verdict": {
+    "id": "720p-medium-characterization",
+    "classification": "diagnostic",
+    "status": "diagnostic",
+    "failures": []
+  },
+  "renderer": {
+    "name": "chromium",
+    "version": "151.0.7922.34",
+    "renderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "vendor": "Google Inc. (Intel)",
+    "softwareRenderer": false,
+    "drawingBuffer": {
+      "width": 1280,
+      "height": 720
+    },
+    "devicePixelRatio": 1,
+    "webgl2": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "platform": "Win32"
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "artifactSha256": "9c87f9d83ebc9f542bf984e684257176ee21281800e03bdbdedf73c987993521",
+  "receiptPath": "output/runs/20260823T015357.366Z-34052-e83070ac/receipt.json"
+}

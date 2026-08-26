@@ -32,7 +32,13 @@ describe('Settings', () => {
     expect(QUALITY.high.scarCap).toBeLessThan(QUALITY.ultra.scarCap);
     expect(QUALITY.low.debrisCap).toBeLessThan(QUALITY.ultra.debrisCap);
     expect(QUALITY.low.smokeEmitterCap).toBeLessThan(QUALITY.ultra.smokeEmitterCap);
-    expect(Object.values(QUALITY).every((quality) => quality.postProcessingLevel === 'none')).toBe(true);
+    // Low is the frozen path and renders direct to the default framebuffer.
+    // Medium and above route through the owned post stage. See
+    // docs/procedural-graphics-overhaul.md Task 2.
+    expect(QUALITY.low.postProcessingLevel).toBe('none');
+    expect(QUALITY.medium.postProcessingLevel).toBe('standard');
+    expect(QUALITY.high.postProcessingLevel).toBe('standard');
+    expect(QUALITY.ultra.postProcessingLevel).toBe('standard');
   });
 
   it('round-trips quality and audio volumes through storage', () => {
